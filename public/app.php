@@ -96,6 +96,8 @@ $router->post('/admin/settings/save', fn() => $adminSettings->save(), [AuthMiddl
 $router->get('/professors', fn() => $professorsCtl->index(), [AuthMiddleware::requireRole('admin')]);
 $router->post('/professors/create', fn() => $professorsCtl->create(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('prof_create', 20, 600)]);
 $router->post('/professors/delete', fn() => $professorsCtl->delete(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('prof_delete', 20, 600)]);
+// Actualizar profesores
+$router->post('/professors/update', fn() => $professorsCtl->update(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('prof_update', 20, 600)]);
 
 // Carreras - Curriculum view
 $router->get('/careers', fn() => $careers->index(), [AuthMiddleware::requireRole('admin')]);
@@ -148,6 +150,8 @@ $router->post('/alumnos/store', fn() => $students->store(), [AuthMiddleware::req
 $router->get('/subjects', fn() => (new App\Controllers\SubjectsController($pdo))->index(), [AuthMiddleware::requireRole('admin')]);
 $router->post('/subjects/create', fn() => (new App\Controllers\SubjectsController($pdo))->create(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('subjects_create', 30, 600)]);
 $router->post('/subjects/delete', fn() => (new App\Controllers\SubjectsController($pdo))->delete(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('subjects_delete', 30, 600)]);
+// Actualizar materias
+$router->post('/subjects/update', fn() => (new App\Controllers\SubjectsController($pdo))->update(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('subjects_update', 30, 600)]);
 
 $router->get('/groups', fn() => (new App\Controllers\GroupsController($pdo))->index(), [AuthMiddleware::requireRole('admin')]);
 $router->post('/groups/create', fn() => (new App\Controllers\GroupsController($pdo))->create(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('groups_create', 30, 600)]);

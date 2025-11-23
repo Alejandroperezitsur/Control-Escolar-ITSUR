@@ -24,7 +24,7 @@ class KpiController
     public function admin(): void
     {
         header('Content-Type: application/json');
-        $totalAlumnos = (int)$this->pdo->query('SELECT COUNT(*) FROM alumnos')->fetchColumn();
+        $totalAlumnos = (int)$this->pdo->query('SELECT COUNT(*) FROM alumnos WHERE activo = 1')->fetchColumn();
         $totalProfesores = (int)$this->pdo->query("SELECT COUNT(*) FROM usuarios WHERE rol = 'profesor' AND activo = 1")->fetchColumn();
         if ($totalProfesores === 0) {
             $pwd = password_hash('demo123', PASSWORD_BCRYPT);
@@ -36,8 +36,6 @@ class KpiController
         
         // Check if carreras table exists and has all required columns
         try {
-            $totalCarreras = (int)$this->pdo->query('SELECT COUNT(*) FROM carreras')->fetchColumn();
-            
             // Check if required columns exist
             $columnsCheck = $this->pdo->query("SHOW COLUMNS FROM carreras LIKE 'descripcion'")->fetch();
             
@@ -76,7 +74,16 @@ class KpiController
                     activo = COALESCE(activo, 1)
                 WHERE descripcion IS NULL OR descripcion = ''");
             }
-            
+
+            // Count only active, canonical careers
+            $validClaves = "'ISC','II','IGE','IE','IM','IER','CP'";
+            $q1 = $this->pdo->query("SELECT COUNT(*) FROM carreras WHERE clave IN ($validClaves) AND (activo = 1 OR activo IS NULL)");
+            $totalCarreras = (int)($q1->fetchColumn() ?: 0);
+            if ($totalCarreras === 0) {
+                // Fallback: distinct claves in case activo column is missing
+                $q2 = $this->pdo->query("SELECT COUNT(DISTINCT clave) FROM carreras WHERE clave IN ($validClaves)");
+                $totalCarreras = (int)($q2->fetchColumn() ?: 0);
+            }
         } catch (\PDOException $e) {
             // Table doesn't exist, create it with all columns
             $this->pdo->exec("CREATE TABLE IF NOT EXISTS carreras (
@@ -104,7 +111,7 @@ class KpiController
                 ('Contador Público', 'CP', 'Profesionista capaz de diseñar, implementar y evaluar sistemas de información financiera.', 9, 240)
                 ON DUPLICATE KEY UPDATE nombre=VALUES(nombre)");
             
-            $totalCarreras = (int)$this->pdo->query('SELECT COUNT(*) FROM carreras')->fetchColumn();
+            $totalCarreras = 7;
         }
         
         // Auto-setup curriculum structure (materias_carrera table)
@@ -184,8 +191,30 @@ class KpiController
         } catch (\Exception $e) {
             // Ignore errors
         }
+
+        // Ensure unique indexes exist for data integrity
+        try {
+            $chkIdx = $this->pdo->query("SHOW INDEX FROM materias WHERE Key_name = 'uq_materias_clave'")->fetch();
+            if (!$chkIdx) {
+                $this->pdo->exec("CREATE UNIQUE INDEX uq_materias_clave ON materias (clave)");
+            }
+        } catch (\PDOException $e) { /* duplicates or engine limitations; rely on service-level validation */ }
+
+        try {
+            $chkIdx2 = $this->pdo->query("SHOW INDEX FROM usuarios WHERE Key_name = 'uq_usuarios_email_role'")->fetch();
+            if (!$chkIdx2) {
+                $this->pdo->exec("CREATE UNIQUE INDEX uq_usuarios_email_role ON usuarios (email, rol)");
+            }
+        } catch (\PDOException $e) { /* ignore if incompatible or duplicates exist */ }
+
+        try {
+            $chkIdx3 = $this->pdo->query("SHOW INDEX FROM alumnos WHERE Key_name = 'uq_alumnos_matricula'")->fetch();
+            if (!$chkIdx3) {
+                $this->pdo->exec("CREATE UNIQUE INDEX uq_alumnos_matricula ON alumnos (matricula)");
+            }
+        } catch (\PDOException $e) { /* ignore */ }
         
-        $activosGrupos = $this->groups->count();
+        $activosGrupos = (int)$this->pdo->query("SELECT COUNT(*) FROM grupos g WHERE EXISTS (SELECT 1 FROM calificaciones c WHERE c.grupo_id = g.id)")->fetchColumn();
 
         if ($totalMaterias === 0) {
             $this->pdo->exec("INSERT INTO materias (nombre, clave) VALUES
@@ -208,7 +237,7 @@ class KpiController
                     if (!$sel->fetchColumn()) { $ins->execute([':m'=>(int)$m['id'], ':p'=>$pid, ':n'=>$name, ':c'=>$ciclo]); }
                 }
             }
-            $activosGrupos = $this->groups->count();
+            $activosGrupos = (int)$this->pdo->query("SELECT COUNT(*) FROM grupos g WHERE EXISTS (SELECT 1 FROM calificaciones c WHERE c.grupo_id = g.id)")->fetchColumn();
         }
 
         if ($totalAlumnos === 0) {
@@ -263,6 +292,7 @@ class KpiController
     {
         header('Content-Type: application/json');
         $grupos = $this->groups->activeByTeacher($profesorId);
+        $grupos = array_values(array_filter($grupos, fn($g) => (int)($g['alumnos'] ?? 0) > 0));
         if (!$grupos) {
             $mats = $this->pdo->query('SELECT id, clave FROM materias ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
             if ($mats) {
@@ -276,6 +306,7 @@ class KpiController
                     if (!$sel->fetchColumn()) { $ins->execute([':m'=>(int)$m['id'], ':p'=>$profesorId, ':n'=>$name, ':c'=>$ciclo]); }
                 }
                 $grupos = $this->groups->activeByTeacher($profesorId);
+                $grupos = array_values(array_filter($grupos, fn($g) => (int)($g['alumnos'] ?? 0) > 0));
                 if ($grupos) {
                     $als = $this->pdo->query('SELECT id FROM alumnos WHERE activo = 1 LIMIT 12')->fetchAll(PDO::FETCH_ASSOC);
                     $chk = $this->pdo->prepare('SELECT 1 FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g LIMIT 1');

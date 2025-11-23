@@ -27,7 +27,7 @@ ob_start();
             <div class="form-text">Se requiere tras múltiples intentos fallidos.</div>
           </div>
           <?php endif; ?>
-          <button class="btn btn-primary w-100" type="submit"><i class="fa-solid fa-right-to-bracket me-1"></i> Ingresar</button>
+          <button class="btn btn-login w-100" type="submit"><i class="fa-solid fa-right-to-bracket me-1"></i> Acceder</button>
         </form>
       </div>
     </div>

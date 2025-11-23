@@ -1,49 +1,67 @@
 <?php
-return [
-    'db' => [
-        // Ajustado para XAMPP: root sin contraseña por defecto
-        'host' => '127.0.0.1:3306',
-        'name' => 'control_escolar',
-        'user' => 'root',
-        'pass' => 'root'
-    ],
-    'app' => [
-        'name' => 'Control Escolar',
-    // URL sugerida para acceder con XAMPP (colocar carpeta del proyecto en htdocs)
+return array (
+  'db' => 
+  array (
+    'host' => '127.0.0.1:3306',
+    'name' => 'control_escolar',
+    'user' => 'root',
+    'pass' => 'root',
+  ),
+  'app' => 
+  array (
+    'name' => 'Control Escolar',
     'url' => 'http://localhost/PWBII/Control-Escolar-ITSUR',
-        'timezone' => 'America/Mexico_City',
-        'charset' => 'UTF-8',
-        'debug' => true // Cambiar a false en producción
-    ],
-    'academic' => [
-        // Ventanas administrables de reinscripción (editar aquí según necesidad)
-        'reinscripcion_windows' => [
-            'enero' => [ 'inicio_dia' => 10, 'fin_dia' => 14, 'mes' => 'Enero' ],
-            'agosto' => [ 'inicio_dia' => 10, 'fin_dia' => 14, 'mes' => 'Agosto' ],
-        ],
-        // Estatus mostrado por defecto para alumnos
-        'estatus_alumno_default' => 'Inscrito',
-        // Cupo por grupo por defecto (sin migración de esquema)
-        'cupo_grupo_default' => 30
-    ],
-    'security' => [
-        'session_timeout' => 3600, // 1 hora
-        'csrf_token_name' => 'csrf_token',
-        'upload_max_size' => 5242880, // 5MB
-        'allowed_extensions' => ['jpg', 'jpeg', 'png']
-    ],
-    // Toggles de módulos visibles en el header/nav
-    'modules' => [
-        'dashboard' => true,
-        'alumnos' => true,
-        'profesores' => true,
-        'materias' => true,
-        'grupos' => true,
-        'calificaciones' => true,
-        'kardex' => true,
-        'mi_carga' => true,
-        'reticula' => true,
-        'reinscripcion' => true,
-        'monitoreo_grupos' => true
-    ]
-];
+    'timezone' => 'America/Mexico_City',
+    'charset' => 'UTF-8',
+    'debug' => true,
+  ),
+  'academic' => 
+  array (
+    'reinscripcion_windows' => 
+    array (
+      'enero' => 
+      array (
+        'inicio_dia' => 10,
+        'fin_dia' => 14,
+        'mes' => 'Enero',
+      ),
+      'agosto' => 
+      array (
+        'inicio_dia' => 10,
+        'fin_dia' => 14,
+        'mes' => 'Agosto',
+      ),
+    ),
+    'estatus_alumno_default' => 'Inscrito',
+    'cupo_grupo_default' => 30,
+    'seed_min_groups_per_cycle' => 3,
+    'seed_min_grades_per_group' => 18,
+    'seed_students_pool' => 40,
+  ),
+  'security' => 
+  array (
+    'session_timeout' => 3600,
+    'csrf_token_name' => 'csrf_token',
+    'upload_max_size' => 5242880,
+    'allowed_extensions' => 
+    array (
+      0 => 'jpg',
+      1 => 'jpeg',
+      2 => 'png',
+    ),
+  ),
+  'modules' => 
+  array (
+    'dashboard' => true,
+    'alumnos' => true,
+    'profesores' => true,
+    'materias' => true,
+    'grupos' => true,
+    'calificaciones' => true,
+    'kardex' => true,
+    'mi_carga' => true,
+    'reticula' => true,
+    'reinscripcion' => true,
+    'monitoreo_grupos' => true,
+  ),
+);

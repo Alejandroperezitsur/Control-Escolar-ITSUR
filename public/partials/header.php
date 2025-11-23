@@ -78,18 +78,25 @@ $modules = $config['modules'] ?? [
         <li class="nav-item me-2">
           <button id="theme-toggle" class="btn btn-outline-secondary" type="button" aria-label="Cambiar tema">🌙</button>
         </li>
+        <?php if (!empty($role)): ?>
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
             <i class="bi bi-person-circle"></i>
             <?= htmlspecialchars($userEmail ?? '', ENT_QUOTES, 'UTF-8') ?>
-            <?php if ($role): ?><span class="badge bg-secondary ms-2"><?= htmlspecialchars($role) ?></span><?php endif; ?>
+            <span class="badge bg-secondary ms-2"><?= htmlspecialchars($role) ?></span>
           </a>
           <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
             <li><a class="dropdown-item" href="<?php echo $base; ?>/app.php?r=/dashboard"><i class="bi bi-person"></i> Mi Perfil</a></li>
-            <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item" href="<?php echo $base; ?>/app.php?r=/logout"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a></li>
           </ul>
         </li>
+        <li class="nav-item ms-2">
+          <a class="btn btn-exit" href="<?php echo $base; ?>/app.php?r=/logout"><i class="bi bi-box-arrow-right"></i> Cerrar Sesión</a>
+        </li>
+        <?php else: ?>
+        <li class="nav-item ms-2">
+          <a class="btn btn-login" href="<?php echo $base; ?>/app.php?r=/login"><i class="bi bi-box-arrow-in-right"></i> Acceder</a>
+        </li>
+        <?php endif; ?>
       </ul>
     </div>
   </div>

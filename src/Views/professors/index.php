@@ -6,7 +6,19 @@ $csrf = $_SESSION['csrf_token'] ?? '';
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3>Profesores</h3>
-    <a href="<?php echo $base; ?>/dashboard" class="btn btn-outline-secondary">Volver</a>
+    <div class="d-flex align-items-center gap-2">
+      <form method="get" action="<?php echo $base; ?>/professors" class="d-flex align-items-center">
+        <input type="text" name="q" value="<?= htmlspecialchars((string)($pagination['q'] ?? '')) ?>" class="form-control" placeholder="Buscar por nombre/email" style="max-width:260px">
+        <select name="status" class="form-select ms-2" style="max-width:180px">
+          <?php $status = (string)($pagination['status'] ?? ''); ?>
+          <option value="" <?= $status===''?'selected':'' ?>>Todos</option>
+          <option value="active" <?= $status==='active'?'selected':'' ?>>Activos</option>
+          <option value="inactive" <?= $status==='inactive'?'selected':'' ?>>Inactivos</option>
+        </select>
+        <button class="btn btn-outline-primary ms-2" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+      </form>
+      <a href="<?php echo $base; ?>/dashboard" class="btn btn-outline-secondary">Volver</a>
+    </div>
   </div>
 
   <div class="card mb-4">
@@ -30,7 +42,14 @@ $csrf = $_SESSION['csrf_token'] ?? '';
 
   <div class="table-responsive">
     <table class="table table-striped">
-      <thead><tr><th>ID</th><th>Nombre</th><th>Email</th><th>Activo</th><th class="text-end">Acciones</th></tr></thead>
+      <thead><tr>
+        <?php $sort = (string)($pagination['sort'] ?? 'nombre'); $order = (string)($pagination['order'] ?? 'ASC'); $pg = (int)($pagination['page'] ?? 1); $qv = urlencode((string)($pagination['q'] ?? '')); $sv = urlencode((string)($pagination['status'] ?? '')); $toggle = $order==='ASC'?'DESC':'ASC'; ?>
+        <th><a href="<?php echo $base; ?>/professors?page=<?= $pg ?>&sort=id&order=<?= $sort==='id'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $sv!==''?"&status=$sv":'' ?>">ID<?= $sort==='id' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
+        <th><a href="<?php echo $base; ?>/professors?page=<?= $pg ?>&sort=nombre&order=<?= $sort==='nombre'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $sv!==''?"&status=$sv":'' ?>">Nombre<?= $sort==='nombre' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
+        <th><a href="<?php echo $base; ?>/professors?page=<?= $pg ?>&sort=email&order=<?= $sort==='email'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $sv!==''?"&status=$sv":'' ?>">Email<?= $sort==='email' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
+        <th><a href="<?php echo $base; ?>/professors?page=<?= $pg ?>&sort=activo&order=<?= $sort==='activo'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $sv!==''?"&status=$sv":'' ?>">Activo<?= $sort==='activo' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
+        <th class="text-end">Acciones</th>
+      </tr></thead>
       <tbody>
         <?php foreach ($professors as $p): ?>
         <tr>
@@ -39,6 +58,9 @@ $csrf = $_SESSION['csrf_token'] ?? '';
           <td><?= htmlspecialchars($p['email']) ?></td>
           <td><?= (int)$p['activo'] === 1 ? 'Sí' : 'No' ?></td>
           <td class="text-end">
+            <button class="btn btn-outline-primary btn-sm me-1" data-bs-toggle="modal" data-bs-target="#editProf<?= (int)$p['id'] ?>">
+              <i class="fa-solid fa-pen"></i>
+            </button>
             <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#delModal<?= (int)$p['id'] ?>">
               <i class="fa-solid fa-trash"></i>
             </button>
@@ -60,12 +82,54 @@ $csrf = $_SESSION['csrf_token'] ?? '';
                 </div>
               </div>
             </div>
+            <div class="modal fade" id="editProf<?= (int)$p['id'] ?>" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <div class="modal-header"><h5 class="modal-title">Editar profesor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <form method="post" action="<?php echo $base; ?>/professors/update" class="needs-validation" novalidate>
+                    <div class="modal-body">
+                      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+                      <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                      <div class="mb-2">
+                        <label class="form-label">Nombre</label>
+                        <input class="form-control" name="nombre" value="<?= htmlspecialchars($p['nombre']) ?>" required>
+                        <div class="invalid-feedback">Ingresa el nombre.</div>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label">Email</label>
+                        <input class="form-control" type="email" name="email" value="<?= htmlspecialchars($p['email']) ?>" required>
+                        <div class="invalid-feedback">Ingresa un correo válido.</div>
+                      </div>
+                      <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" name="activo" id="chkActivo<?= (int)$p['id'] ?>" <?= ((int)$p['activo'] === 1) ? 'checked' : '' ?>>
+                        <label class="form-check-label" for="chkActivo<?= (int)$p['id'] ?>">Activo</label>
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                      <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
           </td>
         </tr>
         <?php endforeach; ?>
       </tbody>
     </table>
   </div>
+
+  <nav aria-label="Paginas">
+    <ul class="pagination justify-content-center mt-3">
+      <?php $pg = (int)($pagination['page'] ?? 1); $pages = (int)($pagination['pages'] ?? 1); $qv = urlencode((string)($pagination['q'] ?? '')); $sv = urlencode((string)($pagination['status'] ?? '')); ?>
+      <?php for ($i=1; $i<=$pages; $i++): ?>
+        <li class="page-item <?= $i === $pg ? 'active' : '' ?>"><a class="page-link" href="<?php echo $base; ?>/professors?page=<?= $i ?><?= $qv!==''?"&q=$qv":'' ?><?= $sv!==''?"&status=$sv":'' ?>"><?= $i ?></a></li>
+      <?php endfor; ?>
+    </ul>
+  </nav>
 </div>
 
 <script>

@@ -39,9 +39,9 @@ $base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
           <button id="theme-toggle" class="btn btn-outline-secondary me-2" type="button" aria-label="Cambiar tema">🌙</button>
           <?php if ($role !== 'guest'): ?>
             <span class="navbar-text me-3"><i class="fa-regular fa-user me-1"></i><?php echo htmlspecialchars($name ?: $role); ?></span>
-            <a href="<?php echo $base; ?>/logout" class="btn btn-outline-light">Salir</a>
+            <a href="<?php echo $base; ?>/logout" class="btn btn-exit">Salir</a>
           <?php else: ?>
-            <a href="<?php echo $base; ?>/login" class="btn btn-outline-light">Acceder</a>
+            <a href="<?php echo $base; ?>/login" class="btn btn-login">Acceder</a>
           <?php endif; ?>
         </div>
       </div>

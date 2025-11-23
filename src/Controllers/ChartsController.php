@@ -52,20 +52,28 @@ class ChartsController
     {
         $gid = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : null;
         $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
-        $filters = ['gid' => $gid, 'ciclo' => $ciclo];
+        $mid = isset($_GET['materia_id']) ? (int)$_GET['materia_id'] : null;
+        $estado = isset($_GET['estado']) ? strtolower(trim((string)$_GET['estado'])) : '';
+        $role = $_SESSION['role'] ?? '';
+        $pid = (int)($_SESSION['user_id'] ?? 0);
+        $filters = ['gid' => $gid, 'ciclo' => $ciclo, 'mid' => $mid, 'estado' => $estado, 'pid' => ($role==='profesor'?$pid:null)];
         $key = $this->cacheKey('promedios_ciclo', $filters);
         $cached = $this->getCache($key);
         if ($cached) {
             header('Content-Type: application/json');
             return json_encode(['ok' => true, 'data' => $cached]);
         }
-        $sql = "SELECT g.ciclo, ROUND(AVG(c.final),2) AS promedio
+        $avgExpr = ($estado === 'pendientes') ? 'ROUND(AVG(COALESCE(c.promedio, ROUND((IFNULL(c.parcial1,0)+IFNULL(c.parcial2,0))/2,2))),2) AS promedio' : 'ROUND(AVG(c.final),2) AS promedio';
+        $sql = "SELECT g.ciclo, $avgExpr
                 FROM calificaciones c
                 JOIN grupos g ON g.id = c.grupo_id
-                WHERE c.final IS NOT NULL";
+                WHERE 1=1";
         $params = [];
+        if ($estado === 'pendientes') { $sql .= ' AND c.final IS NULL'; } else { $sql .= ' AND c.final IS NOT NULL'; }
         if ($gid) { $sql .= ' AND g.id = :gid'; $params[':gid'] = $gid; }
         if ($ciclo) { $sql .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
+        if ($mid) { $sql .= ' AND g.materia_id = :mid'; $params[':mid'] = $mid; }
+        if ($role === 'profesor' && $pid > 0) { $sql .= ' AND g.profesor_id = :pid'; $params[':pid'] = $pid; }
         $sql .= ' GROUP BY g.ciclo ORDER BY g.ciclo';
         $stmt = $this->pdo->prepare($sql);
         foreach ($params as $k=>$v) { $stmt->bindValue($k, $v); }
@@ -93,19 +101,24 @@ class ChartsController
         }
         $gid = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : null;
         $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
-        $key = $this->cacheKey('desempeno_grupo', ['pid' => $pid, 'gid' => $gid, 'ciclo' => $ciclo]);
+        $mid = isset($_GET['materia_id']) ? (int)$_GET['materia_id'] : null;
+        $estado = isset($_GET['estado']) ? strtolower(trim((string)$_GET['estado'])) : '';
+        $key = $this->cacheKey('desempeno_grupo', ['pid' => $pid, 'gid' => $gid, 'ciclo' => $ciclo, 'mid' => $mid, 'estado' => $estado]);
         $cached = $this->getCache($key);
         if ($cached) {
             header('Content-Type: application/json');
             return json_encode(['ok' => true, 'data' => $cached]);
         }
-        $sql = "SELECT g.nombre AS grupo, ROUND(AVG(c.final),2) AS promedio
+        $avgExpr = ($estado === 'pendientes') ? 'ROUND(AVG(COALESCE(c.promedio, ROUND((IFNULL(c.parcial1,0)+IFNULL(c.parcial2,0))/2,2))),2)' : 'ROUND(AVG(c.final),2)';
+        $sql = "SELECT g.nombre AS grupo, $avgExpr AS promedio
                 FROM calificaciones c
                 JOIN grupos g ON g.id = c.grupo_id
-                WHERE c.final IS NOT NULL AND g.profesor_id = :pid";
+                WHERE g.profesor_id = :pid";
         $params = [':pid' => $pid];
+        if ($estado === 'pendientes') { $sql .= ' AND c.final IS NULL'; } else { $sql .= ' AND c.final IS NOT NULL'; }
         if ($gid) { $sql .= ' AND g.id = :gid'; $params[':gid'] = $gid; }
         if ($ciclo) { $sql .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
+        if ($mid) { $sql .= ' AND g.materia_id = :mid'; $params[':mid'] = $mid; }
         $sql .= ' GROUP BY g.id, g.nombre ORDER BY g.nombre';
         $stmt = $this->pdo->prepare($sql);
         foreach ($params as $k=>$v) { $stmt->bindValue($k, $v); }
@@ -128,15 +141,19 @@ class ChartsController
         $pid = (int)($_SESSION['user_id'] ?? 0);
         $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
         $gid = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : null;
-        $filters = ['ciclo' => $ciclo, 'gid' => $gid, 'pid' => ($role==='profesor'?$pid:null)];
+        $mid = isset($_GET['materia_id']) ? (int)$_GET['materia_id'] : null;
+        $estado = isset($_GET['estado']) ? strtolower(trim((string)$_GET['estado'])) : '';
+        $filters = ['ciclo' => $ciclo, 'gid' => $gid, 'mid' => $mid, 'estado' => $estado, 'pid' => ($role==='profesor'?$pid:null)];
         $key = $this->cacheKey('reprobados_materia', $filters);
         $cached = $this->getCache($key);
         if ($cached) {
             header('Content-Type: application/json');
             return json_encode(['ok' => true, 'data' => $cached]);
         }
-        $sql = "SELECT m.nombre AS materia,
-                       ROUND(SUM(CASE WHEN c.final IS NOT NULL AND c.final < 70 THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN c.final IS NOT NULL THEN 1 END),0) * 100, 2) AS porcentaje
+        $expr = ($estado === 'pendientes')
+            ? 'ROUND(SUM(CASE WHEN c.final IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0) * 100, 2)'
+            : 'ROUND(SUM(CASE WHEN c.final IS NOT NULL AND c.final < 70 THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN c.final IS NOT NULL THEN 1 END),0) * 100, 2)';
+        $sql = "SELECT m.nombre AS materia, $expr AS porcentaje
                 FROM calificaciones c
                 JOIN grupos g ON g.id = c.grupo_id
                 JOIN materias m ON m.id = g.materia_id
@@ -145,6 +162,7 @@ class ChartsController
         if ($role === 'profesor' && $pid > 0) { $sql .= ' AND g.profesor_id = :pid'; $params[':pid'] = $pid; }
         if ($ciclo) { $sql .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
         if ($gid) { $sql .= ' AND g.id = :gid'; $params[':gid'] = $gid; }
+        if ($mid) { $sql .= ' AND g.materia_id = :mid'; $params[':mid'] = $mid; }
         $sql .= ' GROUP BY m.id, m.nombre ORDER BY m.nombre';
         $stmt = $this->pdo->prepare($sql);
         foreach ($params as $k=>$v) { $stmt->bindValue($k, $v); }

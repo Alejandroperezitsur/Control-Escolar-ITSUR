@@ -103,16 +103,25 @@ fetch('<?php echo $base; ?>/api/kpis/profesor').then(r=>r.json()).then(d=>{
 
 <script>
 fetch('<?php echo $base; ?>/api/kpis/profesor').then(r=>r.json()).then(d=>{
-  const rows = d.grupos || [];
+  const rows = (d.grupos || []).filter(x => Number(x.alumnos || 0) > 0);
   const tbody = document.getElementById('grp-tbody');
+  const formatAvg = v => (v !== null && v !== undefined && !isNaN(Number(v))) ? Number(v).toFixed(2) : '';
   const render = () => {
     const q = document.getElementById('grp-filter').value.toLowerCase();
-    tbody.innerHTML = rows
-      .filter(x => (x.materia||'').toLowerCase().includes(q) || (x.nombre||'').toLowerCase().includes(q))
+    const filtered = rows.filter(x => (x.materia||'').toLowerCase().includes(q) || (x.grupo||'').toLowerCase().includes(q));
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No hay grupos con alumnos</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = filtered
       .map(x => `<tr>
         <td>${x.ciclo ?? ''}</td>
         <td>${x.materia ?? ''}</td>
-        <td>${x.nombre ?? ''}</td>
+        <td>
+          ${x.grupo ?? ''}
+          <span class="badge bg-secondary ms-2">${Number(x.alumnos||0)} alumnos</span>
+          ${x.promedio ? `<span class="badge bg-info ms-1">${formatAvg(x.promedio)}</span>` : ''}
+        </td>
         <td class="text-end">
           <a class="btn btn-outline-success btn-sm" href="<?php echo $base; ?>/grades"><i class="fa-solid fa-pen"></i> Calificar</a>
           <a class="btn btn-outline-primary btn-sm ms-1" href="<?php echo $base; ?>/grades/group?grupo_id=${x.id}"><i class="fa-solid fa-table"></i> Ver calificaciones</a>

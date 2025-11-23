@@ -32,7 +32,7 @@ class GradesController
         $where = 'WHERE c.final IS NULL';
         if ($ciclo) { $where .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
         
-        $sql = "SELECT c.id, c.alumno_id, c.grupo_id, a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, u.nombre AS profesor
+        $sql = "SELECT c.id, c.alumno_id, c.grupo_id, a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, u.nombre AS profesor
                 FROM calificaciones c
                 JOIN alumnos a ON a.id = c.alumno_id
                 JOIN grupos g ON g.id = c.grupo_id
@@ -57,7 +57,7 @@ class GradesController
         $params = [':p' => $pid];
         $where = 'WHERE c.final IS NULL AND g.profesor_id = :p';
         if ($ciclo) { $where .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
-        $sql = "SELECT c.id, a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo
+        $sql = "SELECT c.id, a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo
                 FROM calificaciones c
                 JOIN alumnos a ON a.id = c.alumno_id
                 JOIN grupos g ON g.id = c.grupo_id

@@ -27,6 +27,49 @@ class AdminApiController extends Controller {
         $limit = filter_input(INPUT_GET, 'limit', FILTER_VALIDATE_INT) ?: 10;
         $q = trim(strip_tags((string)filter_input(INPUT_GET, 'q', FILTER_UNSAFE_RAW)));
         switch ($entity) {
+            case 'dedup':
+                $type = trim(strip_tags((string)filter_input(INPUT_GET, 'type', FILTER_UNSAFE_RAW)));
+                $pdo = $this->usuarioModel->getDb();
+                if ($type === 'materias') {
+                    $keysStmt = $pdo->query("SELECT clave, COUNT(*) AS c FROM materias GROUP BY clave HAVING c > 1");
+                    $keys = $keysStmt->fetchAll();
+                    $rows = [];
+                    foreach ($keys as $k) {
+                        $stmt = $pdo->prepare("SELECT * FROM materias WHERE clave = :c ORDER BY id");
+                        $stmt->bindValue(':c', $k['clave']);
+                        $stmt->execute();
+                        $rows[] = ['key' => $k['clave'], 'items' => $stmt->fetchAll()];
+                    }
+                    $pagination = ['page' => 1, 'total_pages' => 1, 'total_items' => count($rows)];
+                    $this->jsonResponse(['success' => true, 'data' => $rows, 'pagination' => $pagination]);
+                } elseif ($type === 'profesores') {
+                    $keysStmt = $pdo->query("SELECT email, COUNT(*) AS c FROM usuarios WHERE rol = 'profesor' AND email IS NOT NULL AND email <> '' GROUP BY email HAVING c > 1");
+                    $keys = $keysStmt->fetchAll();
+                    $rows = [];
+                    foreach ($keys as $k) {
+                        $stmt = $pdo->prepare("SELECT * FROM usuarios WHERE rol = 'profesor' AND email = :e ORDER BY id");
+                        $stmt->bindValue(':e', $k['email']);
+                        $stmt->execute();
+                        $rows[] = ['key' => $k['email'], 'items' => $stmt->fetchAll()];
+                    }
+                    $pagination = ['page' => 1, 'total_pages' => 1, 'total_items' => count($rows)];
+                    $this->jsonResponse(['success' => true, 'data' => $rows, 'pagination' => $pagination]);
+                } elseif ($type === 'alumnos') {
+                    $keysStmt = $pdo->query("SELECT matricula, COUNT(*) AS c FROM alumnos WHERE matricula IS NOT NULL AND matricula <> '' GROUP BY matricula HAVING c > 1");
+                    $keys = $keysStmt->fetchAll();
+                    $rows = [];
+                    foreach ($keys as $k) {
+                        $stmt = $pdo->prepare("SELECT * FROM alumnos WHERE matricula = :m ORDER BY id");
+                        $stmt->bindValue(':m', $k['matricula']);
+                        $stmt->execute();
+                        $rows[] = ['key' => $k['matricula'], 'items' => $stmt->fetchAll()];
+                    }
+                    $pagination = ['page' => 1, 'total_pages' => 1, 'total_items' => count($rows)];
+                    $this->jsonResponse(['success' => true, 'data' => $rows, 'pagination' => $pagination]);
+                } else {
+                    $this->jsonResponse(['success' => true, 'data' => [], 'pagination' => ['page' => 1, 'total_pages' => 1, 'total_items' => 0]]);
+                }
+                return;
             case 'usuarios':
                 $rol = trim(strip_tags((string)filter_input(INPUT_GET, 'rol', FILTER_UNSAFE_RAW)));
                 if ($rol && $q) {
@@ -134,6 +177,107 @@ class AdminApiController extends Controller {
         $this->validateCSRF();
         $ok = false;
         switch ($entity) {
+            case 'dedup':
+                $action = trim(strip_tags((string)filter_input(INPUT_POST, 'action', FILTER_UNSAFE_RAW)));
+                $pdo = $this->usuarioModel->getDb();
+                if ($action === 'merge_materias') {
+                    $clave = trim(strip_tags((string)filter_input(INPUT_POST, 'clave', FILTER_UNSAFE_RAW)));
+                    $primaryId = filter_input(INPUT_POST, 'primary_id', FILTER_VALIDATE_INT);
+                    if ($clave && $primaryId) {
+                        try {
+                            $pdo->beginTransaction();
+                            $idsStmt = $pdo->prepare("SELECT id FROM materias WHERE clave = :c AND id <> :pid");
+                            $idsStmt->bindValue(':c', $clave);
+                            $idsStmt->bindValue(':pid', $primaryId, \PDO::PARAM_INT);
+                            $idsStmt->execute();
+                            $dupIds = array_map(function($r){ return (int)$r['id']; }, $idsStmt->fetchAll());
+                            if (!empty($dupIds)) {
+                                $in = implode(',', array_fill(0, count($dupIds), '?'));
+                                $upd = $pdo->prepare("UPDATE grupos SET materia_id = ? WHERE materia_id IN ($in)");
+                                $upd->bindValue(1, $primaryId, \PDO::PARAM_INT);
+                                $i = 2;
+                                foreach ($dupIds as $id) { $upd->bindValue($i++, $id, \PDO::PARAM_INT); }
+                                $upd->execute();
+                                $del = $pdo->prepare("DELETE FROM materias WHERE id IN ($in)");
+                                $i = 1;
+                                foreach ($dupIds as $id) { $del->bindValue($i++, $id, \PDO::PARAM_INT); }
+                                $del->execute();
+                            }
+                            $pdo->commit();
+                            $this->jsonResponse(['success' => true]);
+                        } catch (\Throwable $e) {
+                            $pdo->rollBack();
+                            $this->jsonResponse(['success' => false, 'error' => 'No se pudo unificar'], 400);
+                        }
+                    }
+                    $this->jsonResponse(['success' => false, 'error' => 'Parámetros inválidos'], 400);
+                } elseif ($action === 'merge_profesores') {
+                    $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
+                    $primaryId = filter_input(INPUT_POST, 'primary_id', FILTER_VALIDATE_INT);
+                    if ($email && $primaryId) {
+                        try {
+                            $pdo->beginTransaction();
+                            $idsStmt = $pdo->prepare("SELECT id FROM usuarios WHERE rol = 'profesor' AND email = :e AND id <> :pid");
+                            $idsStmt->bindValue(':e', $email);
+                            $idsStmt->bindValue(':pid', $primaryId, \PDO::PARAM_INT);
+                            $idsStmt->execute();
+                            $dupIds = array_map(function($r){ return (int)$r['id']; }, $idsStmt->fetchAll());
+                            if (!empty($dupIds)) {
+                                $in = implode(',', array_fill(0, count($dupIds), '?'));
+                                $upd = $pdo->prepare("UPDATE grupos SET profesor_id = ? WHERE profesor_id IN ($in)");
+                                $upd->bindValue(1, $primaryId, \PDO::PARAM_INT);
+                                $i = 2;
+                                foreach ($dupIds as $id) { $upd->bindValue($i++, $id, \PDO::PARAM_INT); }
+                                $upd->execute();
+                                $del = $pdo->prepare("DELETE FROM usuarios WHERE id IN ($in)");
+                                $i = 1;
+                                foreach ($dupIds as $id) { $del->bindValue($i++, $id, \PDO::PARAM_INT); }
+                                $del->execute();
+                            }
+                            $pdo->commit();
+                            $this->jsonResponse(['success' => true]);
+                        } catch (\Throwable $e) {
+                            $pdo->rollBack();
+                            $this->jsonResponse(['success' => false, 'error' => 'No se pudo unificar'], 400);
+                        }
+                    }
+                    $this->jsonResponse(['success' => false, 'error' => 'Parámetros inválidos'], 400);
+                } else {
+                    if ($action === 'merge_alumnos') {
+                        $matricula = trim(strip_tags((string)filter_input(INPUT_POST, 'matricula', FILTER_UNSAFE_RAW)));
+                        $primaryId = filter_input(INPUT_POST, 'primary_id', FILTER_VALIDATE_INT);
+                        if ($matricula && $primaryId) {
+                            try {
+                                $pdo->beginTransaction();
+                                $idsStmt = $pdo->prepare("SELECT id FROM alumnos WHERE matricula = :m AND id <> :pid");
+                                $idsStmt->bindValue(':m', $matricula);
+                                $idsStmt->bindValue(':pid', $primaryId, \PDO::PARAM_INT);
+                                $idsStmt->execute();
+                                $dupIds = array_map(function($r){ return (int)$r['id']; }, $idsStmt->fetchAll());
+                                if (!empty($dupIds)) {
+                                    $in = implode(',', array_fill(0, count($dupIds), '?'));
+                                    $upd = $pdo->prepare("UPDATE calificaciones SET alumno_id = ? WHERE alumno_id IN ($in)");
+                                    $upd->bindValue(1, $primaryId, \PDO::PARAM_INT);
+                                    $i = 2;
+                                    foreach ($dupIds as $id) { $upd->bindValue($i++, $id, \PDO::PARAM_INT); }
+                                    $upd->execute();
+                                    $del = $pdo->prepare("DELETE FROM alumnos WHERE id IN ($in)");
+                                    $i = 1;
+                                    foreach ($dupIds as $id) { $del->bindValue($i++, $id, \PDO::PARAM_INT); }
+                                    $del->execute();
+                                }
+                                $pdo->commit();
+                                $this->jsonResponse(['success' => true]);
+                            } catch (\Throwable $e) {
+                                $pdo->rollBack();
+                                $this->jsonResponse(['success' => false, 'error' => 'No se pudo unificar'], 400);
+                            }
+                        }
+                        $this->jsonResponse(['success' => false, 'error' => 'Parámetros inválidos'], 400);
+                    }
+                    $this->jsonResponse(['success' => false, 'error' => 'Acción inválida'], 400);
+                }
+                return;
             case 'usuarios':
                 $data = [
                     'matricula' => trim(strip_tags((string)filter_input(INPUT_POST, 'matricula', FILTER_UNSAFE_RAW))),

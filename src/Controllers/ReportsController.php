@@ -38,8 +38,40 @@ class ReportsController
             echo 'No autorizado';
             return;
         }
+        try {
+            $catalogs = new \App\Controllers\CatalogsController($this->pdo);
+            $catalogs->ensureSeed();
+        } catch (\Throwable $e) {}
+        $cyclesList = [];
+        $groupsList = [];
+        $profsList = [];
+        $subjectsList = [];
+        try {
+            $rows = $this->pdo->query('SELECT DISTINCT ciclo FROM grupos ORDER BY ciclo DESC')->fetchAll(PDO::FETCH_ASSOC);
+            $cyclesList = array_map(fn($x) => (string)$x['ciclo'], $rows);
+        } catch (\Throwable $e) {}
+        try {
+            if ($role === 'admin') {
+                $stmt = $this->pdo->query('SELECT g.id, g.nombre, g.ciclo, g.profesor_id, m.nombre AS materia FROM grupos g JOIN materias m ON m.id = g.materia_id ORDER BY g.ciclo DESC, m.nombre, g.nombre');
+                $groupsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                try { $this->pdo->exec("UPDATE usuarios SET nombre = SUBSTRING_INDEX(email,'@',1) WHERE rol = 'profesor' AND (nombre IS NULL OR nombre = '') AND email IS NOT NULL AND email <> ''"); } catch (\Throwable $e) {}
+                $stmtP = $this->pdo->query("SELECT id, COALESCE(NULLIF(nombre,''), SUBSTRING_INDEX(email,'@',1)) AS nombre, email FROM usuarios WHERE rol = 'profesor' AND activo = 1 ORDER BY nombre");
+                $profsList = $stmtP->fetchAll(PDO::FETCH_ASSOC);
+            } else {
+                $pid = (int)($_SESSION['user_id'] ?? 0);
+                $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia FROM grupos g JOIN materias m ON m.id = g.materia_id WHERE g.profesor_id = :p ORDER BY g.ciclo DESC, m.nombre, g.nombre');
+                $stmt->execute([':p' => $pid]);
+                $groupsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+        } catch (\Throwable $e) {}
+        try {
+            $stmtS = $this->pdo->query('SELECT id, nombre, clave FROM materias ORDER BY nombre');
+            $subjectsList = $stmtS->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {}
+        $initialCycles = $cyclesList; $initialGroups = $groupsList; $initialProfs = $profsList;
         $view = __DIR__ . '/../Views/reports/index.php';
         if (file_exists($view)) {
+            $cyclesList = $initialCycles; $groupsList = $initialGroups; $profsList = $initialProfs; $subjectsList = $subjectsList;
             include $view;
         } else {
             echo '<div class="container py-4">Vista de reportes no encontrada.</div>';
@@ -68,6 +100,15 @@ class ReportsController
             $gid = (int)$filters['grupo_id'];
             if ($gid > 0) { $where[] = 'g.id = :gid'; $params[':gid'] = $gid; }
         }
+        if (!empty($filters['materia_id'])) {
+            $mid = (int)$filters['materia_id'];
+            if ($mid > 0) { $where[] = 'g.materia_id = :mid'; $params[':mid'] = $mid; }
+        }
+        if (!empty($filters['estado'])) {
+            $estado = strtolower(trim((string)$filters['estado']));
+            if ($estado === 'con_final') { $where[] = 'c.final IS NOT NULL'; }
+            elseif ($estado === 'pendientes') { $where[] = 'c.final IS NULL'; }
+        }
         // Si el rol es profesor, forzamos su propio profesor_id
         if ($profesorIdFromSession && $profesorIdFromSession > 0) {
             $where[] = 'g.profesor_id = :pid';
@@ -89,19 +130,20 @@ class ReportsController
             return '';
         }
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        if ($method !== 'GET') {
-            $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
-            if (!$this->validateCsrf($token)) {
-                http_response_code(400);
-                echo 'CSRF inválido';
-                return '';
-            }
+        $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
+        if ($token && !$this->validateCsrf($token)) {
+            http_response_code(400);
+            echo 'CSRF inválido';
+            return '';
         }
 
+        $src = ($method === 'GET') ? $_GET : $_POST;
         $filters = [
-            'ciclo' => $_REQUEST['ciclo'] ?? null,
-            'grupo_id' => isset($_REQUEST['grupo_id']) ? (int)$_REQUEST['grupo_id'] : null,
-            'profesor_id' => isset($_REQUEST['profesor_id']) ? (int)$_REQUEST['profesor_id'] : null,
+            'ciclo' => $src['ciclo'] ?? null,
+            'grupo_id' => isset($src['grupo_id']) ? (int)$src['grupo_id'] : null,
+            'profesor_id' => isset($src['profesor_id']) ? (int)$src['profesor_id'] : null,
+            'materia_id' => isset($src['materia_id']) ? (int)$src['materia_id'] : null,
+            'estado' => $src['estado'] ?? null,
         ];
         [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
 
@@ -118,14 +160,22 @@ class ReportsController
             $ps->execute([':id' => $profId]);
             $profName = (string)($ps->fetchColumn() ?: '');
         }
+        $materiaName = '';
+        $midVal = (int)($filters['materia_id'] ?? 0);
+        if ($midVal > 0) {
+            $pm = $this->pdo->prepare("SELECT nombre FROM materias WHERE id = :id LIMIT 1");
+            $pm->execute([':id' => $midVal]);
+            $materiaName = (string)($pm->fetchColumn() ?: '');
+        }
         if ($cicloVal !== '' || $profName !== '') {
             if ($cicloVal !== '') { fputcsv($out, ['Ciclo', $this->ascii($cicloVal)]); }
             if ($profName !== '') { fputcsv($out, ['Profesor', $this->ascii($profName)]); }
+            if ($materiaName !== '') { fputcsv($out, ['Materia', $this->ascii($materiaName)]); }
             fputcsv($out, []);
         }
         fputcsv($out, ['Alumno', 'Grupo', 'Materia', 'Ciclo', 'Parcial1', 'Parcial2', 'Final', 'Promedio']);
 
-        $sql = "SELECT CONCAT(a.nombre,' ',a.apellido) AS alumno, g.nombre AS grupo, m.nombre AS materia, g.ciclo, c.parcial1, c.parcial2, c.final, c.promedio
+        $sql = "SELECT COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, g.nombre AS grupo, m.nombre AS materia, g.ciclo, c.parcial1, c.parcial2, c.final, c.promedio
                 FROM calificaciones c
                 JOIN alumnos a ON c.alumno_id = a.id
                 JOIN grupos g ON c.grupo_id = g.id
@@ -155,24 +205,25 @@ class ReportsController
             exit('No autorizado');
         }
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        if ($method !== 'GET') {
-            $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
-            if (!$this->validateCsrf($token)) {
-                http_response_code(400);
-                exit('CSRF inválido');
-            }
+        $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
+        if ($token && !$this->validateCsrf($token)) {
+            http_response_code(400);
+            exit('CSRF inválido');
         }
 
+        $src = ($method === 'GET') ? $_GET : $_POST;
         $filters = [
-            'ciclo' => $_REQUEST['ciclo'] ?? null,
-            'grupo_id' => isset($_REQUEST['grupo_id']) ? (int)$_REQUEST['grupo_id'] : null,
-            'profesor_id' => isset($_REQUEST['profesor_id']) ? (int)$_REQUEST['profesor_id'] : null,
+            'ciclo' => $src['ciclo'] ?? null,
+            'grupo_id' => isset($src['grupo_id']) ? (int)$src['grupo_id'] : null,
+            'profesor_id' => isset($src['profesor_id']) ? (int)$src['profesor_id'] : null,
+            'materia_id' => isset($src['materia_id']) ? (int)$src['materia_id'] : null,
+            'estado' => $src['estado'] ?? null,
         ];
         [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
 
         Logger::info('report_export_pdf', ['filters' => $filters]);
 
-        $sql = "SELECT a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno,
+        $sql = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno,
                        m.nombre AS materia, g.nombre AS grupo, g.ciclo,
                        c.parcial1, c.parcial2, c.final
                 FROM calificaciones c
@@ -225,8 +276,12 @@ class ReportsController
                   FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
                   $wTop AND c.final IS NOT NULL GROUP BY g.id, g.nombre, m.nombre, g.ciclo ORDER BY promedio DESC LIMIT 5";
         $stP = $this->pdo->prepare($qTopP); $stP->execute($pTop); $rowsP = $stP->fetchAll(PDO::FETCH_ASSOC);
+        $estado = strtolower(trim((string)($filters['estado'] ?? '')));
+        $exprFail = ($estado === 'pendientes')
+            ? "ROUND(SUM(CASE WHEN c.final IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0) * 100, 2)"
+            : "ROUND(SUM(CASE WHEN c.final IS NOT NULL AND c.final < 70 THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN c.final IS NOT NULL THEN 1 END),0) * 100, 2)";
         $qTopF = "SELECT g.nombre AS grupo, m.nombre AS materia, g.ciclo,
-                         ROUND(SUM(CASE WHEN c.final IS NOT NULL AND c.final < 70 THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN c.final IS NOT NULL THEN 1 END),0) * 100, 2) AS porcentaje
+                         $exprFail AS porcentaje
                   FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
                   $wTop GROUP BY g.id, g.nombre, m.nombre, g.ciclo ORDER BY porcentaje DESC LIMIT 5";
         $stF = $this->pdo->prepare($qTopF); $stF->execute($pTop); $rowsF = $stF->fetchAll(PDO::FETCH_ASSOC);
@@ -238,18 +293,21 @@ class ReportsController
         } } else { $html .= '<tr><td colspan="4">Sin datos</td></tr>'; }
         $html .= '</tbody></table>';
 
-        $qTopAl = "SELECT a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno,
+        $qTopAl = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno,
                            ROUND(AVG(c.final),2) AS promedio
                     FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id JOIN grupos g ON g.id = c.grupo_id
                     $wTop AND c.final IS NOT NULL
                     GROUP BY a.id, a.matricula, a.nombre, a.apellido
                     ORDER BY promedio DESC LIMIT 5";
         $stA = $this->pdo->prepare($qTopAl); $stA->execute($pTop); $rowsA = $stA->fetchAll(PDO::FETCH_ASSOC);
-        $qRisk = "SELECT a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final
+        $riskVal = isset($src['riesgo_umbral']) ? (int)$src['riesgo_umbral'] : 60;
+        if ($riskVal < 10) { $riskVal = 10; } elseif ($riskVal > 100) { $riskVal = 100; }
+        $qRisk = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final
                   FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
-                  $wTop AND c.final IS NOT NULL AND c.final < 60
+                  $wTop AND c.final IS NOT NULL AND c.final < :risk
                   ORDER BY c.final ASC, a.apellido LIMIT 5";
-        $stR = $this->pdo->prepare($qRisk); $stR->execute($pTop); $rowsR = $stR->fetchAll(PDO::FETCH_ASSOC);
+        $pTopRisk = $pTop; $pTopRisk[':risk'] = $riskVal;
+        $stR = $this->pdo->prepare($qRisk); $stR->execute($pTopRisk); $rowsR = $stR->fetchAll(PDO::FETCH_ASSOC);
 
         $html .= '<h3 style="margin-top:15px">Top 5 alumnos por promedio</h3>';
         $html .= '<table width="100%" border="1" cellspacing="0" cellpadding="6"><thead><tr><th>Matrícula</th><th>Alumno</th><th>Promedio</th></tr></thead><tbody>';
@@ -258,14 +316,14 @@ class ReportsController
         } } else { $html .= '<tr><td colspan="3">Sin datos</td></tr>'; }
         $html .= '</tbody></table>';
 
-        $html .= '<h3 style="margin-top:15px">Alumnos con riesgo (final < 60)</h3>';
+        $html .= '<h3 style="margin-top:15px">Alumnos con riesgo (final < '.(int)$riskVal.')</h3>';
         $html .= '<table width="100%" border="1" cellspacing="0" cellpadding="6"><thead><tr><th>Ciclo</th><th>Materia</th><th>Grupo</th><th>Alumno</th><th>Final</th></tr></thead><tbody>';
         if ($rowsR) { foreach ($rowsR as $r) {
             $html .= '<tr><td>'.htmlspecialchars($r['ciclo']).'</td><td>'.htmlspecialchars($r['materia']).'</td><td>'.htmlspecialchars($r['grupo']).'</td><td>'.htmlspecialchars($r['alumno']).'</td><td>'.htmlspecialchars(number_format((float)$r['final'],2)).'</td></tr>';
         } } else { $html .= '<tr><td colspan="5">Sin datos</td></tr>'; }
         $html .= '</tbody></table>';
 
-        $html .= '<h3 style="margin-top:15px">Top 5 grupos por % reprobados</h3>';
+        $html .= '<h3 style="margin-top:15px">Top 5 grupos por % '.(($estado==='pendientes')?'pendientes':'reprobados').'</h3>';
         $html .= '<table width="100%" border="1" cellspacing="0" cellpadding="6"><thead><tr><th>Ciclo</th><th>Materia</th><th>Grupo</th><th>% Reprobados</th></tr></thead><tbody>';
         if ($rowsF) { foreach ($rowsF as $r) {
             $html .= '<tr><td>'.htmlspecialchars($r['ciclo']).'</td><td>'.htmlspecialchars($r['materia']).'</td><td>'.htmlspecialchars($r['grupo']).'</td><td>'.htmlspecialchars(number_format((float)$r['porcentaje'],2)).'%</td></tr>';
@@ -299,13 +357,11 @@ class ReportsController
             return '';
         }
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        if ($method !== 'GET') {
-            $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
-            if (!$this->validateCsrf($token)) {
-                http_response_code(400);
-                echo 'CSRF inválido';
-                return '';
-            }
+        $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
+        if ($token && !$this->validateCsrf($token)) {
+            http_response_code(400);
+            echo 'CSRF inválido';
+            return '';
         }
 
         if (!class_exists('ZipArchive')) {
@@ -314,10 +370,13 @@ class ReportsController
             return '';
         }
 
+        $src = ($method === 'GET') ? $_GET : $_POST;
         $filters = [
-            'ciclo' => $_REQUEST['ciclo'] ?? null,
-            'grupo_id' => isset($_REQUEST['grupo_id']) ? (int)$_REQUEST['grupo_id'] : null,
-            'profesor_id' => isset($_REQUEST['profesor_id']) ? (int)$_REQUEST['profesor_id'] : null,
+            'ciclo' => $src['ciclo'] ?? null,
+            'grupo_id' => isset($src['grupo_id']) ? (int)$src['grupo_id'] : null,
+            'profesor_id' => isset($src['profesor_id']) ? (int)$src['profesor_id'] : null,
+            'materia_id' => isset($src['materia_id']) ? (int)$src['materia_id'] : null,
+            'estado' => $src['estado'] ?? null,
         ];
         [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
 
@@ -331,7 +390,7 @@ class ReportsController
             return (string)$csv;
         };
 
-        $sqlMain = "SELECT CONCAT(a.nombre,' ',a.apellido) AS alumno, g.nombre AS grupo, m.nombre AS materia, g.ciclo, c.parcial1, c.parcial2, c.final, c.promedio
+        $sqlMain = "SELECT COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, g.nombre AS grupo, m.nombre AS materia, g.ciclo, c.parcial1, c.parcial2, c.final, c.promedio
                     FROM calificaciones c
                     JOIN alumnos a ON c.alumno_id = a.id
                     JOIN grupos g ON c.grupo_id = g.id
@@ -374,13 +433,23 @@ class ReportsController
                     GROUP BY g.id, g.nombre, m.nombre, g.ciclo
                     ORDER BY porcentaje DESC LIMIT 5";
         $stFail = $this->pdo->prepare($sqlFail); $stFail->execute($params); $rowsFail = $stFail->fetchAll(PDO::FETCH_ASSOC);
-        $csvFail = $makeCsv(['Ciclo', 'Materia', 'Grupo', '% Reprobados'], function() use ($rowsFail) {
+        $estado = strtolower(trim((string)($filters['estado'] ?? '')));
+        if ($estado === 'pendientes') {
+            $sqlFail = "SELECT g.nombre AS grupo, m.nombre AS materia, g.ciclo,
+                               ROUND(SUM(CASE WHEN c.final IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0) * 100, 2) AS porcentaje
+                        FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
+                        $sqlWhere
+                        GROUP BY g.id, g.nombre, m.nombre, g.ciclo
+                        ORDER BY porcentaje DESC LIMIT 5";
+            $stFail = $this->pdo->prepare($sqlFail); $stFail->execute($params); $rowsFail = $stFail->fetchAll(PDO::FETCH_ASSOC);
+        }
+        $csvFail = $makeCsv(['Ciclo', 'Materia', 'Grupo', '% '.(($estado==='pendientes')?'Pendientes':'Reprobados')], function() use ($rowsFail) {
             $out = [];
             foreach ($rowsFail as $r) { $out[] = [$r['ciclo'], $this->ascii($r['materia']), $this->ascii($r['grupo']), number_format((float)$r['porcentaje'],2)]; }
             return $out;
         });
 
-        $sqlTopAlum = "SELECT a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno, ROUND(AVG(c.final),2) AS promedio
+        $sqlTopAlum = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, ROUND(AVG(c.final),2) AS promedio
                         FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id JOIN grupos g ON g.id = c.grupo_id
                         $sqlWhere AND c.final IS NOT NULL
                         GROUP BY a.id, a.matricula, a.nombre, a.apellido
@@ -392,11 +461,14 @@ class ReportsController
             return $out;
         });
 
-        $sqlRisk = "SELECT a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final
+        $riskValZip = isset($src['riesgo_umbral']) ? (int)$src['riesgo_umbral'] : 60;
+        if ($riskValZip < 10) { $riskValZip = 10; } elseif ($riskValZip > 100) { $riskValZip = 100; }
+        $sqlRisk = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final
                     FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
-                    $sqlWhere AND c.final IS NOT NULL AND c.final < 60
+                    $sqlWhere AND c.final IS NOT NULL AND c.final < :risk
                     ORDER BY c.final ASC, a.apellido LIMIT 5";
-        $stRisk = $this->pdo->prepare($sqlRisk); $stRisk->execute($params); $rowsRisk = $stRisk->fetchAll(PDO::FETCH_ASSOC);
+        $paramsZipRisk = $params; $paramsZipRisk[':risk'] = $riskValZip;
+        $stRisk = $this->pdo->prepare($sqlRisk); $stRisk->execute($paramsZipRisk); $rowsRisk = $stRisk->fetchAll(PDO::FETCH_ASSOC);
         $csvRisk = $makeCsv(['Ciclo', 'Materia', 'Grupo', 'Alumno', 'Final'], function() use ($rowsRisk) {
             $out = [];
             foreach ($rowsRisk as $r) { $out[] = [$r['ciclo'], $this->ascii($r['materia']), $this->ascii($r['grupo']), $this->ascii($r['alumno']), number_format((float)$r['final'],2)]; }
@@ -417,6 +489,9 @@ class ReportsController
         $profId = $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : ((int)($filters['profesor_id'] ?? 0));
         $profName = '';
         if ($profId > 0) { $ps = $this->pdo->prepare("SELECT nombre FROM usuarios WHERE id = :id AND rol = 'profesor' LIMIT 1"); $ps->execute([':id'=>$profId]); $profName = (string)($ps->fetchColumn() ?: ''); }
+        $materiaName = '';
+        $midVal = (int)($filters['materia_id'] ?? 0);
+        if ($midVal > 0) { $pm = $this->pdo->prepare("SELECT nombre FROM materias WHERE id = :id LIMIT 1"); $pm->execute([':id'=>$midVal]); $materiaName = (string)($pm->fetchColumn() ?: ''); }
         $slug = fn(string $s) => strtolower(preg_replace('/[^a-z0-9_\-]/', '', str_replace(' ', '_', $this->ascii($s))));
         $fnameParts = ['reportes'];
         if ($cicloVal !== '') { $fnameParts[] = $slug($cicloVal); }
@@ -454,14 +529,15 @@ class ReportsController
             return '';
         }
 
+        $src = ($method === 'GET') ? $_GET : $_POST;
         $filters = [
-            'ciclo' => $_REQUEST['ciclo'] ?? null,
-            'grupo_id' => isset($_REQUEST['grupo_id']) ? (int)$_REQUEST['grupo_id'] : null,
-            'profesor_id' => isset($_REQUEST['profesor_id']) ? (int)$_REQUEST['profesor_id'] : null,
+            'ciclo' => $src['ciclo'] ?? null,
+            'grupo_id' => isset($src['grupo_id']) ? (int)$src['grupo_id'] : null,
+            'profesor_id' => isset($src['profesor_id']) ? (int)$src['profesor_id'] : null,
         ];
         [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
 
-        $qMain = "SELECT CONCAT(a.nombre,' ',a.apellido) AS alumno, g.nombre AS grupo, m.nombre AS materia, g.ciclo, c.parcial1, c.parcial2, c.final, c.promedio
+        $qMain = "SELECT COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, g.nombre AS grupo, m.nombre AS materia, g.ciclo, c.parcial1, c.parcial2, c.final, c.promedio
                   FROM calificaciones c
                   JOIN alumnos a ON c.alumno_id = a.id
                   JOIN grupos g ON c.grupo_id = g.id
@@ -474,6 +550,10 @@ class ReportsController
         $profId = $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : ((int)($filters['profesor_id'] ?? 0));
         $profName = '';
         if ($profId > 0) { $ps = $this->pdo->prepare("SELECT nombre FROM usuarios WHERE id = :id AND rol = 'profesor' LIMIT 1"); $ps->execute([':id'=>$profId]); $profName = (string)($ps->fetchColumn() ?: ''); }
+        $materiaName = '';
+        $midVal = (int)($src['materia_id'] ?? 0);
+        if ($midVal > 0) { $pm = $this->pdo->prepare("SELECT nombre FROM materias WHERE id = :id LIMIT 1"); $pm->execute([':id'=>$midVal]); $materiaName = (string)($pm->fetchColumn() ?: ''); }
+        $estado = strtolower(trim((string)($src['estado'] ?? '')));
 
         $qAvg = "SELECT g.nombre AS grupo, m.nombre AS materia, g.ciclo, ROUND(AVG(c.final),2) AS promedio
                  FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
@@ -482,26 +562,38 @@ class ReportsController
                  ORDER BY promedio DESC LIMIT 5";
         $stAvg = $this->pdo->prepare($qAvg); $stAvg->execute($params); $rowsAvg = $stAvg->fetchAll(PDO::FETCH_ASSOC);
 
-        $qFail = "SELECT g.nombre AS grupo, m.nombre AS materia, g.ciclo,
-                         ROUND(SUM(CASE WHEN c.final IS NOT NULL AND c.final < 70 THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN c.final IS NOT NULL THEN 1 END),0) * 100, 2) AS porcentaje
-                  FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
-                  $sqlWhere
-                  GROUP BY g.id, g.nombre, m.nombre, g.ciclo
-                  ORDER BY porcentaje DESC LIMIT 5";
+        if ($estado === 'pendientes') {
+            $qFail = "SELECT g.nombre AS grupo, m.nombre AS materia, g.ciclo,
+                             ROUND(SUM(CASE WHEN c.final IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0) * 100, 2) AS porcentaje
+                      FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
+                      $sqlWhere
+                      GROUP BY g.id, g.nombre, m.nombre, g.ciclo
+                      ORDER BY porcentaje DESC LIMIT 5";
+        } else {
+            $qFail = "SELECT g.nombre AS grupo, m.nombre AS materia, g.ciclo,
+                             ROUND(SUM(CASE WHEN c.final IS NOT NULL AND c.final < 70 THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN c.final IS NOT NULL THEN 1 END),0) * 100, 2) AS porcentaje
+                      FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
+                      $sqlWhere
+                      GROUP BY g.id, g.nombre, m.nombre, g.ciclo
+                      ORDER BY porcentaje DESC LIMIT 5";
+        }
         $stFail = $this->pdo->prepare($qFail); $stFail->execute($params); $rowsFail = $stFail->fetchAll(PDO::FETCH_ASSOC);
 
-        $qAlum = "SELECT a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno, ROUND(AVG(c.final),2) AS promedio
+        $qAlum = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, ROUND(AVG(c.final),2) AS promedio
                   FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id JOIN grupos g ON g.id = c.grupo_id
                   $sqlWhere AND c.final IS NOT NULL
                   GROUP BY a.id, a.matricula, a.nombre, a.apellido
                   ORDER BY promedio DESC LIMIT 5";
         $stAlum = $this->pdo->prepare($qAlum); $stAlum->execute($params); $rowsAlum = $stAlum->fetchAll(PDO::FETCH_ASSOC);
 
-        $qRisk = "SELECT a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final
+        $riskVal = isset($src['riesgo_umbral']) ? (int)$src['riesgo_umbral'] : 60;
+        if ($riskVal < 10) { $riskVal = 10; } elseif ($riskVal > 100) { $riskVal = 100; }
+        $qRisk = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final
                   FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
-                  $sqlWhere AND c.final IS NOT NULL AND c.final < 60
+                  $sqlWhere AND c.final IS NOT NULL AND c.final < :risk
                   ORDER BY c.final ASC, a.apellido LIMIT 5";
-        $stRisk = $this->pdo->prepare($qRisk); $stRisk->execute($params); $rowsRisk = $stRisk->fetchAll(PDO::FETCH_ASSOC);
+        $paramsRisk = $params; $paramsRisk[':risk'] = $riskVal;
+        $stRisk = $this->pdo->prepare($qRisk); $stRisk->execute($paramsRisk); $rowsRisk = $stRisk->fetchAll(PDO::FETCH_ASSOC);
 
         // Resumen para hoja Calificaciones (promedio general, aprobadas, reprobadas, pendientes)
         $totalConFinal = 0; $sumFinal = 0.0; $aprobadas = 0; $reprobadas = 0; $pendientes = 0;
@@ -532,13 +624,18 @@ class ReportsController
         $bannerRows = [];
         if ($cicloVal !== '') { $bannerRows[] = ['Ciclo', $cicloVal]; }
         if ($profName !== '') { $bannerRows[] = ['Profesor', $profName]; }
+        if ($materiaName !== '') { $bannerRows[] = ['Materia', $materiaName]; }
+        $bannerRowsRisk = $bannerRows;
+        if ($riskVal > 0) { $bannerRowsRisk[] = ['Umbral de riesgo', (string)$riskVal]; }
 
+        $failSheetName = ($estado==='pendientes' ? 'Pendientes' : 'Reprobados');
+        $failHeaderLabel = '% ' . ($estado==='pendientes' ? 'Pendientes' : 'Reprobados');
         $sheets = [
             ['name' => 'Calificaciones', 'headers' => [], 'rows' => $calRows, 'preRows' => $bannerRows, 'headerRowIndex' => (count($bannerRows) + 6)],
             ['name' => 'Top Grupos', 'headers' => ['Ciclo','Materia','Grupo','Promedio'], 'rows' => array_map(function($r){ return [
                 (string)$r['ciclo'], (string)$r['materia'], (string)$r['grupo'], number_format((float)$r['promedio'],2)
             ]; }, $rowsAvg)],
-            ['name' => 'Reprobados', 'headers' => ['Ciclo','Materia','Grupo','% Reprobados'], 'rows' => array_map(function($r){ return [
+            ['name' => $failSheetName, 'headers' => ['Ciclo','Materia','Grupo', $failHeaderLabel], 'rows' => array_map(function($r){ return [
                 (string)$r['ciclo'], (string)$r['materia'], (string)$r['grupo'], number_format((float)$r['porcentaje'],2)
             ]; }, $rowsFail)],
             ['name' => 'Top Alumnos', 'headers' => ['Matrícula','Alumno','Promedio'], 'rows' => array_map(function($r){ return [
@@ -575,9 +672,9 @@ class ReportsController
             $options = [];
             if ($s['name'] === 'Calificaciones') { $options = ['freezeRows' => (int)$s['headerRowIndex'], 'numericCols' => [5,6,7,8], 'preRows' => ($s['preRows'] ?? []), 'headerRowIndex' => (int)$s['headerRowIndex']]; }
             elseif ($s['name'] === 'Top Grupos') { $options = ['freezeRows' => (count($bannerRows) + 1), 'numericCols' => [4], 'preRows' => $bannerRows, 'headerRowIndex' => (count($bannerRows) + 1)]; }
-            elseif ($s['name'] === 'Reprobados') { $options = ['freezeRows' => (count($bannerRows) + 1), 'numericCols' => [4], 'preRows' => $bannerRows, 'headerRowIndex' => (count($bannerRows) + 1)]; }
+            elseif ($s['name'] === $failSheetName) { $options = ['freezeRows' => (count($bannerRows) + 1), 'numericCols' => [4], 'preRows' => $bannerRows, 'headerRowIndex' => (count($bannerRows) + 1)]; }
             elseif ($s['name'] === 'Top Alumnos') { $options = ['freezeRows' => (count($bannerRows) + 1), 'numericCols' => [3], 'preRows' => $bannerRows, 'headerRowIndex' => (count($bannerRows) + 1)]; }
-            elseif ($s['name'] === 'Riesgo') { $options = ['freezeRows' => (count($bannerRows) + 1), 'numericCols' => [5], 'preRows' => $bannerRows, 'headerRowIndex' => (count($bannerRows) + 1)]; }
+            elseif ($s['name'] === 'Riesgo') { $options = ['freezeRows' => (count($bannerRowsRisk) + 1), 'numericCols' => [5], 'preRows' => $bannerRowsRisk, 'headerRowIndex' => (count($bannerRowsRisk) + 1)]; }
             $sheetXml = $this->buildSheetXml($s['headers'], $s['rows'], $options);
             $zip->addFromString('xl/worksheets/sheet'.$sheetIndex.'.xml', $sheetXml);
             $sheetIndex++;
@@ -686,32 +783,39 @@ class ReportsController
 
         $filters = [
             'ciclo' => $_GET['ciclo'] ?? null,
+            'grupo_id' => isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : null,
             'profesor_id' => isset($_GET['profesor_id']) ? (int)$_GET['profesor_id'] : null,
+            'materia_id' => isset($_GET['materia_id']) ? (int)$_GET['materia_id'] : null,
+            'estado' => $_GET['estado'] ?? null,
         ];
-        [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
+        $estado = strtolower(trim((string)$filters['estado'] ?? ''));
+        $filtersNoEstado = $filters; $filtersNoEstado['estado'] = null;
+        [$sqlWhereBase, $params] = $this->buildWhere($filtersNoEstado, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
+        $whereBase = ($sqlWhereBase !== '') ? $sqlWhereBase : ' WHERE 1=1 ';
 
-        $avgSql = "SELECT ROUND(AVG(c.final),2) AS promedio FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id $sqlWhere";
+        $avgExpr = ($estado === 'pendientes') ? 'ROUND(AVG(COALESCE(c.promedio, ROUND((IFNULL(c.parcial1,0)+IFNULL(c.parcial2,0))/2,2))),2)' : 'ROUND(AVG(c.final),2)';
+        $avgSql = "SELECT $avgExpr AS promedio FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id" . $whereBase . (($estado === 'pendientes') ? ' AND c.final IS NULL' : ' AND c.final IS NOT NULL');
         $stmt = $this->pdo->prepare($avgSql);
         $stmt->execute($params);
         $promedio = (float)($stmt->fetchColumn() ?: 0);
 
-        $repSql = "SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id $sqlWhere AND c.final IS NOT NULL AND c.final < 70";
+        $repSql = "SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id" . $whereBase . ' AND c.final IS NOT NULL AND c.final < 70';
         $stmt = $this->pdo->prepare($repSql);
         $stmt->execute($params);
         $reprobados = (int)($stmt->fetchColumn() ?: 0);
 
-        $totSql = "SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id $sqlWhere AND c.final IS NOT NULL";
+        $totSql = "SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id" . $whereBase . ' AND c.final IS NOT NULL';
         $stmt = $this->pdo->prepare($totSql);
         $stmt->execute($params);
         $totalConFinal = (int)($stmt->fetchColumn() ?: 0);
         $porcReprobados = $totalConFinal > 0 ? round(($reprobados / $totalConFinal) * 100, 2) : 0.0;
 
-        $aprSql = "SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id $sqlWhere AND c.final IS NOT NULL AND c.final >= 70";
+        $aprSql = "SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id" . $whereBase . ' AND c.final IS NOT NULL AND c.final >= 70';
         $stmt = $this->pdo->prepare($aprSql);
         $stmt->execute($params);
         $aprobadas = (int)($stmt->fetchColumn() ?: 0);
 
-        $penSql = "SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id $sqlWhere AND c.final IS NULL";
+        $penSql = "SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id" . $whereBase . ' AND c.final IS NULL';
         $stmt = $this->pdo->prepare($penSql);
         $stmt->execute($params);
         $pendientes = (int)($stmt->fetchColumn() ?: 0);
@@ -741,50 +845,59 @@ class ReportsController
             'ciclo' => $_GET['ciclo'] ?? null,
             'grupo_id' => isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : null,
             'profesor_id' => isset($_GET['profesor_id']) ? (int)$_GET['profesor_id'] : null,
+            'materia_id' => isset($_GET['materia_id']) ? (int)$_GET['materia_id'] : null,
+            'estado' => $_GET['estado'] ?? null,
         ];
-        [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
+        $estado = strtolower(trim((string)$filters['estado'] ?? ''));
+        $filtersNoEstado = $filters; $filtersNoEstado['estado'] = null;
+        [$sqlWhereBase, $params] = $this->buildWhere($filtersNoEstado, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
 
         $sqlAvg = "SELECT g.id, g.nombre AS grupo, m.nombre AS materia, g.ciclo, ROUND(AVG(c.final),2) AS promedio
                    FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
-                   $sqlWhere AND c.final IS NOT NULL
+                   $sqlWhereBase AND c.final IS NOT NULL
                    GROUP BY g.id, g.nombre, m.nombre, g.ciclo
                    ORDER BY promedio DESC LIMIT 5";
         $stmt = $this->pdo->prepare($sqlAvg);
         $stmt->execute($params);
         $topProm = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $sqlFail = "SELECT g.id, g.nombre AS grupo, m.nombre AS materia, g.ciclo,
-                           ROUND(SUM(CASE WHEN c.final IS NOT NULL AND c.final < 70 THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN c.final IS NOT NULL THEN 1 END),0) * 100, 2) AS porcentaje
+        $exprFail = ($estado === 'pendientes')
+            ? 'ROUND(SUM(CASE WHEN c.final IS NULL THEN 1 ELSE 0 END) / NULLIF(COUNT(*),0) * 100, 2)'
+            : 'ROUND(SUM(CASE WHEN c.final IS NOT NULL AND c.final < 70 THEN 1 ELSE 0 END) / NULLIF(COUNT(CASE WHEN c.final IS NOT NULL THEN 1 END),0) * 100, 2)';
+        $sqlFail = "SELECT g.id, g.nombre AS grupo, m.nombre AS materia, g.ciclo, $exprFail AS porcentaje
                     FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
-                    $sqlWhere
+                    $sqlWhereBase
                     GROUP BY g.id, g.nombre, m.nombre, g.ciclo
                     ORDER BY porcentaje DESC LIMIT 5";
         $stmt = $this->pdo->prepare($sqlFail);
         $stmt->execute($params);
         $topFail = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $sqlTopAlum = "SELECT a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno,
+        $sqlTopAlum = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno,
                               ROUND(AVG(c.final),2) AS promedio
                         FROM calificaciones c
                         JOIN alumnos a ON a.id = c.alumno_id
                         JOIN grupos g ON g.id = c.grupo_id
-                        $sqlWhere AND c.final IS NOT NULL
+                        $sqlWhereBase AND c.final IS NOT NULL
                         GROUP BY a.id, a.matricula, a.nombre, a.apellido
                         ORDER BY promedio DESC LIMIT 5";
         $stmt = $this->pdo->prepare($sqlTopAlum);
         $stmt->execute($params);
         $topAlumnos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $sqlRiesgo = "SELECT a.matricula, CONCAT(a.nombre,' ',a.apellido) AS alumno,
+        $riskVal = isset($_GET['riesgo_umbral']) ? (int)$_GET['riesgo_umbral'] : 60;
+        if ($riskVal < 10) { $riskVal = 10; } elseif ($riskVal > 100) { $riskVal = 100; }
+        $sqlRiesgo = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno,
                              m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final
                        FROM calificaciones c
                        JOIN alumnos a ON a.id = c.alumno_id
                        JOIN grupos g ON g.id = c.grupo_id
                        JOIN materias m ON m.id = g.materia_id
-                       $sqlWhere AND c.final IS NOT NULL AND c.final < 60
+                       $sqlWhereBase AND c.final IS NOT NULL AND c.final < :risk
                        ORDER BY c.final ASC, a.apellido LIMIT 5";
+        $paramsRisk = $params; $paramsRisk[':risk'] = $riskVal;
         $stmt = $this->pdo->prepare($sqlRiesgo);
-        $stmt->execute($params);
+        $stmt->execute($paramsRisk);
         $alumnosRiesgo = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         header('Content-Type: application/json');

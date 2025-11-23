@@ -142,6 +142,9 @@ body {
 .navbar-brand { font-weight: 700; letter-spacing: .3px; color: var(--text) !important; }
 .nav-link { color: var(--muted) !important; transition: color .2s ease; padding: .5rem .75rem; font-size: 1rem; }
 .nav-link:hover { color: var(--text) !important; }
+/* Visibilidad de texto en navbar */
+.navbar .navbar-text { color: var(--text) !important; }
+[data-theme="light"] .navbar .navbar-text { color: #0f172a !important; }
 /* Navbar en tema claro */
 [data-theme="light"] .navbar { background: linear-gradient(90deg, #ffffff 0%, #eef2ff 100%) !important; }
 [data-theme="light"] .nav-link { color: #334155 !important; }
@@ -188,6 +191,18 @@ body {
 .btn-outline-primary { border-color: var(--primary); color: var(--text); }
 [data-theme="light"] .btn-outline-primary { color: #0f172a; }
  .badge { border-radius: 10px; }
+/* Botón adaptativo: sólido en claro, delineado en oscuro */
+.btn-contrast { border: 1px solid rgba(255,255,255,.6); color: var(--text); background: transparent; transition: all .2s ease; }
+.btn-contrast:hover { background: rgba(255,255,255,.12); }
+[data-theme="light"] .btn-contrast { background: var(--accent); border-color: var(--accent); color: #ffffff; box-shadow: 0 8px 20px rgba(16,185,129,.25); }
+[data-theme="light"] .btn-contrast:hover { filter: brightness(0.96); }
+.btn-exit { background-color: #dc3545; color: #ffffff; border-color: #dc3545; }
+.btn-exit:hover { background-color: #bb2d3b; border-color: #b02a37; }
+.btn-login { background-color: #198754; color: #ffffff; border-color: #198754; }
+.btn-login:hover { background-color: #157347; border-color: #146c43; }
+.btn-outline-primary { border-color: var(--primary); color: var(--text); }
+[data-theme="light"] .btn-outline-primary { color: #0f172a; }
+ .badge { border-radius: 10px; }
 
 /* Formularios */
 .form-control, .form-select { background: var(--surface-2); border: 1px solid rgba(255,255,255,.1); color: var(--text); border-radius: 12px; }
@@ -195,7 +210,8 @@ body {
 .form-control:focus, .form-select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(96,165,250,.12); }
 [data-theme="light"] .form-control::placeholder, [data-theme="light"] .form-select { color: #374151; }
 .form-control::placeholder { color: var(--muted); }
-.form-label { color: var(--muted); }
+.form-label { color: var(--text); font-weight: 600; }
+[data-theme="light"] .form-label { color: #0b1220; }
 /* Large controls for better usability */
 .form-control.input-lg, .form-select.input-lg { padding: .8rem 1rem; font-size: 1rem; min-height: 46px; }
 .btn { padding: .6rem 1rem; font-size: 1rem; }

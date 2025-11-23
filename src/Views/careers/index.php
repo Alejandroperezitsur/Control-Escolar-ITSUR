@@ -174,6 +174,14 @@ ob_start();
   margin-bottom: 1rem;
   border: 1px solid #dee2e6;
 }
+.semester-header.sem-1 { background-color: #0d6efd; color: #ffffff; border-color: #0b5ed7; }
+.semester-header.sem-2 { background-color: #6610f2; color: #ffffff; border-color: #520dc2; }
+.semester-header.sem-3 { background-color: #6f42c1; color: #ffffff; border-color: #59359a; }
+.semester-header.sem-4 { background-color: #d63384; color: #ffffff; border-color: #b02569; }
+.semester-header.sem-5 { background-color: #fd7e14; color: #ffffff; border-color: #dc6803; }
+.semester-header.sem-6 { background-color: #ffc107; color: #212529; border-color: #ffb300; }
+.semester-header.sem-7 { background-color: #20c997; color: #ffffff; border-color: #1aa97e; }
+.semester-header.sem-8 { background-color: #0dcaf0; color: #212529; border-color: #0bb8db; }
 
 .semester-header h5 {
   color: #212529;
@@ -316,12 +324,13 @@ function renderCurriculum(semesters, basePath) {
     const semesterNum = semester.semester;
     const subjects = semester.subjects || [];
     const isResidencias = semesterNum === 9;
+    const headerClass = isResidencias ? 'bg-success text-white' : ('sem-' + (semesterNum % 9));
     
     html += `
       <div class="col-md-6 col-lg-4 col-xl-3 semester-column">
-        <div class="semester-header ${isResidencias ? 'bg-success text-white' : ''}">
-          <h5 class="mb-1 ${isResidencias ? 'text-white' : ''}">Semestre ${semesterNum}</h5>
-          <small class="${isResidencias ? 'text-white' : ''}">${subjects.length} materia${subjects.length !== 1 ? 's' : ''}</small>
+        <div class="semester-header ${headerClass}">
+          <h5 class="mb-1">Semestre ${semesterNum}</h5>
+          <small>${subjects.length} materia${subjects.length !== 1 ? 's' : ''}</small>
           ${isResidencias ? '<div class="mt-2"><i class="fa-solid fa-star me-1"></i><strong>Requisitos:</strong> 10 niveles de Inglés + Servicio Social</div>' : ''}
         </div>
         <div class="subjects-list">
