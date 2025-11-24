@@ -233,7 +233,8 @@ let chartFailInst = null;
 const params = new URLSearchParams(window.location.search);
   const ROOT = '<?php echo $base; ?>';
   const CURRENT_ROLE = '<?php echo $role; ?>';
-  const api = (p) => ROOT + (ROOT.endsWith('/public') ? ('/app.php?r=' + p) : p);
+  // Genera rutas limpias para API y reportes, sin /app.php?r=...
+  const api = (p) => ROOT + p;
   async function safeJson(res){ try { return await res.json(); } catch(e){ return { ok:false, message:'Respuesta inválida' }; } }
   function debounce(fn, delay=300){ let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); }; }
   function refreshAll(){ updateSummary(); updateChart(); renderActiveFilters(); syncExportHiddenFields(); updateURLFromFilters(); saveFilters(); updateViewGroupButton(); }
