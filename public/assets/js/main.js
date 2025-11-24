@@ -44,7 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Tema con toggle y persistencia GLOBAL
+
+  // --- TEMA: toggle global y robusto ---
   const THEME_KEY = 'sicenet-theme';
   const getSystemPref = () => {
     try { return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; } catch { return 'dark'; }
@@ -52,34 +53,36 @@ document.addEventListener('DOMContentLoaded', () => {
   const getStoredTheme = () => {
     try { return localStorage.getItem(THEME_KEY); } catch { return null; }
   };
-  const applyTheme = (theme) => {
+  function updateThemeToggles(theme) {
+    document.querySelectorAll('#theme-toggle, #themeToggle').forEach(btn => {
+      btn.textContent = (theme === 'light') ? '\u2600\ufe0f' : '\ud83c\udf19';
+      btn.setAttribute('aria-label', (theme === 'light') ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
+    });
+  }
+  function applyTheme(theme) {
     const t = theme === 'light' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', t);
     if (document.body) document.body.setAttribute('data-theme', t);
-    // Forzar cambio en ambos (html y body) para máxima compatibilidad
     try {
       document.getElementsByTagName('html')[0].setAttribute('data-theme', t);
       document.getElementsByTagName('body')[0].setAttribute('data-theme', t);
     } catch(e){}
-    // Sincronizar todos los toggles de tema en la página
-    document.querySelectorAll('#theme-toggle, #themeToggle').forEach(btn => {
-      btn.textContent = (t === 'light') ? '\u2600\ufe0f' : '\ud83c\udf19';
-      btn.setAttribute('aria-label', (t === 'light') ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
-    });
-    // Disparar evento global para que otros scripts puedan reaccionar
+    updateThemeToggles(t);
     document.dispatchEvent(new CustomEvent('theme-changed', { detail: { theme: t } }));
-  };
-  // Aplicar tema lo antes posible (por si el HTML ya tiene data-theme)
-  const initial = getStoredTheme() || getSystemPref() || 'dark';
-  applyTheme(initial);
-  // Escuchar todos los toggles de tema presentes
-  document.querySelectorAll('#theme-toggle, #themeToggle').forEach(toggleBtn => {
-    toggleBtn.addEventListener('click', () => {
+  }
+  // Inicializar tema según preferencia guardada o sistema
+  const initialTheme = getStoredTheme() || getSystemPref() || 'dark';
+  applyTheme(initialTheme);
+  // Eliminar listeners previos para evitar duplicados
+  document.querySelectorAll('#theme-toggle, #themeToggle').forEach(btn => {
+    btn.removeEventListener('click', btn._themeHandler || (()=>{}));
+    btn._themeHandler = function() {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';
       const next = current === 'light' ? 'dark' : 'light';
       applyTheme(next);
       try { localStorage.setItem(THEME_KEY, next); } catch {}
-    }, { passive: true });
+    };
+    btn.addEventListener('click', btn._themeHandler, { passive: true });
   });
 
   // Autoactivar ordenamiento en tablas con clase .table-sort
