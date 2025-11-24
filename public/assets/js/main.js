@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+
   // Marcar activo en el sidebar según la URL
   const links = document.querySelectorAll('.app-sidebar .menu-section a');
   const path = location.pathname.replace(/\\/g, '/');
@@ -43,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Tema con toggle y persistencia
+  // Tema con toggle y persistencia GLOBAL
   const THEME_KEY = 'sicenet-theme';
   const getSystemPref = () => {
     try { return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; } catch { return 'dark'; }
@@ -54,24 +55,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const applyTheme = (theme) => {
     const t = theme === 'light' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', t);
-    try { document.body && document.body.setAttribute('data-theme', t); } catch {}
-    const btn = document.getElementById('theme-toggle') || document.getElementById('themeToggle');
-    if (btn) {
-      btn.textContent = (t === 'light') ? '☀️' : '🌙';
+    if (document.body) document.body.setAttribute('data-theme', t);
+    // Forzar cambio en ambos (html y body) para máxima compatibilidad
+    try {
+      document.getElementsByTagName('html')[0].setAttribute('data-theme', t);
+      document.getElementsByTagName('body')[0].setAttribute('data-theme', t);
+    } catch(e){}
+    // Sincronizar todos los toggles de tema en la página
+    document.querySelectorAll('#theme-toggle, #themeToggle').forEach(btn => {
+      btn.textContent = (t === 'light') ? '\u2600\ufe0f' : '\ud83c\udf19';
       btn.setAttribute('aria-label', (t === 'light') ? 'Cambiar a modo oscuro' : 'Cambiar a modo claro');
-    }
+    });
+    // Disparar evento global para que otros scripts puedan reaccionar
+    document.dispatchEvent(new CustomEvent('theme-changed', { detail: { theme: t } }));
   };
+  // Aplicar tema lo antes posible (por si el HTML ya tiene data-theme)
   const initial = getStoredTheme() || getSystemPref() || 'dark';
   applyTheme(initial);
-  const toggleBtn = document.getElementById('theme-toggle') || document.getElementById('themeToggle');
-  if (toggleBtn) {
+  // Escuchar todos los toggles de tema presentes
+  document.querySelectorAll('#theme-toggle, #themeToggle').forEach(toggleBtn => {
     toggleBtn.addEventListener('click', () => {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';
       const next = current === 'light' ? 'dark' : 'light';
       applyTheme(next);
       try { localStorage.setItem(THEME_KEY, next); } catch {}
     }, { passive: true });
-  }
+  });
 
   // Autoactivar ordenamiento en tablas con clase .table-sort
   document.querySelectorAll('table.table-sort').forEach(tbl => enableTableSort(tbl));

@@ -8,7 +8,7 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
 ob_start();
 ?>
 <div class="container py-4">
-  <?php $isPublic = str_ends_with($base, '/public'); $goDashboard = $base . ($isPublic ? '/app.php?r=/dashboard' : '/dashboard'); ?>
+  <?php $isPublic = (substr($base, -7) === '/public'); $goDashboard = $base . ($isPublic ? '/app.php?r=/dashboard' : '/dashboard'); ?>
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3>Reportes Avanzados</h3>
     <a href="<?php echo $goDashboard; ?>" class="btn btn-outline-secondary">Volver</a>
@@ -378,7 +378,8 @@ function updateSummary() {
   const resumenUrl = api('/reports/summary') + (qs.toString() ? ('?' + qs.toString()) : '');
   fetch(resumenUrl).then(safeJson).then(j => {
     const box = document.getElementById('summaryBox');
-    if (!j.ok) { box.textContent = j.message || 'Error'; return; }
+    if (!box) return;
+    if (!j.ok) { box.textContent = j.message || 'Sin datos'; return; }
     const prom = Number(j.data.promedio ?? 0);
     const promCls = isNaN(prom) ? 'text-muted' : (prom >= 70 ? 'text-success' : 'text-danger');
     box.innerHTML = `
@@ -393,6 +394,9 @@ function updateSummary() {
       </div>
       <div class="col-12"><strong>Reprobados:</strong> ${j.data.reprobados ?? 0} (${j.data.porcentaje_reprobados ?? 0}%)</div>
     </div>`;
+  }).catch(() => {
+    const box = document.getElementById('summaryBox');
+    if (box) box.textContent = 'Sin datos';
   });
 }
 
@@ -404,7 +408,8 @@ function updateChart() {
   const qs = new URLSearchParams();
   const c = document.getElementById('sel-ciclo')?.value || '';
   const g = document.getElementById('sel-grupo')?.value || '';
-  const m = document.getElementById('sel-materia')?.value || '';
+  const m = qs.get('materia_id') || '';
+
   const e = document.getElementById('sel-estado')?.value || '';
   if (c) qs.set('ciclo', c);
   if (g) qs.set('grupo_id', g);
@@ -412,10 +417,10 @@ function updateChart() {
   if (e) qs.set('estado', e);
   chartUrl += (qs.toString() ? ('?' + qs.toString()) : '');
   fetch(chartUrl).then(safeJson).then(j => {
-    if (!j.ok) return;
     const ctx = document.getElementById('chartStats');
     const emptyEl = document.getElementById('chartStatsEmpty');
     const loadEl = document.getElementById('chartStatsLoading');
+    if (!j.ok) { if (emptyEl) emptyEl.style.display = ''; if (loadEl) loadEl.style.display = 'none'; return; }
     const isLine = (chartUrl.includes('promedios-ciclo'));
     const vals = (j.data.data || []).map(Number);
     const bgColors = vals.map(v => (isNaN(v) ? 'rgba(108,117,125,0.3)' : (v >= 70 ? 'rgba(25,135,84,0.4)' : 'rgba(220,53,69,0.4)')));
@@ -451,6 +456,11 @@ function updateChart() {
     if (chartStatsInst) { try { chartStatsInst.destroy(); } catch(e){} }
     if ((j.data.labels||[]).length === 0) { if (emptyEl) emptyEl.style.display = ''; } else { if (emptyEl) emptyEl.style.display = 'none'; chartStatsInst = new Chart(ctx, config); }
     if (loadEl) loadEl.style.display = 'none';
+  }).catch(() => {
+    const loadEl = document.getElementById('chartStatsLoading');
+    const emptyEl = document.getElementById('chartStatsEmpty');
+    if (loadEl) loadEl.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = '';
   });
 
   // Fail chart
@@ -459,9 +469,10 @@ function updateChart() {
   let failUrl = api('/api/charts/reprobados');
   failUrl += (qs.toString() ? ('?' + qs.toString()) : '');
   fetch(failUrl).then(safeJson).then(j => {
-    if (!j.ok) return;
     const ctxF = document.getElementById('chartFail');
     const emptyElF = document.getElementById('chartFailEmpty');
+    const loadElF = document.getElementById('chartFailLoading');
+    if (!j.ok) { if (emptyElF) emptyElF.style.display = ''; if (loadElF) loadElF.style.display = 'none'; return; }
     const vals = (j.data.data || []).map(Number);
     const bg = vals.map(v => (isNaN(v) ? 'rgba(108,117,125,0.3)' : (v >= 30 ? 'rgba(220,53,69,0.4)' : 'rgba(25,135,84,0.4)')));
     const border = vals.map(v => (isNaN(v) ? '#6c757d' : (v >= 30 ? '#dc3545' : '#198754')));
@@ -491,7 +502,12 @@ function updateChart() {
     };
     if (chartFailInst) { try { chartFailInst.destroy(); } catch(e){} }
     if ((j.data.labels||[]).length === 0) { if (emptyElF) emptyElF.style.display = ''; } else { if (emptyElF) emptyElF.style.display = 'none'; chartFailInst = new Chart(ctxF, cfg); }
-    const loadElF = document.getElementById('chartFailLoading'); if (loadElF) loadElF.style.display = 'none';
+    if (loadElF) loadElF.style.display = 'none';
+  }).catch(() => {
+    const emptyElF = document.getElementById('chartFailEmpty');
+    const loadElF = document.getElementById('chartFailLoading');
+    if (loadElF) loadElF.style.display = 'none';
+    if (emptyElF) emptyElF.style.display = '';
   });
 
   // Tops
@@ -501,8 +517,7 @@ function updateChart() {
   const p = pEl ? (pEl.value || '') : '';
   if (p) qs2.set('profesor_id', p);
   if (g) qs2.set('grupo_id', g);
-  const m = document.getElementById('sel-materia')?.value || '';
-  const e = document.getElementById('sel-estado')?.value || '';
+  
   const r = document.getElementById('sel-risk')?.value || '60';
   if (m) qs2.set('materia_id', m);
   if (e) qs2.set('estado', e);
@@ -511,19 +526,34 @@ function updateChart() {
   if (rt) rt.textContent = `Alumnos con riesgo (final < ${r})`;
   fetch(api('/reports/tops') + (qs2.toString() ? ('?' + qs2.toString()) : ''))
     .then(safeJson).then(j => {
-      if (!j.ok) return;
-      const prom = j.data.top_promedios || [];
-      const fail = j.data.top_reprobados || [];
-      const talum = j.data.top_alumnos || [];
-      const riesgo = j.data.alumnos_riesgo || [];
       const tp = document.getElementById('tbody-top-prom');
       const tf = document.getElementById('tbody-top-fail');
       const ta = document.getElementById('tbody-top-alum');
       const tr = document.getElementById('tbody-risk');
-      tp.innerHTML = prom.length ? prom.map(x => `<tr><td>${x.ciclo}</td><td>${x.materia}</td><td><a href="#" data-gid="${x.id||''}">${x.grupo}</a></td><td class="text-end">${Number(x.promedio||0).toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="4" class="text-muted">Sin datos</td></tr>';
-      tf.innerHTML = fail.length ? fail.map(x => `<tr><td>${x.ciclo}</td><td>${x.materia}</td><td><a href="#" data-gid="${x.id||''}">${x.grupo}</a></td><td class="text-end">${Number(x.porcentaje||0).toFixed(2)}%</td></tr>`).join('') : '<tr><td colspan="4" class="text-muted">Sin datos</td></tr>';
-      ta.innerHTML = talum.length ? talum.map(x => `<tr><td>${x.matricula}</td><td>${x.alumno}</td><td class="text-end">${Number(x.promedio||0).toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="3" class="text-muted">Sin datos</td></tr>';
-      tr.innerHTML = riesgo.length ? riesgo.map(x => `<tr><td>${x.ciclo}</td><td>${x.materia}</td><td>${x.grupo}</td><td>${x.alumno}</td><td class="text-end">${Number(x.final||0).toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="5" class="text-muted">Sin datos</td></tr>';
+      if (!j.ok) {
+        if (tp) tp.innerHTML = '<tr><td colspan="4" class="text-muted">Sin datos</td></tr>';
+        if (tf) tf.innerHTML = '<tr><td colspan="4" class="text-muted">Sin datos</td></tr>';
+        if (ta) ta.innerHTML = '<tr><td colspan="3" class="text-muted">Sin datos</td></tr>';
+        if (tr) tr.innerHTML = '<tr><td colspan="5" class="text-muted">Sin datos</td></tr>';
+        return;
+      }
+      const prom = j.data.top_promedios || [];
+      const fail = j.data.top_reprobados || [];
+      const talum = j.data.top_alumnos || [];
+      const riesgo = j.data.alumnos_riesgo || [];
+      if (tp) tp.innerHTML = prom.length ? prom.map(x => `<tr><td>${x.ciclo}</td><td>${x.materia}</td><td><a href="#" data-gid="${x.id||''}">${x.grupo}</a></td><td class="text-end">${Number(x.promedio||0).toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="4" class="text-muted">Sin datos</td></tr>';
+      if (tf) tf.innerHTML = fail.length ? fail.map(x => `<tr><td>${x.ciclo}</td><td>${x.materia}</td><td><a href="#" data-gid="${x.id||''}">${x.grupo}</a></td><td class="text-end">${Number(x.porcentaje||0).toFixed(2)}%</td></tr>`).join('') : '<tr><td colspan="4" class="text-muted">Sin datos</td></tr>';
+      if (ta) ta.innerHTML = talum.length ? talum.map(x => `<tr><td>${x.matricula}</td><td>${x.alumno}</td><td class="text-end">${Number(x.promedio||0).toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="3" class="text-muted">Sin datos</td></tr>';
+      if (tr) tr.innerHTML = riesgo.length ? riesgo.map(x => `<tr><td>${x.ciclo}</td><td>${x.materia}</td><td>${x.grupo}</td><td>${x.alumno}</td><td class="text-end">${Number(x.final||0).toFixed(2)}</td></tr>`).join('') : '<tr><td colspan="5" class="text-muted">Sin datos</td></tr>';
+    }).catch(() => {
+      const tp = document.getElementById('tbody-top-prom');
+      const tf = document.getElementById('tbody-top-fail');
+      const ta = document.getElementById('tbody-top-alum');
+      const tr = document.getElementById('tbody-risk');
+      if (tp) tp.innerHTML = '<tr><td colspan="4" class="text-muted">Sin datos</td></tr>';
+      if (tf) tf.innerHTML = '<tr><td colspan="4" class="text-muted">Sin datos</td></tr>';
+      if (ta) ta.innerHTML = '<tr><td colspan="3" class="text-muted">Sin datos</td></tr>';
+      if (tr) tr.innerHTML = '<tr><td colspan="5" class="text-muted">Sin datos</td></tr>';
     });
 }
 

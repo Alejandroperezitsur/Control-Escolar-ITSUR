@@ -14,6 +14,20 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
   <title>Control Escolar</title>
   <meta name="csrf-token" content="<?= $_SESSION['csrf_token'] ?? '' ?>">
   <base href="<?php echo $base; ?>/">
+  <script>
+    // Aplicar tema antes de cargar CSS para evitar flash
+    (function(){
+      try {
+        var THEME_KEY = 'sicenet-theme';
+        var t = localStorage.getItem(THEME_KEY);
+        if (!t) {
+          t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+        if (document.body) document.body.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+      } catch(e) {}
+    })();
+  </script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://unpkg.com/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
