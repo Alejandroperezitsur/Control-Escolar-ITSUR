@@ -15,8 +15,42 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
   <meta name="csrf-token" content="<?= $_SESSION['csrf_token'] ?? '' ?>">
   <base href="<?php echo $base; ?>/">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://unpkg.com/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
   <link href="<?php echo $base; ?>/assets/css/styles.css" rel="stylesheet">
+  <link href="/Control-Escolar-ITSUR/public/assets/css/styles.css" rel="stylesheet">
+  <style>
+    .container{max-width:1200px;margin:0 auto;padding:0 1rem}
+    .row{display:flex;flex-wrap:wrap;margin-left:-.5rem;margin-right:-.5rem}
+    [class*="col-"]{padding:.5rem}
+    .col-6{flex:0 0 auto;width:50%}
+    .col-md-2{flex:0 0 auto;width:16.6667%}
+    .col-md-3{flex:0 0 auto;width:25%}
+    .col-md-4{flex:0 0 auto;width:33.3333%}
+    .col-md-6{flex:0 0 auto;width:50%}
+    @media (max-width: 768px){.col-md-2,.col-md-3,.col-md-4,.col-md-6{width:100%}}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{padding:.5rem;border:1px solid rgba(255,255,255,.08)}
+    .table-striped tbody tr:nth-child(odd){background:rgba(255,255,255,.04)}
+    .table-hover tbody tr:hover{background:rgba(255,255,255,.08)}
+    .table-light th{background:rgba(255,255,255,.1)}
+    .table-responsive{width:100%;overflow:auto}
+    .btn{display:inline-block;padding:.375rem .75rem;border:1px solid transparent;border-radius:.375rem}
+    .btn-outline-primary{border-color:#0d6efd;color:#0d6efd;background:transparent}
+    .btn-outline-success{border-color:#198754;color:#198754;background:transparent}
+    .btn-outline-secondary{border-color:#6c757d;color:#6c757d;background:transparent}
+    .btn-primary{background:#0d6efd;color:#fff;border-color:#0d6efd}
+    .badge{display:inline-block;padding:.35em .65em;font-size:.75em;border-radius:.5rem}
+    .card{background:#ffffff0d;border:1px solid rgba(255,255,255,.12);border-radius:.5rem}
+    .card .card-body{padding:1rem}
+    .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);align-items:center;justify-content:center;z-index:1050}
+    .modal.show{display:flex}
+    .modal-dialog{background:var(--surface);border-radius:12px;max-width:500px;width:100%}
+    .modal-content{border-radius:12px}
+    .modal-header,.modal-footer{padding:1rem;border-bottom:1px solid rgba(255,255,255,.08)}
+    .modal-header{display:flex;align-items:center;justify-content:space-between}
+  </style>
 </head>
 <body data-theme="dark">
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -75,7 +109,15 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
   </div>
   <?php unset($_SESSION['flash'], $_SESSION['flash_type']); endif; ?>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="<?php echo $base; ?>/assets/js/main.js"></script>
+  <script src="/Control-Escolar-ITSUR/public/assets/js/main.js"></script>
+  <script>
+    document.addEventListener('click',function(e){var b=e.target.closest('[data-bs-toggle="modal"]');if(!b)return;var t=b.getAttribute('data-bs-target');var m=t?document.querySelector(t):null;if(m){e.preventDefault();m.classList.add('show');}}
+    );
+    document.addEventListener('click',function(e){if(e.target.closest('[data-bs-dismiss="modal"],.btn-close')){var m=e.target.closest('.modal');if(m){e.preventDefault();m.classList.remove('show');}}});
+  </script>
   <?php if (($role ?? '') === 'admin'): ?>
   <script>
   (function(){

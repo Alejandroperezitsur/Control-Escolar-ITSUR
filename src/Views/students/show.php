@@ -54,7 +54,6 @@ ob_start();
       </div>
     </div>
 
-    <script>
     </div>
     <div class="d-flex gap-2">
       <a href="<?php echo $base; ?>/alumnos" class="btn btn-sm btn-outline-secondary">Volver</a>
@@ -289,7 +288,6 @@ function saveStudent(e) {
   .catch(err => { console.error(err); alert('Error de red'); })
   .finally(() => { btn.disabled = false; btn.textContent = originalText; });
 }
-</script>
 </script>
 
 <?php
