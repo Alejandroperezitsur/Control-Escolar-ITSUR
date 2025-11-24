@@ -230,8 +230,100 @@ class GradesController
         }
         $svc = new \App\Services\GroupsService($this->pdo);
         $rows = $svc->studentsInGroup($grupoId);
+        // Para el modal de asignar/cambiar profesor:
+        $profesores = [];
+        $grupo = $grp;
+        if ($role === 'admin') {
+            $stmtProf = $this->pdo->query("SELECT id, COALESCE(NULLIF(nombre,''), SUBSTRING_INDEX(email,'@',1)) AS nombre FROM usuarios WHERE rol = 'profesor' AND activo = 1 ORDER BY nombre");
+            $profesores = $stmtProf->fetchAll(PDO::FETCH_ASSOC);
+        }
         ob_start();
         include __DIR__ . '/../Views/grades/group.php';
         return ob_get_clean();
+    }
+
+    public function exportGroupCsv(): string
+    {
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
+        $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
+        if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
+        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
+        $stmt->execute([':id' => $grupoId]);
+        $grp = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
+        if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
+        $rows = (new \App\Services\GroupsService($this->pdo))->studentsInGroup($grupoId);
+        header('Content-Type: text/csv; charset=UTF-8');
+        $fname = 'grupo_' . (int)$grupoId . '_calificaciones.csv';
+        header('Content-Disposition: attachment; filename="' . $fname . '"');
+        $fp = fopen('php://temp', 'w+');
+        fputcsv($fp, ['Matrícula','Alumno','Parcial 1','Parcial 2','Final','Promedio']);
+        foreach ($rows as $r) {
+            $al = trim((string)($r['nombre'] ?? '')); $ap = trim((string)($r['apellido'] ?? ''));
+            fputcsv($fp, [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap), (string)($r['parcial1'] ?? ''), (string)($r['parcial2'] ?? ''), (string)($r['final'] ?? ''), (string)($r['promedio'] ?? '') ]);
+        }
+        rewind($fp);
+        $csv = stream_get_contents($fp);
+        fclose($fp);
+        return (string)$csv;
+    }
+
+    public function exportGroupXlsx(): string
+    {
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
+        $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
+        if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
+        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
+        $stmt->execute([':id' => $grupoId]);
+        $grp = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
+        if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
+        $rowsDb = (new \App\Services\GroupsService($this->pdo))->studentsInGroup($grupoId);
+        $headers = ['Matrícula','Alumno','Parcial 1','Parcial 2','Final','Promedio'];
+        $rows = [];
+        foreach ($rowsDb as $r) { $al = trim((string)($r['nombre'] ?? '')); $ap = trim((string)($r['apellido'] ?? '')); $rows[] = [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap), (string)($r['parcial1'] ?? ''), (string)($r['parcial2'] ?? ''), (string)($r['final'] ?? ''), (string)($r['promedio'] ?? '') ]; }
+        if (!class_exists('ZipArchive')) { http_response_code(500); return 'ZipArchive no disponible'; }
+        $tmp = tempnam(sys_get_temp_dir(), 'xlsx');
+        $zip = new \ZipArchive();
+        $zip->open($tmp, \ZipArchive::OVERWRITE);
+        $contentTypes = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' . '<Default Extension="xml" ContentType="application/xml"/>' . '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' . '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' . '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' . '</Types>';
+        $relsRoot = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' . '</Relationships>';
+        $relsWorkbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' . '<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' . '</Relationships>';
+        $workbook = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Calificaciones" sheetId="1" r:id="rId1"/></sheets></workbook>';
+        $stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' . '<numFmts count="0"/>' . '<fonts count="2"><font><sz val="11"/><color theme="1"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="11"/><color theme="1"/><name val="Calibri"/><family val="2"/></font></fonts>' . '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEFEFEF"/><bgColor indexed="64"/></patternFill></fill></fills>' . '<borders count="1"><border/></borders>' . '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' . '<cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="1" fillId="1" borderId="0" xfId="0" applyFont="1" applyFill="1"/></cellXfs>' . '</styleSheet>';
+        $sheetXml = $this->buildSimpleSheetXml($headers, $rows, ['freezeRows' => 1, 'numericCols' => [3,4,5,6]]);
+        $zip->addFromString('[Content_Types].xml', $contentTypes);
+        $zip->addFromString('_rels/.rels', $relsRoot);
+        $zip->addFromString('xl/_rels/workbook.xml.rels', $relsWorkbook);
+        $zip->addFromString('xl/styles.xml', $stylesXml);
+        $zip->addFromString('xl/workbook.xml', $workbook);
+        $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
+        $zip->close();
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $slug = function(string $s): string { $s = iconv('UTF-8','ASCII//TRANSLIT',$s); $s = strtolower(str_replace(' ', '_', $s)); $s = preg_replace('/[^a-z0-9_\-]/', '', $s); return $s ?: 'grupo'; };
+        $fname = 'grupo_' . (int)$grupoId . '_' . $slug((string)($grp['materia'] ?? '')) . '_' . $slug((string)($grp['nombre'] ?? '')) . '.xlsx';
+        header('Content-Disposition: attachment; filename="' . $fname . '"');
+        header('Content-Length: ' . filesize($tmp));
+        readfile($tmp);
+        @unlink($tmp);
+        return '';
+    }
+
+    private function buildSimpleSheetXml(array $headers, array $rows, array $options = []): string
+    {
+        $freezeRows = (int)($options['freezeRows'] ?? 0);
+        $numericCols = (array)($options['numericCols'] ?? []);
+        $xml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
+        if ($freezeRows > 0) { $xml .= '<sheetViews><sheetView workbookViewId="0"><pane ySplit="'.$freezeRows.'" topLeftCell="A'.($freezeRows+1).'" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'; }
+        $xml .= '<sheetData>';
+        $rowNum = 1;
+        $colLabel = function(int $index): string { $label = ''; $n = $index; while ($n > 0) { $n -= 1; $label = chr(65 + ($n % 26)) . $label; $n = intdiv($n, 26); } return $label; };
+        $makeRow = function(array $cells, ?int $styleOverride = null) use (&$rowNum, $numericCols, $colLabel) { $r = '<row r="'.$rowNum.'">'; for ($i=0; $i<count($cells); $i++) { $col = $colLabel($i+1); $val = (string)$cells[$i]; $normalized = str_replace([','], '', $val); $isNum = $normalized !== '' && is_numeric($normalized); $applyNumFmt = in_array($i+1, $numericCols, true); if ($isNum) { $styleAttr = ''; if ($styleOverride !== null) { $styleAttr = ' s="'.$styleOverride.'"'; } elseif ($applyNumFmt) { $styleAttr = ' s="1"'; } $r .= '<c r="'.$col.$rowNum.'" t="n"'.$styleAttr.'><v>'.htmlspecialchars((string)$normalized, ENT_QUOTES).'</v></c>'; } else { $styleAttr = ($styleOverride !== null) ? (' s="'.$styleOverride.'"') : ''; $r .= '<c r="'.$col.$rowNum.'" t="inlineStr"'.$styleAttr.'><is><t>'.htmlspecialchars($val, ENT_QUOTES).'</t></is></c>'; } } $r .= '</row>'; $rowNum++; return $r; };
+        if (!empty($headers)) { $xml .= $makeRow($headers, 2); }
+        foreach ($rows as $row) { $xml .= $makeRow($row); }
+        $xml .= '</sheetData></worksheet>';
+        return $xml;
     }
 }

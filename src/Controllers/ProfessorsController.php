@@ -45,6 +45,25 @@ class ProfessorsController
         include __DIR__ . '/../Views/professors/index.php';
     }
 
+    public function show(): string
+    {
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'admin') { http_response_code(403); return 'No autorizado'; }
+        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        if ($id <= 0) { http_response_code(400); return 'ID inválido'; }
+        $stmt = $this->pdo->prepare('SELECT id, nombre, email, matricula, activo FROM usuarios WHERE id = :id AND rol = "profesor"');
+        $stmt->execute([':id' => $id]);
+        $profesor = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$profesor) { http_response_code(404); return 'Profesor no encontrado'; }
+        $svc = new \App\Services\GroupsService($this->pdo);
+        $grupos = $svc->activeByTeacher($id);
+        $cyclesStmt = $this->pdo->query('SELECT DISTINCT ciclo FROM grupos ORDER BY ciclo DESC');
+        $ciclos = array_map(fn($x) => (string)$x['ciclo'], $cyclesStmt->fetchAll(PDO::FETCH_ASSOC));
+        ob_start();
+        include __DIR__ . '/../Views/professors/show.php';
+        return ob_get_clean();
+    }
+
     public function create(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }

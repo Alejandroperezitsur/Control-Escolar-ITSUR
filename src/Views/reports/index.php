@@ -1,7 +1,10 @@
 <?php
 $role = $_SESSION['role'] ?? '';
 $csrf = $_SESSION['csrf_token'] ?? '';
-$base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
+$scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
+$base = $scriptDir;
+$p = strpos($scriptDir, '/public');
+if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
 ob_start();
 ?>
 <div class="container py-4">
@@ -172,7 +175,7 @@ ob_start();
               </div>
               <div class="table-responsive">
                 <table class="table table-sm">
-                  <thead><tr><th>Ciclo</th><th>Materia</th><th>Grupo</th><th class="text-end">% Reprobados</th></tr></thead>
+                  <thead><tr><th>Ciclo</th><th>Materia</th><th>Grupo</th><th id="th-top-fail" class="text-end">% Reprobados</th></tr></thead>
                   <tbody id="tbody-top-fail"></tbody>
                 </table>
               </div>
@@ -479,6 +482,8 @@ function updateChart() {
     if (subjName) labelFailText += ' — ' + subjName;
     if (grpLabel) labelFailText += ' — ' + grpLabel;
     if (c) labelFailText += ' — ' + c;
+    const thFail = document.getElementById('th-top-fail');
+    if (thFail) { thFail.textContent = (e === 'pendientes') ? '% Pendientes' : '% Reprobados'; }
     const cfg = {
       type: 'bar',
       data: { labels: j.data.labels, datasets: [{ label: labelFailText, data: vals, backgroundColor: bg, borderColor: border, borderWidth: 1 }] },
@@ -533,7 +538,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const btnCopy = document.getElementById('btn-copy-link');
   const btnDlStats = document.getElementById('btn-dl-chart-stats');
   const btnDlFail = document.getElementById('btn-dl-chart-fail');
-  const btnExportTops = document.getElementById('btn-export-tops');
+    const btnExportTops = document.getElementById('btn-export-tops');
   const selRisk = document.getElementById('sel-risk');
   try {
     let cycles = Array.isArray(window.__initialCatalogs?.cycles) ? window.__initialCatalogs.cycles : [];
@@ -627,8 +632,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       lines.push('Ciclo,Materia,Grupo,Promedio');
       (j.data.top_promedios||[]).forEach(r => { lines.push([esc(r.ciclo), esc(r.materia), esc(r.grupo), String(Number(r.promedio||0).toFixed(2))].join(',')); });
       lines.push('');
-      lines.push('"Top 5 grupos por % reprobados"');
-      lines.push('Ciclo,Materia,Grupo,% Reprobados');
+      lines.push('"Top 5 grupos por % ' + (e === 'pendientes' ? 'pendientes' : 'reprobados') + '"');
+      lines.push('Ciclo,Materia,Grupo,% ' + (e === 'pendientes' ? 'Pendientes' : 'Reprobados'));
       (j.data.top_reprobados||[]).forEach(r => { lines.push([esc(r.ciclo), esc(r.materia), esc(r.grupo), String(Number(r.porcentaje||0).toFixed(2))].join(',')); });
       lines.push('');
       lines.push('"Top 5 alumnos por promedio"');

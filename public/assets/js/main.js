@@ -335,3 +335,58 @@ function printTable(tableSelector) {
     return _open.call(this, method, url, async, user, password);
   };
 })();
+
+// -------- Helpers para gestión de Alumnos (compartidos) --------
+window.BASE_URL = window.BASE_URL || (document.querySelector('base')?.getAttribute('href') || '');
+function openCreateModal(){
+  try{
+    const form = document.getElementById('studentForm'); if(form) form.reset();
+    const idEl = document.getElementById('studentId'); if(idEl) idEl.value = '';
+    const title = document.getElementById('modalTitle'); if(title) title.textContent = 'Nuevo Alumno';
+    const pwd = document.getElementById('password'); if(pwd){ pwd.placeholder='Contraseña'; pwd.required = true; }
+    const help = document.getElementById('passwordHelp'); if(help) help.style.display = 'none';
+    const act = document.getElementById('activo'); if(act) act.checked = true;
+    const m = (typeof bootstrap !== 'undefined' && document.getElementById('studentModal')) ? new bootstrap.Modal(document.getElementById('studentModal')) : null;
+    if(m) m.show();
+  }catch(e){ console.error(e); alert('Error al abrir el formulario'); }
+}
+
+async function openEditModal(id){
+  try{
+    const res = await fetch(`${BASE_URL}/alumnos/get?id=${id}`);
+    const data = await res.json();
+    if(data.error){ alert(data.error); return; }
+    document.getElementById('studentId').value = data.id;
+    document.getElementById('matricula').value = data.matricula || '';
+    document.getElementById('nombre').value = data.nombre || '';
+    document.getElementById('apellido').value = data.apellido || '';
+    document.getElementById('email').value = data.email || '';
+    const act = document.getElementById('activo'); if(act) act.checked = data.activo == 1;
+    const title = document.getElementById('modalTitle'); if(title) title.textContent = 'Editar Alumno';
+    const pwd = document.getElementById('password'); if(pwd){ pwd.placeholder='Dejar en blanco para mantener actual'; pwd.required = false; }
+    const m = (typeof bootstrap !== 'undefined' && document.getElementById('studentModal')) ? new bootstrap.Modal(document.getElementById('studentModal')) : null;
+    if(m) m.show();
+  }catch(e){ console.error(e); alert('Error de conexión al obtener datos'); }
+}
+
+function saveStudent(e){
+  e.preventDefault();
+  const form = e.target;
+  const fd = new FormData(form);
+  const id = fd.get('id');
+  const url = id ? `${BASE_URL}/alumnos/update` : `${BASE_URL}/alumnos/store`;
+  const btn = document.getElementById('saveBtn'); const orig = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Guardando...'; }
+  fetch(url, { method: 'POST', body: fd }).then(r=>r.json()).then(data=>{ if(data.success){ location.reload(); } else { alert(data.error || 'Error desconocido'); } }).catch(()=> alert('Error de red')).finally(()=>{ if(btn){ btn.disabled=false; btn.textContent=orig; } });
+}
+
+function deleteStudent(id){
+  if(!confirm('¿Estás seguro de eliminar este alumno? Esta acción no se puede deshacer.')) return;
+  const fd = new FormData(); fd.append('id', id); fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+  fetch(`${BASE_URL}/alumnos/delete`, { method: 'POST', body: fd }).then(r=>r.json()).then(data=>{ if(data.success){ location.reload(); } else { alert(data.error || 'Error al eliminar'); } });
+}
+
+window.openCreateModal = openCreateModal;
+window.openEditModal = openEditModal;
+window.saveStudent = saveStudent;
+window.deleteStudent = deleteStudent;

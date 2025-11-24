@@ -72,6 +72,78 @@ class StudentsController
         include __DIR__ . '/../Views/students/index.php';
     }
 
+    public function show(): string
+    {
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'admin') { http_response_code(403); return 'No autorizado'; }
+        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        if ($id <= 0) { http_response_code(400); return 'ID inválido'; }
+
+        $stmt = $this->pdo->prepare('SELECT id, matricula, nombre, apellido, email, activo, fecha_nac, foto FROM alumnos WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+        $alumno = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$alumno) { http_response_code(404); return 'Alumno no encontrado'; }
+
+        $svc = new \App\Services\StudentsService($this->pdo);
+        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
+        $carga = $svc->getAcademicLoad($id, $ciclo !== '' ? $ciclo : null);
+
+        $sql = "SELECT m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.parcial1, c.parcial2, c.final,
+                       ROUND(IFNULL(c.final, (IFNULL(c.parcial1,0)+IFNULL(c.parcial2,0))/2),2) AS promedio
+                FROM calificaciones c
+                JOIN grupos g ON g.id = c.grupo_id
+                JOIN materias m ON m.id = g.materia_id
+                WHERE c.alumno_id = :a
+                ORDER BY g.ciclo DESC, m.nombre, g.nombre";
+        $stCal = $this->pdo->prepare($sql);
+        $stCal->execute([':a' => $id]);
+        $calificaciones = $stCal->fetchAll(PDO::FETCH_ASSOC);
+
+        $stGr = $this->pdo->prepare('SELECT DISTINCT g.id, g.nombre, g.ciclo, m.nombre AS materia FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id WHERE c.alumno_id = :a ORDER BY g.ciclo DESC, m.nombre, g.nombre');
+        $stGr->execute([':a' => $id]);
+        $grupos = $stGr->fetchAll(PDO::FETCH_ASSOC);
+
+        $cyclesStmt = $this->pdo->query('SELECT DISTINCT ciclo FROM grupos ORDER BY ciclo DESC');
+        $ciclos = array_map(fn($x) => (string)$x['ciclo'], $cyclesStmt->fetchAll(PDO::FETCH_ASSOC));
+
+        $allGroups = $this->pdo->query('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia FROM grupos g JOIN materias m ON m.id = g.materia_id ORDER BY g.ciclo DESC, m.nombre, g.nombre')->fetchAll(PDO::FETCH_ASSOC);
+
+        ob_start();
+        include __DIR__ . '/../Views/students/show.php';
+        return ob_get_clean();
+    }
+
+    public function enroll(): void
+    {
+        if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
+        $alumnoId = filter_input(INPUT_POST, 'alumno_id', FILTER_VALIDATE_INT);
+        $grupoId = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
+        if (!$alumnoId || !$grupoId) { http_response_code(400); echo 'Parámetros inválidos'; return; }
+        $chkA = $this->pdo->prepare('SELECT 1 FROM alumnos WHERE id = :id AND activo = 1');
+        $chkA->execute([':id' => $alumnoId]);
+        if (!$chkA->fetchColumn()) { http_response_code(400); echo 'Alumno no existe o inactivo'; return; }
+        $chkG = $this->pdo->prepare('SELECT 1 FROM grupos WHERE id = :id');
+        $chkG->execute([':id' => $grupoId]);
+        if (!$chkG->fetchColumn()) { http_response_code(400); echo 'Grupo no existe'; return; }
+        $exists = $this->pdo->prepare('SELECT 1 FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g');
+        $exists->execute([':a' => $alumnoId, ':g' => $grupoId]);
+        if ($exists->fetchColumn()) { http_response_code(409); echo 'Ya inscrito'; return; }
+        $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final) VALUES (:a,:g,NULL,NULL,NULL)');
+        $ok = $ins->execute([':a' => $alumnoId, ':g' => $grupoId]);
+        if ($ok) { header('Content-Type: application/json'); echo json_encode(['success' => true]); } else { http_response_code(500); echo 'Error al inscribir'; }
+    }
+
+    public function unenroll(): void
+    {
+        if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
+        $alumnoId = filter_input(INPUT_POST, 'alumno_id', FILTER_VALIDATE_INT);
+        $grupoId = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
+        if (!$alumnoId || !$grupoId) { http_response_code(400); echo 'Parámetros inválidos'; return; }
+        $del = $this->pdo->prepare('DELETE FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g');
+        $ok = $del->execute([':a' => $alumnoId, ':g' => $grupoId]);
+        if ($ok) { header('Content-Type: application/json'); echo json_encode(['success' => true]); } else { http_response_code(500); echo 'Error al desinscribir'; }
+    }
+
     public function store(): void
     {
         $this->checkAdmin();

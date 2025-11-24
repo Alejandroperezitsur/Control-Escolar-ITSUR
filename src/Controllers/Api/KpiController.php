@@ -277,6 +277,7 @@ class KpiController
 
         $promedioGeneral = $this->grades->globalAverage();
         $pendientes = (int)$this->pdo->query('SELECT COUNT(*) FROM calificaciones WHERE final IS NULL')->fetchColumn();
+        $sinOferta = (int)$this->pdo->query('SELECT COUNT(*) FROM materias m WHERE NOT EXISTS (SELECT 1 FROM grupos g WHERE g.materia_id = m.id)')->fetchColumn();
         echo json_encode([
             'alumnos' => $totalAlumnos,
             'profesores' => $totalProfesores,
@@ -285,6 +286,7 @@ class KpiController
             'promedio' => $promedioGeneral,
             'grupos' => $activosGrupos,
             'pendientes_evaluacion' => $pendientes,
+            'sin_oferta' => $sinOferta,
         ]);
     }
 

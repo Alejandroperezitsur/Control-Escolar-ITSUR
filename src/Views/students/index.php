@@ -63,18 +63,20 @@ ob_start();
                 <tr><td colspan="5" class="text-center py-5 text-muted">No se encontraron alumnos.</td></tr>
             <?php else: foreach ($students as $s): ?>
               <tr>
-                <td class="ps-4 fw-medium"><?= htmlspecialchars($s['matricula']) ?></td>
+                <td class="ps-4 fw-medium"><a href="<?= $base; ?>/alumnos/detalle?id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['matricula']) ?></a></td>
                 <td>
                     <div class="d-flex align-items-center">
                         <div class="avatar-initials bg-primary-subtle text-primary rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.85rem;">
                             <?= strtoupper(substr($s['nombre'],0,1).substr($s['apellido'],0,1)) ?>
                         </div>
                         <div>
-                            <?= htmlspecialchars($s['nombre'] . ' ' . $s['apellido']) ?>
+                            <a href="<?= $base; ?>/alumnos/detalle?id=<?= (int)$s['id'] ?>" class="text-decoration-none">
+                                <?= htmlspecialchars($s['nombre'] . ' ' . $s['apellido']) ?>
+                            </a>
                         </div>
                     </div>
                 </td>
-                <td class="text-dark small"><?= htmlspecialchars($s['email'] ?? '—') ?></td>
+                <td class="text-dark small"><a href="<?= $base; ?>/alumnos/detalle?id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['email'] ?? '—') ?></a></td>
 
                 <td>
                     <?php
@@ -125,7 +127,8 @@ ob_start();
 <div class="modal fade" id="studentModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form id="studentForm" onsubmit="saveStudent(event)">
+            <form id="studentForm" onsubmit="saveStudent(event)">
+                <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
         <div class="modal-header">
           <h5 class="modal-title" id="modalTitle">Nuevo Alumno</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -297,6 +300,7 @@ function deleteStudent(id) {
     
     const formData = new FormData();
     formData.append('id', id);
+    formData.append('csrf_token', '<?= $_SESSION['csrf_token'] ?? '' ?>');
     
     fetch(`${BASE_URL}/alumnos/delete`, {
         method: 'POST',

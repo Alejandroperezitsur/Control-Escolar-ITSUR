@@ -54,8 +54,8 @@ $csrf = $_SESSION['csrf_token'] ?? '';
         <?php foreach ($professors as $p): ?>
         <tr>
           <td><?= htmlspecialchars($p['id']) ?></td>
-          <td><?= htmlspecialchars($p['nombre']) ?></td>
-          <td><?= htmlspecialchars($p['email']) ?></td>
+          <td><a href="<?= $base; ?>/professors/detail?id=<?= (int)$p['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($p['nombre']) ?></a></td>
+          <td><a href="<?= $base; ?>/professors/detail?id=<?= (int)$p['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($p['email']) ?></a></td>
           <td><?= (int)$p['activo'] === 1 ? 'Sí' : 'No' ?></td>
           <td class="text-end">
             <button class="btn btn-outline-primary btn-sm me-1" data-bs-toggle="modal" data-bs-target="#editProf<?= (int)$p['id'] ?>">

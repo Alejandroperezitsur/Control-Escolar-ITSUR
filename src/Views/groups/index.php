@@ -49,9 +49,9 @@ ob_start();
         <?php foreach (($groups ?? []) as $g): ?>
         <tr>
           <td><?= htmlspecialchars($g['id']) ?></td>
-          <td><?= htmlspecialchars($g['materia'] ?? '') ?></td>
-          <td><?= htmlspecialchars($g['profesor'] ?? '') ?></td>
-          <td><?= htmlspecialchars($g['nombre']) ?></td>
+          <td><a href="<?= $base; ?>/subjects/detail?id=<?= (int)($g['materia_id'] ?? 0) ?>" class="text-decoration-none"><?= htmlspecialchars($g['materia'] ?? '') ?></a></td>
+          <td><a href="<?= $base; ?>/professors/detail?id=<?= (int)($g['profesor_id'] ?? 0) ?>" class="text-decoration-none"><?= htmlspecialchars($g['profesor'] ?? '') ?></a></td>
+          <td><a href="<?= $base; ?>/grades/group?grupo_id=<?= (int)$g['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($g['nombre']) ?></a></td>
           <td><?= htmlspecialchars($g['ciclo']) ?></td>
           <td><?= htmlspecialchars($g['cupo']) ?></td>
           <td class="text-end">

@@ -142,6 +142,30 @@ body {
 .navbar-brand { font-weight: 700; letter-spacing: .3px; color: var(--text) !important; }
 .nav-link { color: var(--muted) !important; transition: color .2s ease; padding: .5rem .75rem; font-size: 1rem; }
 .nav-link:hover { color: var(--text) !important; }
+/* Asegurar que los badges KPI del navbar sean legibles en tema oscuro */
+[data-theme="dark"] .navbar .nav-link .badge,
+[data-theme="dark"] .navbar .nav-link #nav-count-sinoferta,
+[data-theme="dark"] .navbar .nav-link #nav-count-alumnos,
+[data-theme="dark"] .navbar .nav-link #nav-count-profesores,
+[data-theme="dark"] .navbar .nav-link #nav-count-materias,
+[data-theme="dark"] .navbar .nav-link #nav-count-grupos {
+  color: var(--text) !important;
+  background: rgba(255,255,255,0.06) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow: none !important;
+}
+/* Forzar que SOLO los números de los contadores sean negros (legible y solicitado)
+   Aplicamos fondo claro y texto negro a los badges de KPI para mantener contraste. */
+.navbar .nav-link #nav-count-alumnos,
+.navbar .nav-link #nav-count-materias,
+.navbar .nav-link #nav-count-profesores,
+.navbar .nav-link #nav-count-grupos,
+.navbar .nav-link #nav-count-sinoferta {
+  background: #ffffff !important;
+  color: #000 !important;
+  border: 1px solid rgba(0,0,0,0.08) !important;
+  box-shadow: none !important;
+}
 /* Visibilidad de texto en navbar */
 .navbar .navbar-text { color: var(--text) !important; }
 [data-theme="light"] .navbar .navbar-text { color: #0f172a !important; }
@@ -198,6 +222,8 @@ body {
 [data-theme="light"] .btn-contrast:hover { filter: brightness(0.96); }
 .btn-exit { background-color: #dc3545; color: #ffffff; border-color: #dc3545; }
 .btn-exit:hover { background-color: #bb2d3b; border-color: #b02a37; }
+@keyframes kpiFlash { 0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,.0); } 30% { transform: scale(1.06); box-shadow: 0 0 0 .35rem rgba(34,197,94,.18); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(34,197,94,.0); } }
+.kpi-flash { animation: kpiFlash .8s ease; }
 .btn-login { background-color: #198754; color: #ffffff; border-color: #198754; }
 .btn-login:hover { background-color: #157347; border-color: #146c43; }
 .btn-outline-primary { border-color: var(--primary); color: var(--text); }

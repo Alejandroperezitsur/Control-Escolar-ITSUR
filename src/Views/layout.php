@@ -1,7 +1,10 @@
 <?php
 $role = $_SESSION['role'] ?? 'guest';
 $name = $_SESSION['name'] ?? '';
-$base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
+$scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
+$base = $scriptDir;
+$p = strpos($scriptDir, '/public');
+if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
 ?>
 <!doctype html>
 <html lang="es">
@@ -9,6 +12,8 @@ $base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Control Escolar</title>
+  <meta name="csrf-token" content="<?= $_SESSION['csrf_token'] ?? '' ?>">
+  <base href="<?php echo $base; ?>/">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
   <link href="<?php echo $base; ?>/assets/css/styles.css" rel="stylesheet">
@@ -25,7 +30,10 @@ $base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
           <?php if ($role === 'admin'): ?>
             <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/dashboard">Dashboard</a></li>
             <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/reports">Reportes</a></li>
-            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/alumnos">Alumnos</a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/alumnos">Alumnos <span class="badge bg-light text-dark ms-1" id="nav-count-alumnos" data-bs-toggle="tooltip" title="Alumnos activos">—</span></a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/subjects">Materias <span class="badge bg-light text-dark ms-1" id="nav-count-materias" data-bs-toggle="tooltip" title="Materias registradas">—</span><span class="badge bg-warning text-dark ms-1" id="nav-count-sinoferta" data-bs-toggle="tooltip" title="Materias sin oferta">—</span></a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/professors">Profesores <span class="badge bg-light text-dark ms-1" id="nav-count-profesores" data-bs-toggle="tooltip" title="Profesores activos">—</span></a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/groups">Grupos <span class="badge bg-light text-dark ms-1" id="nav-count-grupos" data-bs-toggle="tooltip" title="Grupos activos con calificaciones">—</span></a></li>
             <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/admin/settings">Ajustes</a></li>
           <?php elseif ($role === 'profesor'): ?>
             <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/dashboard">Dashboard</a></li>
@@ -36,6 +44,9 @@ $base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
           <?php endif; ?>
         </ul>
         <div class="d-flex align-items-center">
+          <?php if ($role === 'admin'): ?>
+          <button id="nav-refresh-kpis" class="btn btn-outline-primary btn-sm me-2" type="button" data-bs-toggle="tooltip" title="Actualizar ahora">↻</button>
+          <?php endif; ?>
           <button id="theme-toggle" class="btn btn-outline-secondary me-2" type="button" aria-label="Cambiar tema">🌙</button>
           <?php if ($role !== 'guest'): ?>
             <span class="navbar-text me-3"><i class="fa-regular fa-user me-1"></i><?php echo htmlspecialchars($name ?: $role); ?></span>
@@ -65,5 +76,61 @@ $base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
   <?php unset($_SESSION['flash'], $_SESSION['flash_type']); endif; ?>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="<?php echo $base; ?>/assets/js/main.js"></script>
+  <?php if (($role ?? '') === 'admin'): ?>
+  <script>
+  (function(){
+    const base = '<?php echo $base; ?>';
+    var tEls = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    tEls.forEach(function(el){ new bootstrap.Tooltip(el); });
+    function setBadge(id, val){ var el = document.getElementById(id); if (!el) return; var prev = el.textContent; var next = (typeof val === 'number' ? String(val) : '—'); el.textContent = next; if (prev !== next) { el.classList.add('kpi-flash'); setTimeout(function(){ el.classList.remove('kpi-flash'); }, 800); } }
+    function setTip(id, text){ var el = document.getElementById(id); if (!el) return; el.setAttribute('title', text); var inst = bootstrap.Tooltip.getInstance(el); if (inst) inst.dispose(); new bootstrap.Tooltip(el); }
+    function setErrorMode(on){ var ids=['nav-count-alumnos','nav-count-profesores','nav-count-materias','nav-count-grupos']; ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; el.classList.toggle('bg-warning', !!on); el.classList.toggle('text-dark', !!on); el.classList.toggle('bg-light', !on); }); }
+    var loadingTimer = null;
+    function showLoading(){ var ids=['nav-count-alumnos','nav-count-profesores','nav-count-materias','nav-count-grupos','nav-count-sinoferta']; ids.forEach(function(id){ var el=document.getElementById(id); if(!el) return; if (!el.nextElementSibling || el.nextElementSibling.getAttribute('data-role') !== 'kpi-loading') { var sp=document.createElement('span'); sp.setAttribute('data-role','kpi-loading'); sp.className='spinner-grow spinner-grow-sm text-light ms-1'; sp.style.verticalAlign='middle'; el.parentNode.insertBefore(sp, el.nextSibling); } setTip(id, 'Actualizando…'); }); }
+    function showLoadingDelayed(){ if (loadingTimer) { clearTimeout(loadingTimer); } loadingTimer = setTimeout(showLoading, 200); }
+    function hideLoading(){ if (loadingTimer) { clearTimeout(loadingTimer); loadingTimer = null; } document.querySelectorAll('[data-role="kpi-loading"]').forEach(function(sp){ sp.remove(); }); }
+    function loadKpis(){
+      showLoadingDelayed();
+      fetch(base + '/api/kpis/admin').then(r=>r.json()).then(j=>{
+        if (!j) return;
+        setErrorMode(false);
+        setBadge('nav-count-alumnos', Number(j.alumnos ?? 0));
+        setBadge('nav-count-profesores', Number(j.profesores ?? 0));
+        setBadge('nav-count-materias', Number(j.materias ?? 0));
+        setBadge('nav-count-grupos', Number(j.grupos ?? 0));
+        var sinO = Number(j.sin_oferta ?? 0);
+        setBadge('nav-count-sinoferta', sinO);
+        var soEl = document.getElementById('nav-count-sinoferta'); if (soEl) { soEl.classList.toggle('bg-warning', sinO > 0); soEl.classList.toggle('text-dark', sinO > 0); soEl.classList.toggle('bg-light', sinO === 0); }
+        var stamp = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        setTip('nav-count-alumnos', 'Alumnos activos: ' + (j.alumnos ?? '—') + ' — Actualizado: ' + stamp);
+        setTip('nav-count-profesores', 'Profesores activos: ' + (j.profesores ?? '—') + ' — Actualizado: ' + stamp);
+        setTip('nav-count-materias', 'Materias registradas: ' + (j.materias ?? '—') + ' — Actualizado: ' + stamp);
+        setTip('nav-count-sinoferta', 'Materias sin oferta: ' + sinO + ' — Actualizado: ' + stamp + ' — Clic para filtrar');
+        setTip('nav-count-grupos', 'Grupos activos con calificaciones: ' + (j.grupos ?? '—') + ' — Actualizado: ' + stamp);
+        hideLoading();
+      }).catch(()=>{
+        setErrorMode(true);
+        var stamp = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+        setTip('nav-count-alumnos', 'Error de red — Último intento: ' + stamp);
+        setTip('nav-count-profesores', 'Error de red — Último intento: ' + stamp);
+        setTip('nav-count-materias', 'Error de red — Último intento: ' + stamp);
+        setTip('nav-count-sinoferta', 'Error de red — Último intento: ' + stamp);
+        setTip('nav-count-grupos', 'Error de red — Último intento: ' + stamp);
+        hideLoading();
+      });
+    }
+    var btn = document.getElementById('nav-refresh-kpis'); if (btn) { btn.addEventListener('click', function(){ loadKpis(); }); }
+    var so = document.getElementById('nav-count-sinoferta'); if (so) { so.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); var c=''; try { c = String(localStorage.getItem('subjects_last_ciclo')||''); } catch(e){} var url = base + '/subjects?estado=sin_grupos' + (c!==''?('&ciclo='+encodeURIComponent(c)):''); location.href = url; }); so.style.cursor = 'pointer'; }
+    loadKpis();
+    var isDash = (location.search.indexOf('r=/dashboard') !== -1) || (location.pathname.endsWith('/dashboard'));
+    var REFRESH_MS = isDash ? 30000 : 60000;
+    var kpiTimer = setInterval(loadKpis, REFRESH_MS);
+    document.addEventListener('visibilitychange', function(){
+      if (document.hidden) { clearInterval(kpiTimer); }
+      else { clearInterval(kpiTimer); kpiTimer = setInterval(loadKpis, REFRESH_MS); loadKpis(); }
+    });
+  })();
+  </script>
+  <?php endif; ?>
 </body>
 </html>
