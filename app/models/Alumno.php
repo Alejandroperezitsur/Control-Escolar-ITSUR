@@ -1,3 +1,19 @@
+    // Soporte para paginación en getAll
+    public function getAll($page = 1, $limit = 10) {
+        $page = max(1, (int)$page);
+        $limit = max(1, (int)$limit);
+        $offset = ($page - 1) * $limit;
+        $sql = "SELECT * FROM {$this->table} LIMIT {$limit} OFFSET {$offset}";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    // Soporte para contar todos los alumnos
+    public function count() {
+        $sql = "SELECT COUNT(*) FROM {$this->table}";
+        return (int)$this->db->query($sql)->fetchColumn();
+    }
 <?php
 require_once __DIR__ . '/Model.php';
 

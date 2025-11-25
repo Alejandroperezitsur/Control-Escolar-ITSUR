@@ -2,10 +2,10 @@
 return array (
   'db' => 
   array (
-    'host' => '127.0.0.1:3306',
-    'name' => 'control_escolar',
-    'user' => 'root',
-    'pass' => 'root',
+    'host' => 'sql212.infinityfree.com:3306',
+    'name' => 'if0_40512739_control_escolar',
+    'user' => 'if0_40512739',
+    'pass' => 'APcZEb123',
   ),
   'app' => 
   array (
