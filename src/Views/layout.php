@@ -128,9 +128,40 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
   <script src="<?php echo $base; ?>/assets/js/main.js"></script>
   <script src="/Control-Escolar-ITSUR/public/assets/js/main.js"></script>
   <script>
-    document.addEventListener('click',function(e){var b=e.target.closest('[data-bs-toggle="modal"]');if(!b)return;var t=b.getAttribute('data-bs-target');var m=t?document.querySelector(t):null;if(m){e.preventDefault();m.classList.add('show');}}
-    );
-    document.addEventListener('click',function(e){if(e.target.closest('[data-bs-dismiss="modal"],.btn-close')){var m=e.target.closest('.modal');if(m){e.preventDefault();m.classList.remove('show');}}});
+    (function(){
+      document.addEventListener('click', function(e){
+        var trigger = e.target.closest('[data-bs-toggle="modal"]');
+        if (!trigger) return;
+        var targetSel = trigger.getAttribute('data-bs-target');
+        var el = targetSel ? document.querySelector(targetSel) : null;
+        if (!el) return;
+        e.preventDefault();
+        try {
+          if (window.bootstrap && window.bootstrap.Modal) {
+            var inst = window.bootstrap.Modal.getInstance(el) || new window.bootstrap.Modal(el);
+            inst.show();
+          } else {
+            el.classList.add('show');
+          }
+        } catch { el.classList.add('show'); }
+      });
+
+      document.addEventListener('click', function(e){
+        var isDismiss = !!e.target.closest('[data-bs-dismiss="modal"], .btn-close');
+        if (!isDismiss) return;
+        var el = e.target.closest('.modal');
+        if (!el) return;
+        e.preventDefault();
+        try {
+          if (window.bootstrap && window.bootstrap.Modal) {
+            var inst = window.bootstrap.Modal.getInstance(el) || new window.bootstrap.Modal(el);
+            inst.hide();
+          } else {
+            el.classList.remove('show');
+          }
+        } catch { el.classList.remove('show'); }
+      });
+    })();
   </script>
   <?php if (($role ?? '') === 'admin'): ?>
   <script>

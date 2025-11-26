@@ -110,12 +110,20 @@ ob_start();
     <div class="card-footer bg-white border-top-0 py-3">
         <nav aria-label="Page navigation">
             <ul class="pagination justify-content-center mb-0">
+                <?php
+                $queryParams = $_GET;
+                $queryParams['page'] = max(1, $page - 1);
+                $prevUrl = '?' . http_build_query($queryParams);
+                
+                $queryParams['page'] = min($totalPages ?? 1, $page + 1);
+                $nextUrl = '?' . http_build_query($queryParams);
+                ?>
                 <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                    <a class="page-link" href="?page=<?= $page - 1 ?>&q=<?= htmlspecialchars($_GET['q'] ?? '') ?>&status=<?= htmlspecialchars($_GET['status'] ?? '') ?>">Anterior</a>
+                    <a class="page-link" href="<?= htmlspecialchars($prevUrl) ?>">Anterior</a>
                 </li>
                 <li class="page-item disabled"><span class="page-link">Página <?= $page ?> de <?= $totalPages ?? 1 ?></span></li>
                 <li class="page-item <?= ($page >= ($totalPages ?? 1)) ? 'disabled' : '' ?>">
-                    <a class="page-link" href="?page=<?= $page + 1 ?>&q=<?= htmlspecialchars($_GET['q'] ?? '') ?>&status=<?= htmlspecialchars($_GET['status'] ?? '') ?>">Siguiente</a>
+                    <a class="page-link" href="<?= htmlspecialchars($nextUrl) ?>">Siguiente</a>
                 </li>
             </ul>
         </nav>

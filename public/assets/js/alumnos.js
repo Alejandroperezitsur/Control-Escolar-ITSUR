@@ -76,7 +76,11 @@ class AlumnosUI {
                 if (response.success) {
                     this.showAlert('success', response.message);
                     this.loadAlumnos();
-                    bootstrap.Modal.getInstance('#alumnoModal').hide();
+                    const el = document.getElementById('alumnoModal');
+                    if (el) {
+                        const inst = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
+                        inst.hide();
+                    }
                 } else {
                     this.showAlert('danger', response.error);
                     this.showFormErrors(response.errors);
@@ -181,7 +185,8 @@ class AlumnosUI {
             const response = await AlumnosAPI.getOne(id);
             if (response.success) {
                 const alumno = response.data;
-                const modal = new bootstrap.Modal('#detalleAlumnoModal');
+                const detalleEl = document.getElementById('detalleAlumnoModal');
+                const modal = detalleEl ? new bootstrap.Modal(detalleEl) : null;
                 document.querySelector('#detalle-alumno-content').innerHTML = `
                     <div class="row">
                         <div class="col-md-4">
@@ -253,8 +258,9 @@ class AlumnosUI {
                 document.querySelector('#alumno-form-email').value = alumno.email;
                 document.querySelector('#alumno-form-fecha_nac').value = alumno.fecha_nac;
                 
-                const modal = new bootstrap.Modal('#alumnoModal');
-                modal.show();
+                const editEl = document.getElementById('alumnoModal');
+                const modal = editEl ? new bootstrap.Modal(editEl) : null;
+                if (modal) modal.show();
             } else {
                 this.showAlert('danger', response.error);
             }

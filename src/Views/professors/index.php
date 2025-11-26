@@ -134,7 +134,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
 
 <script>
 // Bootstrap client-side validation
-(() => {
+(function() {
   const form = document.querySelector('form[action="<?php echo $base; ?>/professors/create"]');
   form.addEventListener('submit', (event) => {
     if (!form.checkValidity()) {
@@ -143,6 +143,20 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     }
     form.classList.add('was-validated');
   }, false);
+})();
+
+// Validación para formularios de edición en modales
+(function() {
+  const editForms = Array.from(document.querySelectorAll('form.needs-validation'));
+  editForms.forEach(f => {
+    f.addEventListener('submit', (event) => {
+      if (!f.checkValidity()) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      f.classList.add('was-validated');
+    }, false);
+  });
 })();
 </script>
 
