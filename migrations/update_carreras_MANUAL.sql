@@ -1,25 +1,17 @@
--- Script de migración simplificado para ejecutar manualmente en phpMyAdmin
--- o desde MySQL Workbench
 
-USE control_escolar;
 
--- Agregar columna descripcion
 ALTER TABLE carreras 
 ADD COLUMN descripcion TEXT AFTER nombre;
 
--- Agregar columna duracion_semestres
 ALTER TABLE carreras 
 ADD COLUMN duracion_semestres INT DEFAULT 9 AFTER descripcion;
 
--- Agregar columna creditos_totales
 ALTER TABLE carreras 
 ADD COLUMN creditos_totales INT DEFAULT 240 AFTER duracion_semestres;
 
--- Agregar columna activo
 ALTER TABLE carreras 
 ADD COLUMN activo TINYINT(1) DEFAULT 1 AFTER creditos_totales;
 
--- Actualizar datos existentes con descripciones
 UPDATE carreras SET 
     descripcion = CASE 
         WHEN clave = 'ISC' OR clave = 'IC' THEN 'Profesionista capaz de diseñar, desarrollar e implementar sistemas computacionales aplicando las metodologías y tecnologías más recientes.'
@@ -35,7 +27,6 @@ UPDATE carreras SET
     creditos_totales = 240,
     activo = 1;
 
--- Verificar el resultado
 SELECT id, nombre, clave, 
        SUBSTRING(descripcion, 1, 50) as descripcion_preview,
        duracion_semestres, 

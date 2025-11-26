@@ -1,9 +1,4 @@
--- Archivo simplificado de base de datos para Control Escolar
--- Hecho rapido por un programador junior: estructura mínima para pruebas
--- NOTA: contraseña en texto plano en los inserts (solo para pruebas)
 
-CREATE DATABASE IF NOT EXISTS `control_escolar` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE `control_escolar`;
 
 -- Tabla de usuarios (muy simple)
 CREATE TABLE IF NOT EXISTS `usuarios` (

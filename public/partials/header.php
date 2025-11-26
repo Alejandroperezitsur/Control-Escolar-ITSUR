@@ -1,7 +1,7 @@
 <?php
 // Cargar configuración para toggles de módulos
 $base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
-echo '<link href="' . htmlspecialchars($base) . '/assets/css/styles.css" rel="stylesheet">';
+echo '<link href="/assets/css/styles.css" rel="stylesheet">';
 $role = $_SESSION['role'] ?? ($_SESSION['user_role'] ?? '');
 $userEmail = $_SESSION['user_email'] ?? ($_SESSION['user_identifier'] ?? '');
 $config = [];

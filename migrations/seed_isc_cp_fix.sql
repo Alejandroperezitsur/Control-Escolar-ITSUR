@@ -1,4 +1,4 @@
-USE control_escolar;
+
 
 -- Get IDs
 SET @isc_id = (SELECT id FROM carreras WHERE clave = 'ISC' OR clave = 'IC' LIMIT 1);

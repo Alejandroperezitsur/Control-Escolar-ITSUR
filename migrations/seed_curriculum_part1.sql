@@ -1,6 +1,6 @@
 -- Link subjects to careers and semesters
 -- This creates the complete curriculum for all 7 careers
-USE control_escolar;
+
 
 -- Get career IDs (assuming they're in order: ISC, II, IGE, IE, IM, IER, CP)
 SET @isc_id = (SELECT id FROM carreras WHERE clave = 'ISC' OR clave = 'IC' LIMIT 1);

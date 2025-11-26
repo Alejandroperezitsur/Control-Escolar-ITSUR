@@ -1,4 +1,4 @@
-USE control_escolar;
+
 
 -- 1. Insert Subjects (Materias) if they don't exist
 INSERT IGNORE INTO materias (nombre, clave) VALUES

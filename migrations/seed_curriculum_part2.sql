@@ -1,5 +1,5 @@
 -- Curriculum assignment for remaining careers: IGE, IE, IM, IER, CP
-USE control_escolar;
+
 
 SET @ige_id = (SELECT id FROM carreras WHERE clave = 'IGE' LIMIT 1);
 SET @ie_id = (SELECT id FROM carreras WHERE clave = 'IE' LIMIT 1);

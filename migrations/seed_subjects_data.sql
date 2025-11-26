@@ -1,16 +1,12 @@
--- Seed comprehensive curriculum data for all 7 careers
--- Each career has 9 semesters, with semester 9 being Residencias Profesionales
-USE control_escolar;
 
--- First, insert common subjects that all careers share
 INSERT INTO materias (nombre, clave) VALUES
--- Matemáticas básicas
 ('Cálculo Diferencial', 'MAT-1001'),
 ('Cálculo Integral', 'MAT-1002'),
 ('Cálculo Vectorial', 'MAT-1003'),
 ('Álgebra Lineal', 'MAT-1004'),
 ('Ecuaciones Diferenciales', 'MAT-1005'),
 ('Probabilidad y Estadística', 'MAT-1006'),
+-- Removed CREATE DATABASE and USE statements for compatibility with InfinityFree
 
 -- Inglés (10 niveles)
 ('Inglés I', 'ING-1001'),
