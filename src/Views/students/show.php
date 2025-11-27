@@ -9,8 +9,9 @@ ob_start();
     <!-- Modal Create/Edit (duplicado aquí para permitir edición desde la vista de perfil) -->
     <div class="modal fade" id="studentModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog">
-        <div class="modal-content">
+    <div class="modal-content">
           <form id="studentForm" onsubmit="saveStudent(event)">
+            <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token'] ?? '' ?>">
             <div class="modal-header">
               <h5 class="modal-title" id="modalTitle">Editar Alumno</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -20,20 +21,24 @@ ob_start();
               <div class="mb-3">
                 <label for="matricula" class="form-label">Matrícula <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="matricula" name="matricula" required>
+                <div class="invalid-feedback">Ingresa la matrícula.</div>
               </div>
               <div class="row g-3 mb-3">
                 <div class="col-6">
                     <label for="nombre" class="form-label">Nombre <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="nombre" name="nombre" required>
+                    <div class="invalid-feedback">Ingresa el nombre.</div>
                 </div>
                 <div class="col-6">
                     <label for="apellido" class="form-label">Apellido <span class="text-danger">*</span></label>
                     <input type="text" class="form-control" id="apellido" name="apellido" required>
+                    <div class="invalid-feedback">Ingresa el apellido.</div>
                 </div>
               </div>
               <div class="mb-3">
                 <label for="email" class="form-label">Email</label>
                 <input type="email" class="form-control" id="email" name="email">
+                <div class="invalid-feedback">Ingresa un correo válido.</div>
               </div>
               <div class="mb-3">
                 <label for="password" class="form-label">Contraseña</label>
@@ -53,6 +58,8 @@ ob_start();
         </div>
       </div>
     </div>
+
+    <div id="toastContainer" class="position-fixed top-0 end-0 p-3" style="z-index:1100"></div>
 
     </div>
     <div class="d-flex gap-2">
@@ -269,6 +276,7 @@ function openEditModal(id) {
       document.getElementById('modalTitle').textContent = 'Editar Alumno';
       const pwd = document.getElementById('password'); if(pwd) { pwd.placeholder = 'Dejar en blanco para mantener actual'; pwd.required = false; }
       const m = getModal(); if(m) m.show();
+      showToast('Datos del alumno cargados', 'success');
     })
     .catch(e => { console.error(e); alert('Error de conexión al obtener datos'); });
 }
@@ -285,8 +293,28 @@ function saveStudent(e) {
   fetch(url, { method: 'POST', body: formData })
   .then(r => r.json())
   .then(data => { if(data.success) { location.reload(); } else { alert(data.error || 'Error desconocido'); } })
-  .catch(err => { console.error(err); alert('Error de red'); })
+  .catch(err => { console.error(err); showToast('Error de red', 'danger'); })
   .finally(() => { btn.disabled = false; btn.textContent = originalText; });
+}
+
+function showToast(message, type = 'success') {
+  try {
+    const container = document.getElementById('toastContainer');
+    const bg = type === 'success' ? 'bg-success text-white' : type === 'warning' ? 'bg-warning text-dark' : 'bg-danger text-white';
+    const id = 't' + String(Date.now());
+    const html = `
+      <div id="${id}" class="toast align-items-center ${bg}" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+          <div class="toast-body">${message}</div>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+      </div>`;
+    container.insertAdjacentHTML('beforeend', html);
+    const el = document.getElementById(id);
+    const t = new bootstrap.Toast(el, { delay: 2500 });
+    t.show();
+    el.addEventListener('hidden.bs.toast', () => { el.remove(); });
+  } catch (e) {}
 }
 </script>
 

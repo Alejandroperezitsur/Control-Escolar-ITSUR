@@ -8,6 +8,8 @@ ob_start();
     <h3>Materias <span class="badge bg-light text-dark ms-2"><?= (int)($pagination['total'] ?? 0) ?></span><span class="text-muted fs-6 ms-2">Página <?= (int)($pagination['page'] ?? 1) ?> de <?= (int)($pagination['pages'] ?? 1) ?></span></h3>
     <a href="<?php echo $base; ?>/dashboard" class="btn btn-outline-secondary">Volver</a>
   </div>
+  <?php $flash = $_SESSION['flash'] ?? null; $flashType = $_SESSION['flash_type'] ?? 'info'; unset($_SESSION['flash'], $_SESSION['flash_type']); ?>
+  <div id="toastContainer" class="position-fixed top-0 end-0 p-3" style="z-index:1100"></div>
 
   <div class="card mb-3">
     <div class="card-body">
@@ -294,6 +296,22 @@ ob_start();
       }
     }
   } catch (e) {}
+
+  function showToast(message, type) {
+    const container = document.getElementById('toastContainer');
+    if (!container || !message) return;
+    const bg = type === 'success' ? 'bg-success text-white' : type === 'warning' ? 'bg-warning text-dark' : type === 'danger' ? 'bg-danger text-white' : 'bg-primary text-white';
+    const id = 't' + String(Date.now());
+    const html = `<div id="${id}" class="toast align-items-center ${bg}" role="alert" aria-live="assertive" aria-atomic="true"><div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div></div>`;
+    container.insertAdjacentHTML('beforeend', html);
+    const el = document.getElementById(id);
+    const t = new bootstrap.Toast(el, { delay: 2500 });
+    t.show();
+    el.addEventListener('hidden.bs.toast', () => { el.remove(); });
+  }
+  <?php if ($flash): ?>
+  showToast('<?= htmlspecialchars($flash) ?>', '<?= htmlspecialchars($flashType) ?>');
+  <?php endif; ?>
 })();
 </script>
 

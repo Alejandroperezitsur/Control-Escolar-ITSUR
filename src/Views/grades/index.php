@@ -20,25 +20,30 @@ ob_start();
             <label class="form-label">Grupo</label>
             <select name="grupo_id" id="grupo_id" class="form-select" required></select>
             <div class="form-text">Selecciona el grupo asignado.</div>
+            <div class="invalid-feedback">Selecciona un grupo.</div>
           </div>
           <div class="col-md-4">
             <label class="form-label">Alumno</label>
             <select name="alumno_id" id="alumno_id" class="form-select" required></select>
             <div class="form-text">Selecciona el alumno activo.</div>
+            <div class="invalid-feedback">Selecciona un alumno.</div>
           </div>
           <div class="col-md-4 d-flex align-items-end">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" value="1" id="onlyPending">
               <label class="form-check-label" for="onlyPending">Solo pendientes</label>
             </div>
+            <span class="badge bg-warning text-dark ms-2" id="pendingBadge">Pendientes: —</span>
           </div>
           <div class="col-md-4">
             <label class="form-label">Parcial 1</label>
             <input type="number" min="0" max="100" step="1" name="parcial1" class="form-control" placeholder="0-100">
+            <div class="invalid-feedback">Ingresa un número entre 0 y 100.</div>
           </div>
         <div class="col-md-4">
           <label class="form-label">Parcial 2</label>
           <input type="number" min="0" max="100" step="1" name="parcial2" class="form-control" placeholder="0-100">
+          <div class="invalid-feedback">Ingresa un número entre 0 y 100.</div>
         </div>
         <div class="col-md-4">
           <label class="form-label">Final</label>
@@ -46,6 +51,7 @@ ob_start();
             <input type="number" min="0" max="100" step="1" name="final" class="form-control" placeholder="0-100">
             <button type="button" id="btnCalcFinal" class="btn btn-outline-secondary"><i class="fa-solid fa-calculator me-1"></i> Calcular</button>
           </div>
+          <div class="invalid-feedback">Ingresa un número entre 0 y 100.</div>
         </div>
         </div>
 
@@ -54,7 +60,8 @@ ob_start();
           <button type="button" id="openConfirmNext" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#confirmModal"><i class="fa-solid fa-forward-step me-1"></i> Guardar y siguiente</button>
           <button type="button" id="btnReset" class="btn btn-outline-secondary"><i class="fa-solid fa-broom me-1"></i> Limpiar</button>
           <a href="<?php echo $base; ?>/grades/bulk" class="btn btn-outline-info"><i class="fa-solid fa-file-csv me-1"></i> Carga Masiva</a>
-          <span class="badge bg-secondary" id="promedioBadge">Promedio actual: —</span>
+          <span class="badge bg-secondary" id="promedioBadge" role="status" aria-live="polite">Promedio actual: —</span>
+          <span class="badge bg-info text-dark" id="draftBadge" style="display:none">Borrador restaurado</span>
         </div>
       </form>
     </div>
@@ -82,6 +89,7 @@ ob_start();
 
 <script>
 var GO_NEXT = false;
+var IS_DIRTY = false;
 (async function init() {
   const grupoSel = document.getElementById('grupo_id');
   const alumnoSel = document.getElementById('alumno_id');
@@ -90,11 +98,14 @@ var GO_NEXT = false;
   const LS_G = 'grades_last_group';
   const LS_A = 'grades_last_alumno';
   const LS_P = 'grades_only_pending';
+  const getDraftKey = (gid, aid) => 'grades_draft_' + String(gid||'') + '_' + String(aid||'');
   
   console.log('Iniciando carga de catálogos...');
   console.log('Session info - Role:', '<?php echo $_SESSION['role'] ?? 'N/A'; ?>', 'User ID:', '<?php echo $_SESSION['user_id'] ?? 'N/A'; ?>');
   
   try {
+    grupoSel.innerHTML = '<option value="">Cargando grupos...</option>';
+    alumnoSel.innerHTML = '<option value="">Selecciona el grupo para ver alumnos...</option>';
     // Poblar grupos: si admin, usar todos los grupos; si profesor, solo los propios
     const gruposUrl = '<?php echo $base; ?>/app.php?r=<?php echo ($role === 'admin' ? '/api/catalogs/groups_all' : '/api/catalogs/groups'); ?>';
     const qs = new URLSearchParams(location.search);
@@ -158,38 +169,43 @@ var GO_NEXT = false;
     }
     
     // Cargar alumnos según el grupo seleccionado (propios del profesor)
-    async function loadStudentsByGroup(gid) {
-      if (!gid) { alumnoSel.innerHTML = '<option value="">Selecciona el alumno activo...</option>'; return; }
-      var pend = document.getElementById('onlyPending');
-      var qpend = (pend && pend.checked) ? '&pending=1' : '';
-      const url = '<?php echo $base; ?>/app.php?r=/api/catalogs/group_students&gid=' + encodeURIComponent(gid) + qpend;
-      console.log('Fetching alumnos por grupo desde:', url);
-      try {
-        const res = await fetch(url);
-        console.log('Alumnos (grupo) response status:', res.status, res.statusText);
-        if (!res.ok) {
-          const t = await res.text();
-          console.error('Error alumnos por grupo:', res.status, res.statusText, t);
+      async function loadStudentsByGroup(gid) {
+        if (!gid) { alumnoSel.innerHTML = '<option value="">Selecciona el alumno activo...</option>'; return; }
+        var pend = document.getElementById('onlyPending');
+        var qpend = (pend && pend.checked) ? '&pending=1' : '';
+        const url = '<?php echo $base; ?>/app.php?r=/api/catalogs/group_students&gid=' + encodeURIComponent(gid) + qpend;
+        console.log('Fetching alumnos por grupo desde:', url);
+        try {
+          const res = await fetch(url);
+          console.log('Alumnos (grupo) response status:', res.status, res.statusText);
+          if (!res.ok) {
+            const t = await res.text();
+            console.error('Error alumnos por grupo:', res.status, res.statusText, t);
+            alumnoSel.innerHTML = '<option value="">Error al cargar alumnos</option>';
+            return;
+          }
+          const list = await res.json();
+          try {
+            const resPend = await fetch('<?php echo $base; ?>/app.php?r=/api/catalogs/group_students&gid=' + encodeURIComponent(gid) + '&pending=1');
+            const pendList = await resPend.json();
+            var pb = document.getElementById('pendingBadge'); if (pb) { pb.textContent = 'Pendientes: ' + String((pendList||[]).length || 0); }
+          } catch(e){ var pb = document.getElementById('pendingBadge'); if (pb) { pb.textContent = 'Pendientes: —'; } }
+          if (list.length > 0) {
+            alumnoSel.innerHTML = '<option value="">Selecciona el alumno activo...</option>';
+            const og = document.createElement('optgroup');
+            og.label = 'Alumnos del grupo';
+            og.innerHTML = list.map(a => `<option value="${a.id}">${a.matricula || ''} · ${a.nombre || ''} ${a.apellido || ''}</option>`).join('');
+            alumnoSel.appendChild(og);
+            const firstA = list[0]?.id;
+            if (firstA) { alumnoSel.value = String(firstA); }
+          } else {
+            alumnoSel.innerHTML = '<option value="">No hay alumnos en el grupo</option>';
+          }
+        } catch (e) {
+          console.error('Excepción cargando alumnos por grupo:', e);
           alumnoSel.innerHTML = '<option value="">Error al cargar alumnos</option>';
-          return;
         }
-        const list = await res.json();
-        if (list.length > 0) {
-          alumnoSel.innerHTML = '<option value="">Selecciona el alumno activo...</option>';
-          const og = document.createElement('optgroup');
-          og.label = 'Alumnos del grupo';
-          og.innerHTML = list.map(a => `<option value="${a.id}">${a.matricula || ''} · ${a.nombre || ''} ${a.apellido || ''}</option>`).join('');
-          alumnoSel.appendChild(og);
-          const firstA = list[0]?.id;
-          if (firstA) { alumnoSel.value = String(firstA); }
-        } else {
-          alumnoSel.innerHTML = '<option value="">No hay alumnos en el grupo</option>';
-        }
-      } catch (e) {
-        console.error('Excepción cargando alumnos por grupo:', e);
-        alumnoSel.innerHTML = '<option value="">Error al cargar alumnos</option>';
       }
-    }
 
     async function prefillGrades() {
       const gid = grupoSel.value;
@@ -202,7 +218,25 @@ var GO_NEXT = false;
         const json = await res.json();
         const d = json && json.data ? json.data : null;
         const setVal = (name, val) => { const el = document.querySelector(`[name="${name}"]`); if (!el) return; el.value = (val === null || typeof val === 'undefined') ? '' : String(val); };
-        if (d) { setVal('parcial1', d.parcial1); setVal('parcial2', d.parcial2); setVal('final', d.final); updatePromedioBadge(); focusNext(); }
+        if (d) { setVal('parcial1', d.parcial1); setVal('parcial2', d.parcial2); setVal('final', d.final); }
+        const p1El = document.querySelector('[name="parcial1"]');
+        const p2El = document.querySelector('[name="parcial2"]');
+        const finEl = document.querySelector('[name="final"]');
+        if (p1El && p2El && finEl && p1El.value === '' && p2El.value === '' && finEl.value === '') {
+          try {
+            const draftRaw = localStorage.getItem(getDraftKey(gid, aid));
+            if (draftRaw) {
+              const draft = JSON.parse(draftRaw);
+              if (draft && typeof draft === 'object') {
+                if (typeof draft.p1 !== 'undefined') p1El.value = String(draft.p1 ?? '');
+                if (typeof draft.p2 !== 'undefined') p2El.value = String(draft.p2 ?? '');
+                if (typeof draft.fin !== 'undefined') finEl.value = String(draft.fin ?? '');
+              }
+            }
+          } catch(e){}
+        }
+        updatePromedioBadge();
+        focusNext();
       } catch {}
     }
 
@@ -257,9 +291,11 @@ var GO_NEXT = false;
     setTimeout(prefillGrades, 200);
     var btnOpen = document.getElementById('openConfirm'); if (btnOpen) { btnOpen.addEventListener('click', function(){ GO_NEXT = false; }); }
     var btnNext = document.getElementById('openConfirmNext'); if (btnNext) { btnNext.addEventListener('click', function(){ GO_NEXT = true; }); }
-    var btnReset = document.getElementById('btnReset'); if (btnReset) { btnReset.addEventListener('click', function(){ var f1=document.querySelector('[name="parcial1"]'); var f2=document.querySelector('[name="parcial2"]'); var ff=document.querySelector('[name="final"]'); if (f1) f1.value=''; if (f2) f2.value=''; if (ff) ff.value=''; updatePromedioBadge(); focusNext(); }); }
+    var btnReset = document.getElementById('btnReset'); if (btnReset) { btnReset.addEventListener('click', function(){ var f1=document.querySelector('[name="parcial1"]'); var f2=document.querySelector('[name="parcial2"]'); var ff=document.querySelector('[name="final"]'); if (f1) f1.value=''; if (f2) f2.value=''; if (ff) ff.value=''; try { var gid = document.getElementById('grupo_id').value || ''; var aid = document.getElementById('alumno_id').value || ''; if (gid && aid) { localStorage.removeItem('grades_draft_' + String(gid) + '_' + String(aid)); } } catch(e){} updatePromedioBadge(); focusNext(); }); }
     document.addEventListener('keydown', function(e){ var k = e.key || e.keyCode; if (e.ctrlKey && (k === 'Enter' || k === 13)) { GO_NEXT = true; var m = document.getElementById('confirmModal'); try { var inst = window.bootstrap && window.bootstrap.Modal ? (window.bootstrap.Modal.getInstance(m) || new window.bootstrap.Modal(m)) : null; if (inst) inst.show(); else { m.classList.add('show'); } } catch(x){ m.classList.add('show'); } e.preventDefault(); } });
     document.addEventListener('keydown', function(e){ var k = e.key || e.keyCode; if (!e.ctrlKey && (k === 'Enter' || k === 13)) { GO_NEXT = false; var m = document.getElementById('confirmModal'); try { var inst = window.bootstrap && window.bootstrap.Modal ? (window.bootstrap.Modal.getInstance(m) || new window.bootstrap.Modal(m)) : null; if (inst) inst.show(); else { m.classList.add('show'); } } catch(x){ m.classList.add('show'); } e.preventDefault(); } });
+    document.addEventListener('keydown', function(e){ var k = e.key || e.keyCode; if (e.altKey && (k === 'ArrowDown' || k === 40)) { var opts = Array.from(alumnoSel.options).filter(function(o){ return !!o.value; }); var idx = opts.findIndex(function(o){ return o.value === String(alumnoSel.value || ''); }); var next = (idx >= 0 && (idx + 1) < opts.length) ? opts[idx + 1].value : ''; if (next) { alumnoSel.value = String(next); alumnoSel.dispatchEvent(new Event('change')); } e.preventDefault(); } });
+    document.addEventListener('keydown', function(e){ var k = e.key || e.keyCode; if (e.altKey && (k === 'ArrowUp' || k === 38)) { var opts = Array.from(alumnoSel.options).filter(function(o){ return !!o.value; }); var idx = opts.findIndex(function(o){ return o.value === String(alumnoSel.value || ''); }); var prev = (idx > 0) ? opts[idx - 1].value : ''; if (prev) { alumnoSel.value = String(prev); alumnoSel.dispatchEvent(new Event('change')); } e.preventDefault(); } });
     var btnCalc = document.getElementById('btnCalcFinal'); if (btnCalc) { btnCalc.addEventListener('click', function(){ var p1=document.querySelector('[name="parcial1"]').value; var p2=document.querySelector('[name="parcial2"]').value; var fin=document.querySelector('[name="final"]'); var n1=Number(p1), n2=Number(p2); if (!isNaN(n1) && !isNaN(n2)) { var avg=Math.round(((n1+n2)/2)); avg=Math.max(0, Math.min(100, avg)); fin.value=String(avg); updatePromedioBadge(); fin.focus(); } }); }
   } catch (error) {
     console.error('Error en init():', error);
@@ -287,9 +323,11 @@ document.getElementById('confirmSubmit').addEventListener('click', function() {
   const numeric = ['parcial1','parcial2','final'];
   for (const name of numeric) {
     const el = form.querySelector(`[name="${name}"]`);
-    if (el.value !== '' && (isNaN(el.value) || el.value < 0 || el.value > 100)) {
-      el.classList.add('is-invalid'); return;
-    } else { el.classList.remove('is-invalid'); }
+    if (el.value !== '') {
+      const n = Number(el.value);
+      if (Number.isNaN(n) || n < 0 || n > 100) { el.classList.add('is-invalid'); return; }
+    }
+    el.classList.remove('is-invalid');
   }
   updatePromedioBadge();
   if (redirectInput) {
@@ -304,6 +342,9 @@ document.getElementById('confirmSubmit').addEventListener('click', function() {
     }
   }
   if (btn) { btn.disabled = true; }
+  try { var gid = grupoSel.value || ''; var aid = alumnoSel.value || ''; if (gid && aid) { localStorage.removeItem(getDraftKey(gid, aid)); } } catch(e){}
+  IS_DIRTY = false;
+  var db = document.getElementById('draftBadge'); if (db) { db.style.display = 'none'; }
   form.submit();
 });
 
@@ -313,12 +354,12 @@ document.getElementById('confirmSubmit').addEventListener('click', function() {
   const paint = (el) => {
     const v = el.value === '' ? null : Number(el.value);
     el.classList.remove('is-valid','is-invalid','text-success','text-danger');
-    if (v === null || isNaN(v)) return;
+    if (v === null || Number.isNaN(v)) return;
     if (v >= 70) { el.classList.add('is-valid','text-success'); }
     else { el.classList.add('is-invalid','text-danger'); }
   };
-  inputs.forEach(el => el && el.addEventListener('input', () => paint(el)));
-  function clampInt(el){ var v = el.value; if (v === '') return; var n = Math.round(Number(v)); if (isNaN(n)) { el.value = ''; } else { if (n < 0) n = 0; if (n > 100) n = 100; el.value = String(n); } updatePromedioBadge(); paint(el); }
+  inputs.forEach(el => el && el.addEventListener('input', () => { paint(el); IS_DIRTY = true; }));
+  function clampInt(el){ var v = el.value; if (v === '') return; var n = Math.round(Number(v)); if (Number.isNaN(n)) { el.value = ''; } else { if (n < 0) n = 0; if (n > 100) n = 100; el.value = String(n); } updatePromedioBadge(); paint(el); }
   inputs.forEach(el => el && el.addEventListener('blur', () => clampInt(el)));
   function updatePromedioBadge() {
     const p1 = document.querySelector('[name="parcial1"]').value;
@@ -343,8 +384,21 @@ document.getElementById('confirmSubmit').addEventListener('click', function() {
     const btn = document.getElementById('confirmSubmit'); if (btn) { btn.focus(); }
   }
   inputs.forEach(el => el && el.addEventListener('input', updatePromedioBadge));
+  function saveDraft(){ var gid = document.getElementById('grupo_id').value; var aid = document.getElementById('alumno_id').value; if (!gid || !aid) return; var p1 = document.querySelector('[name="parcial1"]').value; var p2 = document.querySelector('[name="parcial2"]').value; var fin = document.querySelector('[name="final"]').value; try { localStorage.setItem(getDraftKey(gid, aid), JSON.stringify({ p1, p2, fin })); } catch(e){} }
+  inputs.forEach(el => el && el.addEventListener('input', saveDraft));
   updatePromedioBadge();
   focusNext();
+  function updateSubmitState(){
+    var ok = true;
+    var req = ['grupo_id','alumno_id'];
+    for (var i=0;i<req.length;i++){ var el = document.querySelector('[name="'+req[i]+'"]'); if (!el || !el.value) { ok = false; break; } }
+    if (ok){ var names = ['parcial1','parcial2','final']; for (var j=0;j<names.length;j++){ var eln = document.querySelector('[name="'+names[j]+'"]'); if (!eln) continue; var v = eln.value; if (v !== '') { var n = Number(v); if (Number.isNaN(n) || n < 0 || n > 100) { ok = false; break; } } } }
+    var b1 = document.getElementById('openConfirm'); var b2 = document.getElementById('openConfirmNext'); var bc = document.getElementById('confirmSubmit');
+    if (b1) b1.disabled = !ok; if (b2) b2.disabled = !ok; if (bc) bc.disabled = !ok;
+  }
+  ['parcial1','parcial2','final','grupo_id','alumno_id'].forEach(function(n){ var el = document.querySelector('[name="'+n+'"]'); if (el) { el.addEventListener('input', updateSubmitState); el.addEventListener('change', updateSubmitState); el.addEventListener('blur', updateSubmitState); } });
+  updateSubmitState();
+  window.addEventListener('beforeunload', function(e){ if (IS_DIRTY) { e.preventDefault(); e.returnValue = ''; } });
 })();
 </script>
 

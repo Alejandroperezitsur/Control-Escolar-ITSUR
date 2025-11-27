@@ -128,6 +128,13 @@ function setupEvalModal(btn) {
     document.getElementById('parcial2').value = '';
     document.getElementById('final').value = '';
 }
+
+(function(){
+  var ids=['parcial1','parcial2','final'];
+  function paint(el){ var v = el.value === '' ? null : Number(el.value); el.classList.remove('is-valid','is-invalid','text-success','text-danger'); if (v === null || Number.isNaN(v)) return; if (v >= 70) { el.classList.add('is-valid','text-success'); } else { el.classList.add('is-invalid','text-danger'); } }
+  function clamp(el){ var v = el.value; if (v === '') return; var n = Math.round(Number(v)); if (Number.isNaN(n)) { el.value = ''; } else { if (n < 0) n = 0; if (n > 100) n = 100; el.value = String(n); } paint(el); }
+  ids.forEach(function(id){ var el = document.getElementById(id); if (!el) return; el.addEventListener('input', function(){ paint(el); }); el.addEventListener('blur', function(){ clamp(el); }); });
+})();
 </script>
 
 <?php

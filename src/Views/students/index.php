@@ -178,22 +178,26 @@ ob_start();
           <div class="mb-3">
             <label for="matricula" class="form-label">Matrícula <span class="text-danger">*</span></label>
             <input type="text" class="form-control" id="matricula" name="matricula" required>
+            <div class="invalid-feedback">Ingresa la matrícula.</div>
           </div>
           
           <div class="row g-3 mb-3">
             <div class="col-6">
                 <label for="nombre" class="form-label">Nombre <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="nombre" name="nombre" required>
+                <div class="invalid-feedback">Ingresa el nombre.</div>
             </div>
             <div class="col-6">
                 <label for="apellido" class="form-label">Apellido <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="apellido" name="apellido" required>
+                <div class="invalid-feedback">Ingresa el apellido.</div>
             </div>
           </div>
 
           <div class="mb-3">
             <label for="email" class="form-label">Email</label>
             <input type="email" class="form-control" id="email" name="email">
+            <div class="invalid-feedback">Ingresa un correo válido.</div>
           </div>
 
 
@@ -217,6 +221,8 @@ ob_start();
     </div>
   </div>
 </div>
+
+<div id="toastContainer" class="position-fixed top-0 end-0 p-3" style="z-index:1100"></div>
 
 <script>
 const API_BASE_URL = '<?php echo $base; ?>';
@@ -310,10 +316,11 @@ function openEditModal(id) {
             
             const m = getModal();
             if(m) m.show();
+            showToast('Datos del alumno cargados', 'success');
         })
         .catch(e => {
             console.error('Fetch error:', e);
-            alert('Error al cargar datos: ' + e.message);
+            showToast('Error al cargar datos', 'danger');
         });
 }
 
@@ -352,14 +359,15 @@ function saveStudent(e) {
     .then(data => {
         console.log('Response:', data);
         if(data.success) {
-            location.reload();
+            showToast(id ? 'Alumno actualizado' : 'Alumno creado', 'success');
+            setTimeout(() => location.reload(), 600);
         } else {
-            alert(data.error || 'Error desconocido');
+            showToast(data.error || 'Error desconocido', 'danger');
         }
     })
     .catch(err => {
         console.error(err);
-        alert('Error: ' + err.message);
+        showToast('Error de red', 'danger');
     })
     .finally(() => {
         btn.disabled = false;
@@ -388,15 +396,36 @@ function deleteStudent(id) {
     }))
     .then(data => {
         if(data.success) {
-            location.reload();
+            showToast('Alumno eliminado', 'warning');
+            setTimeout(() => location.reload(), 600);
         } else {
-            alert(data.error || 'Error al eliminar');
+            showToast(data.error || 'Error al eliminar', 'danger');
         }
     })
     .catch(e => {
         console.error(e);
-        alert('Error: ' + e.message);
+        showToast('Error de red', 'danger');
     });
+}
+
+function showToast(message, type = 'success') {
+    try {
+        const container = document.getElementById('toastContainer');
+        const bg = type === 'success' ? 'bg-success text-white' : type === 'warning' ? 'bg-warning text-dark' : 'bg-danger text-white';
+        const id = 't' + String(Date.now());
+        const html = `
+        <div id="${id}" class="toast align-items-center ${bg}" role="alert" aria-live="assertive" aria-atomic="true">
+          <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+          </div>
+        </div>`;
+        container.insertAdjacentHTML('beforeend', html);
+        const el = document.getElementById(id);
+        const t = new bootstrap.Toast(el, { delay: 2500 });
+        t.show();
+        el.addEventListener('hidden.bs.toast', () => { el.remove(); });
+    } catch (e) {}
 }
 </script>
 

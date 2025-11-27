@@ -13,19 +13,19 @@ $role = $_SESSION['role'] ?? null;
       <div class="menu-section">
         <div class="menu-section-title">Operaciones Académicas</div>
         <ul>
-          <li><a href="<?php echo $base; ?>/app.php?r=/dashboard" data-icon="bi-journal-text">Kardex</a></li>
-          <li><a href="<?php echo $base; ?>/app.php?r=/dashboard" data-icon="bi-list-check">Mi Carga Académica</a></li>
-          <li><a href="<?php echo $base; ?>/app.php?r=/dashboard" data-icon="bi-diagram-3">Retícula Académica</a></li>
-          <li><a href="<?php echo $base; ?>/app.php?r=/dashboard" data-icon="bi-arrow-repeat">Reinscripción</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/alumno/calificaciones" data-icon="bi-journal-text">Kardex</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/alumno/carga" data-icon="bi-list-check">Mi Carga Académica</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/alumno/reticula" data-icon="bi-diagram-3">Retícula Académica</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/alumno/reinscripcion" data-icon="bi-arrow-repeat">Reinscripción</a></li>
         </ul>
       </div>
     <?php elseif ($role === 'admin'): ?>
       <div class="menu-section">
         <div class="menu-section-title">Operaciones Académicas</div>
         <ul>
-          <li><a href="<?php echo $base; ?>/app.php?r=/dashboard" data-icon="bi-journal-text">Kardex</a></li>
-          <li><a href="<?php echo $base; ?>/app.php?r=/dashboard" data-icon="bi-list-check">Mi Carga Académica</a></li>
-          <li><a href="<?php echo $base; ?>/app.php?r=/dashboard" data-icon="bi-diagram-3">Retícula Académica</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/reports" data-icon="bi-journal-text">Kardex</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/groups" data-icon="bi-list-check">Mi Carga Académica</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/careers" data-icon="bi-diagram-3">Retícula Académica</a></li>
           <li><a href="<?php echo $base; ?>/app.php?r=/dashboard" data-icon="bi-arrow-repeat">Reinscripción</a></li>
         </ul>
       </div>
@@ -42,10 +42,10 @@ $role = $_SESSION['role'] ?? null;
       <div class="menu-section">
         <div class="menu-section-title">Operaciones Académicas</div>
         <ul>
-          <li><a href="kardex.php" data-icon="bi-journal-text">Kardex</a></li>
-          <li><a href="mi_carga.php" data-icon="bi-list-check">Mi Carga Académica</a></li>
-          <li><a href="reticula.php" data-icon="bi-diagram-3">Retícula Académica</a></li>
-          <li><a href="reinscripcion.php" data-icon="bi-arrow-repeat">Reinscripción</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/login" data-icon="bi-journal-text">Kardex</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/login" data-icon="bi-list-check">Mi Carga Académica</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/login" data-icon="bi-diagram-3">Retícula Académica</a></li>
+          <li><a href="<?php echo $base; ?>/app.php?r=/login" data-icon="bi-arrow-repeat">Reinscripción</a></li>
         </ul>
       </div>
     <?php endif; ?>

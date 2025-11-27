@@ -116,6 +116,7 @@ class StudentsController
     public function enroll(): void
     {
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
+        $this->assertCsrfPost();
         $alumnoId = filter_input(INPUT_POST, 'alumno_id', FILTER_VALIDATE_INT);
         $grupoId = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
         if (!$alumnoId || !$grupoId) { http_response_code(400); echo 'Parámetros inválidos'; return; }
@@ -136,6 +137,7 @@ class StudentsController
     public function unenroll(): void
     {
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
+        $this->assertCsrfPost();
         $alumnoId = filter_input(INPUT_POST, 'alumno_id', FILTER_VALIDATE_INT);
         $grupoId = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
         if (!$alumnoId || !$grupoId) { http_response_code(400); echo 'Parámetros inválidos'; return; }
@@ -147,6 +149,7 @@ class StudentsController
     public function store(): void
     {
         $this->checkAdmin();
+        $this->assertCsrfPost();
         $data = $_POST;
         
         // Validation
@@ -188,6 +191,7 @@ class StudentsController
     public function update(): void
     {
         $this->checkAdmin();
+        $this->assertCsrfPost();
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
         if (!$id) {
             $this->jsonResponse(['error' => 'ID inválido'], 400);
@@ -234,6 +238,7 @@ class StudentsController
     public function delete(): void
     {
         $this->checkAdmin();
+        $this->assertCsrfPost();
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
         if (!$id) {
             $this->jsonResponse(['error' => 'ID inválido'], 400);
@@ -273,6 +278,13 @@ class StudentsController
         if (($_SESSION['role'] ?? '') !== 'admin') {
             $this->jsonResponse(['error' => 'No autorizado'], 403);
             exit;
+        }
+    }
+    private function assertCsrfPost(): void
+    {
+        $token = $_POST['csrf_token'] ?? '';
+        if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
+            $this->jsonResponse(['error' => 'CSRF inválido'], 403);
         }
     }
 
@@ -377,6 +389,147 @@ class StudentsController
         ob_start();
         include __DIR__ . '/../Views/student/pending.php';
         return ob_get_clean();
+    }
+
+    public function myReticula(): string
+    {
+        $aid = (int)($_SESSION['user_id'] ?? 0);
+        $sql = "SELECT g.ciclo, m.nombre AS materia, g.nombre AS grupo
+                FROM calificaciones c
+                JOIN grupos g ON g.id = c.grupo_id
+                JOIN materias m ON m.id = g.materia_id
+                WHERE c.alumno_id = :a
+                ORDER BY g.ciclo DESC, m.nombre, g.nombre";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':a' => $aid]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $map = [];
+        foreach ($rows as $r) {
+            $c = (string)($r['ciclo'] ?? '');
+            if (!isset($map[$c])) { $map[$c] = []; }
+            $map[$c][] = ['materia' => (string)($r['materia'] ?? ''), 'grupo' => (string)($r['grupo'] ?? '')];
+        }
+        $cycles = array_keys($map);
+        ob_start();
+        include __DIR__ . '/../Views/student/reticula.php';
+        return ob_get_clean();
+    }
+
+    public function myReinscripcion(): string
+    {
+        $aid = (int)($_SESSION['user_id'] ?? 0);
+        $svc = new \App\Services\StudentsService($this->pdo);
+        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
+        $career = isset($_GET['career']) ? strtoupper(trim((string)$_GET['career'])) : '';
+        $load = $svc->getAcademicLoad($aid, $ciclo !== '' ? $ciclo : null);
+
+        $params = [];
+        $where = 'WHERE 1=1';
+        if ($ciclo !== '') { $where .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
+        if ($career !== '') {
+            $where .= ' AND EXISTS (SELECT 1 FROM materias_carrera mc JOIN carreras c ON c.id = mc.carrera_id WHERE mc.materia_id = m.id AND c.clave = :car)';
+            $params[':car'] = $career;
+        }
+        $sql = "SELECT g.id, g.nombre AS grupo, g.ciclo, COALESCE(g.cupo,30) AS cupo,
+                        m.id AS materia_id, m.nombre AS materia,
+                        (SELECT COUNT(*) FROM calificaciones cc WHERE cc.grupo_id = g.id) AS ocupados,
+                        EXISTS (
+                            SELECT 1 FROM calificaciones c2 JOIN grupos g2 ON g2.id = c2.grupo_id
+                            WHERE c2.alumno_id = :a AND g2.materia_id = m.id AND c2.final IS NOT NULL AND c2.final >= 70
+                        ) AS ya_aprobada,
+                        EXISTS (
+                            SELECT 1 FROM calificaciones c3 WHERE c3.alumno_id = :a AND c3.grupo_id = g.id
+                        ) AS ya_inscrito,
+                        EXISTS (
+                            SELECT 1 FROM calificaciones c4 JOIN grupos g4 ON g4.id = c4.grupo_id
+                            WHERE c4.alumno_id = :a AND c4.final IS NULL AND g4.materia_id = m.id AND g4.ciclo = g.ciclo AND g4.id <> g.id
+                        ) AS tiene_pendiente_misma
+                FROM grupos g
+                JOIN materias m ON m.id = g.materia_id
+                $where
+                ORDER BY g.ciclo DESC, m.nombre, g.nombre";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':a', $aid, PDO::PARAM_INT);
+        foreach ($params as $k=>$v) { $stmt->bindValue($k, $v); }
+        $stmt->execute();
+        $rowsOfferAll = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $offer = [];
+        foreach ($rowsOfferAll as $r) {
+            $ocup = (int)($r['ocupados'] ?? 0);
+            $cupo = (int)($r['cupo'] ?? 30);
+            $aprob = (int)($r['ya_aprobada'] ?? 0) === 1;
+            $insc = (int)($r['ya_inscrito'] ?? 0) === 1;
+            if ($ocup >= $cupo) { continue; }
+            if ($aprob) { continue; }
+            if ($insc) { continue; }
+            $pendSame = (int)($r['tiene_pendiente_misma'] ?? 0) === 1;
+            if ($pendSame) { continue; }
+            $offer[] = $r;
+        }
+        $csrf = $_SESSION['csrf_token'] ?? '';
+        ob_start();
+        include __DIR__ . '/../Views/student/reinscripcion.php';
+        return ob_get_clean();
+    }
+
+    public function selfEnroll(): string
+    {
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'alumno') { http_response_code(403); return json_encode(['error' => 'No autorizado']); }
+        $token = $_POST['csrf_token'] ?? '';
+        if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); return json_encode(['error' => 'CSRF inválido']); }
+        $aid = (int)($_SESSION['user_id'] ?? 0);
+        $gid = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
+        if (!$aid || !$gid) { http_response_code(400); return json_encode(['error' => 'Parámetros inválidos']); }
+        $stG = $this->pdo->prepare('SELECT g.id, g.materia_id, g.ciclo, COALESCE(g.cupo,30) AS cupo FROM grupos g WHERE g.id = :id');
+        $stG->execute([':id' => $gid]);
+        $g = $stG->fetch(PDO::FETCH_ASSOC);
+        if (!$g) { http_response_code(404); return json_encode(['error' => 'Grupo no existe']); }
+        $stCnt = $this->pdo->prepare('SELECT COUNT(*) FROM calificaciones WHERE grupo_id = :g');
+        $stCnt->execute([':g' => $gid]);
+        $ocup = (int)$stCnt->fetchColumn();
+        if ($ocup >= (int)($g['cupo'] ?? 30)) { http_response_code(409); return json_encode(['error' => 'Cupo lleno']); }
+        $stDup = $this->pdo->prepare('SELECT 1 FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g LIMIT 1');
+        $stDup->execute([':a' => $aid, ':g' => $gid]);
+        if ($stDup->fetchColumn()) { http_response_code(409); return json_encode(['error' => 'Ya inscrito en el grupo']); }
+        $stApr = $this->pdo->prepare('SELECT 1 FROM calificaciones c JOIN grupos gx ON gx.id = c.grupo_id WHERE c.alumno_id = :a AND gx.materia_id = :m AND c.final IS NOT NULL AND c.final >= 70 LIMIT 1');
+        $stApr->execute([':a' => $aid, ':m' => (int)($g['materia_id'] ?? 0)]);
+        if ($stApr->fetchColumn()) { http_response_code(409); return json_encode(['error' => 'Materia ya aprobada']); }
+        // Bloqueo: ya tiene pendiente en misma materia y ciclo
+        $stPendSame = $this->pdo->prepare('SELECT 1 FROM calificaciones c JOIN grupos gx ON gx.id = c.grupo_id WHERE c.alumno_id = :a AND c.final IS NULL AND gx.materia_id = :m AND gx.ciclo = :c AND gx.id <> :g LIMIT 1');
+        $stPendSame->execute([':a' => $aid, ':m' => (int)($g['materia_id'] ?? 0), ':c' => (string)($g['ciclo'] ?? ''), ':g' => (int)($g['id'] ?? 0)]);
+        if ($stPendSame->fetchColumn()) { http_response_code(409); return json_encode(['error' => 'Ya tienes una inscripción pendiente en la misma materia y ciclo']); }
+        // Límite de grupos por ciclo (pendientes)
+        $cfg = @include __DIR__ . '/../../config/config.php';
+        $maxPerCycle = 7;
+        if (is_array($cfg) && isset($cfg['academic']['max_grupos_por_ciclo'])) { $maxPerCycle = (int)$cfg['academic']['max_grupos_por_ciclo'] ?: $maxPerCycle; }
+        $stCountCycle = $this->pdo->prepare('SELECT COUNT(*) FROM calificaciones c JOIN grupos gx ON gx.id = c.grupo_id WHERE c.alumno_id = :a AND gx.ciclo = :c AND c.final IS NULL');
+        $stCountCycle->execute([':a' => $aid, ':c' => (string)($g['ciclo'] ?? '')]);
+        $pendingInCycle = (int)$stCountCycle->fetchColumn();
+        if ($pendingInCycle >= $maxPerCycle) { http_response_code(409); return json_encode(['error' => 'Has alcanzado el límite de grupos pendientes por ciclo']); }
+        $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final) VALUES (:a,:g,NULL,NULL,NULL)');
+        $ok = $ins->execute([':a' => $aid, ':g' => $gid]);
+        if ($ok) { header('Content-Type: application/json'); return json_encode(['success' => true]); }
+        http_response_code(500); return json_encode(['error' => 'Error al inscribir']);
+    }
+
+    public function selfUnenroll(): string
+    {
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'alumno') { http_response_code(403); return json_encode(['error' => 'No autorizado']); }
+        $token = $_POST['csrf_token'] ?? '';
+        if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); return json_encode(['error' => 'CSRF inválido']); }
+        $aid = (int)($_SESSION['user_id'] ?? 0);
+        $gid = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
+        if (!$aid || !$gid) { http_response_code(400); return json_encode(['error' => 'Parámetros inválidos']); }
+        $stChk = $this->pdo->prepare('SELECT c.id FROM calificaciones c WHERE c.alumno_id = :a AND c.grupo_id = :g AND c.final IS NULL');
+        $stChk->execute([':a' => $aid, ':g' => $gid]);
+        $row = $stChk->fetch(PDO::FETCH_ASSOC);
+        if (!$row) { http_response_code(409); return json_encode(['error' => 'No se puede desinscribir (ya evaluado o no inscrito)']); }
+        $del = $this->pdo->prepare('DELETE FROM calificaciones WHERE id = :id');
+        $ok = $del->execute([':id' => (int)($row['id'] ?? 0)]);
+        if ($ok) { header('Content-Type: application/json'); return json_encode(['success' => true]); }
+        http_response_code(500); return json_encode(['error' => 'Error al desinscribir']);
     }
 
     public function mySubjects(): string

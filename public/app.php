@@ -159,6 +159,10 @@ $router->get('/api/alumno/calificaciones/resumen', fn() => (new App\Controllers\
 $router->get('/alumno/carga', fn() => (new App\Controllers\StudentsController($pdo))->myLoad(), [AuthMiddleware::requireRole('alumno')]);
 $router->get('/alumno/pendientes', fn() => (new App\Controllers\StudentsController($pdo))->myPending(), [AuthMiddleware::requireRole('alumno')]);
 $router->get('/api/alumno/materias', fn() => (new App\Controllers\StudentsController($pdo))->mySubjects(), [AuthMiddleware::requireRole('alumno')]);
+$router->get('/alumno/reticula', fn() => (new App\Controllers\StudentsController($pdo))->myReticula(), [AuthMiddleware::requireRole('alumno')]);
+$router->get('/alumno/reinscripcion', fn() => (new App\Controllers\StudentsController($pdo))->myReinscripcion(), [AuthMiddleware::requireRole('alumno')]);
+$router->post('/alumno/enroll', fn() => (new App\Controllers\StudentsController($pdo))->selfEnroll(), [AuthMiddleware::requireRole('alumno'), RateLimitMiddleware::limit('alumno_enroll', 20, 600)]);
+$router->post('/alumno/unenroll', fn() => (new App\Controllers\StudentsController($pdo))->selfUnenroll(), [AuthMiddleware::requireRole('alumno'), RateLimitMiddleware::limit('alumno_unenroll', 20, 600)]);
 
 // Migración de alumnos.php → nueva ruta
 $router->get('/alumnos', fn() => $students->index(), [AuthMiddleware::requireRole('admin')]);

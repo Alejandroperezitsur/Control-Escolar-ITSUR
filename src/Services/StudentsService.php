@@ -59,7 +59,7 @@ class StudentsService
         $params = [':alumno_id' => $idAlumno];
         $whereCiclo = '';
         if ($ciclo) { $whereCiclo = ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
-        $sql = "SELECT m.nombre AS materia, m.clave, g.nombre AS grupo, g.ciclo,
+        $sql = "SELECT m.nombre AS materia, m.clave, g.id AS grupo_id, g.nombre AS grupo, g.ciclo,
                        c.parcial1, c.parcial2, c.final
                 FROM calificaciones c
                 JOIN grupos g ON c.grupo_id = g.id
@@ -78,6 +78,7 @@ class StudentsService
             if ($final !== null) { $estado = ($final >= 70) ? 'Aprobado' : 'Reprobado'; }
             $out[] = [
                 'materia' => (string)($r['materia'] ?? ''),
+                'grupo_id' => (int)($r['grupo_id'] ?? 0),
                 'grupo' => (string)($r['grupo'] ?? ''),
                 'ciclo' => (string)($r['ciclo'] ?? ''),
                 'calificacion' => $final,
