@@ -14,6 +14,7 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
   <title>Control Escolar</title>
   <meta name="csrf-token" content="<?= $_SESSION['csrf_token'] ?? '' ?>">
   <base href="<?php echo $base; ?>/">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <script>
     // Aplicar tema antes de cargar CSS para evitar flash
     (function(){
@@ -57,10 +58,15 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
     .card .card-body{padding:1rem}
     .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);align-items:center;justify-content:center;z-index:1050}
     .modal.show{display:flex}
-    .modal-dialog{background:var(--surface);border-radius:12px;max-width:500px;width:100%}
-    .modal-content{border-radius:12px}
+    .modal-dialog{background:var(--surface);border-radius:12px;max-width:500px;width:100%;box-shadow:var(--shadow)}
+    .modal-content{border-radius:12px;background:var(--surface);border:1px solid rgba(255,255,255,.12)}
     .modal-header,.modal-footer{padding:1rem;border-bottom:1px solid rgba(255,255,255,.08)}
     .modal-header{display:flex;align-items:center;justify-content:space-between}
+    .modal-body{padding:1rem}
+    .btn-close{width:1rem;height:1rem;border:none;background:transparent;opacity:.7;cursor:pointer}
+    .btn-close::before{content:'\00d7';display:inline-block;font-size:1.25rem;line-height:1rem}
+    .btn-close:hover{opacity:1}
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1040}
   </style>
 </head>
 <body data-theme="dark">
@@ -154,6 +160,23 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
             el.classList.remove('show');
           }
         } catch { el.classList.remove('show'); }
+      });
+
+      // Fallback para cerrar toasts sin Bootstrap
+      document.addEventListener('click', function(e){
+        var toastDismissEl = e.target.closest('[data-bs-dismiss="toast"]') || (e.target.closest('.btn-close') && e.target.closest('.toast'));
+        if (!toastDismissEl) return;
+        var toastEl = e.target.closest('.toast');
+        if (!toastEl) return;
+        e.preventDefault();
+        try {
+          if (window.bootstrap && window.bootstrap.Toast) {
+            var inst = window.bootstrap.Toast.getInstance(toastEl) || new window.bootstrap.Toast(toastEl);
+            inst.hide();
+          } else {
+            toastEl.remove();
+          }
+        } catch { toastEl.remove(); }
       });
     })();
   </script>

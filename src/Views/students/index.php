@@ -229,16 +229,15 @@ const API_BASE_URL = '<?php echo $base; ?>';
 let modalInstance = null;
 
 function getModal() {
+    const el = document.getElementById('studentModal');
+    if (!el) { return null; }
     if (typeof bootstrap === 'undefined') {
-        console.error('Bootstrap not loaded');
-        alert('Error: Componentes de interfaz no cargados. Recargue la página.');
-        return null;
+        return {
+            show: function(){ el.classList.add('show'); el.removeAttribute('aria-hidden'); el.setAttribute('aria-modal','true'); },
+            hide: function(){ el.classList.remove('show'); el.setAttribute('aria-hidden','true'); el.removeAttribute('aria-modal'); }
+        };
     }
-    if (!modalInstance) {
-        const el = document.getElementById('studentModal');
-        if (!el) { console.error('Modal element missing'); return null; }
-        modalInstance = new bootstrap.Modal(el);
-    }
+    if (!modalInstance) { modalInstance = new bootstrap.Modal(el); }
     return modalInstance;
 }
 
@@ -274,7 +273,7 @@ function openCreateModal() {
 }
 
 function openEditModal(id) {
-    const url = `${API_BASE_URL}/alumnos/get?id=${id}`;
+    const url = `${API_BASE_URL}/app.php?r=/alumnos/get&id=${id}`;
     console.log('Fetching student from:', url);
     
     fetch(url)
@@ -334,7 +333,7 @@ function saveStudent(e) {
 
     const formData = new FormData(form);
     const id = formData.get('id');
-    const url = id ? `${API_BASE_URL}/alumnos/update` : `${API_BASE_URL}/alumnos/store`;
+    const url = id ? `${API_BASE_URL}/app.php?r=/alumnos/update` : `${API_BASE_URL}/app.php?r=/alumnos/store`;
     console.log('Saving to:', url);
     
     const btn = document.getElementById('saveBtn');
@@ -382,7 +381,7 @@ function deleteStudent(id) {
     formData.append('id', id);
     formData.append('csrf_token', '<?= $_SESSION['csrf_token'] ?? '' ?>');
     
-    fetch(`${API_BASE_URL}/alumnos/delete`, {
+    fetch(`${API_BASE_URL}/app.php?r=/alumnos/delete`, {
         method: 'POST',
         body: formData
     })
