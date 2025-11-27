@@ -27,7 +27,7 @@ ob_start();
         <button class="btn btn-sm btn-primary" onclick="openCreateModal()">
             <i class="fa-solid fa-plus me-1"></i> Nuevo Alumno
         </button>
-        <a href="<?php echo $base; ?>/dashboard" class="btn btn-sm btn-outline-secondary">Volver</a>
+        <a href="/public/app.php?r=/dashboard" class="btn btn-sm btn-outline-secondary">Volver</a>
     </div>
   </div>
 
@@ -69,20 +69,20 @@ ob_start();
                 <tr><td colspan="5" class="text-center py-5 text-muted">No se encontraron alumnos.</td></tr>
             <?php else: foreach ($students as $s): ?>
               <tr>
-                <td class="ps-4 fw-medium"><a href="<?= $base; ?>/alumnos/detalle?id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['matricula']) ?></a></td>
+                <td class="ps-4 fw-medium"><a href="/public/app.php?r=/alumnos/detalle&id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['matricula']) ?></a></td>
                 <td>
                     <div class="d-flex align-items-center">
                         <div class="avatar-initials bg-primary-subtle text-primary rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.85rem;">
                             <?= strtoupper(substr($s['nombre'],0,1).substr($s['apellido'],0,1)) ?>
                         </div>
                         <div>
-                            <a href="<?= $base; ?>/alumnos/detalle?id=<?= (int)$s['id'] ?>" class="text-decoration-none">
+                            <a href="/public/app.php?r=/alumnos/detalle&id=<?= (int)$s['id'] ?>" class="text-decoration-none">
                                 <?= htmlspecialchars($s['nombre'] . ' ' . $s['apellido']) ?>
                             </a>
                         </div>
                     </div>
                 </td>
-                <td class="text-dark small"><a href="<?= $base; ?>/alumnos/detalle?id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['email'] ?? '—') ?></a></td>
+                <td class="text-dark small"><a href="/public/app.php?r=/alumnos/detalle&id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['email'] ?? '—') ?></a></td>
 
                 <td>
                     <?php
@@ -98,7 +98,7 @@ ob_start();
                     </a>
                 </td>
                 <td class="text-end pe-4">
-                    <button class="btn btn-sm btn-link text-decoration-none p-0 me-2" onclick="openEditModal(<?= $s['id'] ?>)" title="Editar">
+                    <button class="btn btn-sm btn-link text-decoration-none p-0 me-2" data-bs-toggle="modal" data-bs-target="#studentModal" onclick="openEditModal(<?= $s['id'] ?>)" title="Editar">
                         <i class="fa-solid fa-pen-to-square"></i>
                     </button>
                     <button class="btn btn-sm btn-link text-danger text-decoration-none p-0" onclick="deleteStudent(<?= $s['id'] ?>)" title="Eliminar">
@@ -225,7 +225,7 @@ ob_start();
 <div id="toastContainer" class="position-fixed top-0 end-0 p-3" style="z-index:1100"></div>
 
 <script>
-const API_BASE_URL = '<?php echo $base; ?>';
+const API_BASE_URL = window.location.origin + '/public';
 let modalInstance = null;
 
 function getModal() {
@@ -275,8 +275,17 @@ function openCreateModal() {
 function openEditModal(id) {
     const url = `${API_BASE_URL}/app.php?r=/alumnos/get&id=${id}`;
     console.log('Fetching student from:', url);
-    
-    fetch(url)
+
+    try {
+        const m = getModal();
+        if (m) m.show();
+        const title = document.getElementById('modalTitle');
+        if (title) title.textContent = 'Cargando alumno...';
+        const btn = document.getElementById('saveBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Cargando...'; }
+    } catch {}
+
+    fetch(url, { credentials: 'same-origin' })
         .then(response => {
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -313,13 +322,19 @@ function openEditModal(id) {
             const help = document.getElementById('passwordHelp');
             if(help) help.style.display = 'block';
             
-            const m = getModal();
-            if(m) m.show();
+            const title = document.getElementById('modalTitle');
+            if (title) title.textContent = 'Editar Alumno';
+            const btn = document.getElementById('saveBtn');
+            if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
             showToast('Datos del alumno cargados', 'success');
         })
         .catch(e => {
             console.error('Fetch error:', e);
-            showToast('Error al cargar datos', 'danger');
+            const title = document.getElementById('modalTitle');
+            if (title) title.textContent = 'Editar Alumno';
+            const btn = document.getElementById('saveBtn');
+            if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+            showToast('Error de conexión al obtener datos', 'danger');
         });
 }
 
@@ -343,7 +358,8 @@ function saveStudent(e) {
 
     fetch(url, {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'same-origin'
     })
     .then(response => {
         return response.text().then(text => {
@@ -383,7 +399,8 @@ function deleteStudent(id) {
     
     fetch(`${API_BASE_URL}/app.php?r=/alumnos/delete`, {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'same-origin'
     })
     .then(response => response.text().then(text => {
         try {

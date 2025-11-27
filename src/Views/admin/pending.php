@@ -72,7 +72,7 @@ ob_start();
 <div class="modal fade" id="evalModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form method="post" action="<?php echo $base; ?>/app.php?r=/grades/create">
+      <form method="post" action="/public/app.php?r=/grades/create">
         <div class="modal-header">
           <h5 class="modal-title">Evaluar Alumno</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

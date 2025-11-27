@@ -350,6 +350,14 @@ function printTable(tableSelector) {
 
 // -------- Helpers para gestión de Alumnos (compartidos) --------
 window.BASE_URL = window.BASE_URL || (document.querySelector('base')?.getAttribute('href') || '');
+const PUBLIC_BASE = (function(){
+  try {
+    const path = location.pathname.replace(/\\/g,'/');
+    const i = path.indexOf('/public');
+    return i >= 0 ? path.substring(0, i + 7) : '';
+  } catch { return ''; }
+})();
+const ROUTER = PUBLIC_BASE + '/app.php?r=';
 function openCreateModal(){
   try{
     const form = document.getElementById('studentForm'); if(form) form.reset();
@@ -365,7 +373,12 @@ function openCreateModal(){
 
 async function openEditModal(id){
   try{
-    const res = await fetch(`${BASE_URL}/alumnos/get?id=${id}`);
+    const modalEl = document.getElementById('studentModal');
+    const m = (typeof bootstrap !== 'undefined' && modalEl) ? new bootstrap.Modal(modalEl) : null;
+    if(m) m.show();
+    const title = document.getElementById('modalTitle'); if(title) title.textContent = 'Cargando alumno...';
+    const btn = document.getElementById('saveBtn'); if(btn){ btn.disabled = true; btn.textContent = 'Cargando...'; }
+    const res = await fetch(`${ROUTER}/alumnos/get&id=${id}`, { credentials: 'same-origin' });
     const data = await res.json();
     if(data.error){ alert(data.error); return; }
     document.getElementById('studentId').value = data.id;
@@ -376,8 +389,8 @@ async function openEditModal(id){
     const act = document.getElementById('activo'); if(act) act.checked = data.activo == 1;
     const title = document.getElementById('modalTitle'); if(title) title.textContent = 'Editar Alumno';
     const pwd = document.getElementById('password'); if(pwd){ pwd.placeholder='Dejar en blanco para mantener actual'; pwd.required = false; }
-    const m = (typeof bootstrap !== 'undefined' && document.getElementById('studentModal')) ? new bootstrap.Modal(document.getElementById('studentModal')) : null;
-    if(m) m.show();
+    if(title) title.textContent = 'Editar Alumno';
+    if(btn){ btn.disabled = false; btn.textContent = 'Guardar'; }
   }catch(e){ console.error(e); alert('Error de conexión al obtener datos'); }
 }
 
@@ -386,16 +399,16 @@ function saveStudent(e){
   const form = e.target;
   const fd = new FormData(form);
   const id = fd.get('id');
-  const url = id ? `${BASE_URL}/alumnos/update` : `${BASE_URL}/alumnos/store`;
+  const url = id ? `${ROUTER}/alumnos/update` : `${ROUTER}/alumnos/store`;
   const btn = document.getElementById('saveBtn'); const orig = btn ? btn.textContent : '';
   if(btn){ btn.disabled = true; btn.textContent = 'Guardando...'; }
-  fetch(url, { method: 'POST', body: fd }).then(r=>r.json()).then(data=>{ if(data.success){ location.reload(); } else { alert(data.error || 'Error desconocido'); } }).catch(()=> alert('Error de red')).finally(()=>{ if(btn){ btn.disabled=false; btn.textContent=orig; } });
+  csrfFetch(url, { method: 'POST', body: fd, credentials: 'same-origin' }).then(r=>r.json()).then(data=>{ if(data.success){ location.reload(); } else { alert(data.error || 'Error desconocido'); } }).catch(()=> alert('Error de red')).finally(()=>{ if(btn){ btn.disabled=false; btn.textContent=orig; } });
 }
 
 function deleteStudent(id){
   if(!confirm('¿Estás seguro de eliminar este alumno? Esta acción no se puede deshacer.')) return;
   const fd = new FormData(); fd.append('id', id); fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
-  fetch(`${BASE_URL}/alumnos/delete`, { method: 'POST', body: fd }).then(r=>r.json()).then(data=>{ if(data.success){ location.reload(); } else { alert(data.error || 'Error al eliminar'); } });
+  csrfFetch(`${ROUTER}/alumnos/delete`, { method: 'POST', body: fd, credentials: 'same-origin' }).then(r=>r.json()).then(data=>{ if(data.success){ location.reload(); } else { alert(data.error || 'Error al eliminar'); } });
 }
 
 window.openCreateModal = openCreateModal;

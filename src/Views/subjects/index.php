@@ -13,7 +13,7 @@ ob_start();
 
   <div class="card mb-3">
     <div class="card-body">
-      <form method="get" action="<?php echo $base; ?>/app.php?r=/subjects" class="d-flex align-items-center">
+      <form method="get" action="/public/app.php?r=/subjects" class="d-flex align-items-center">
         <input type="text" name="q" value="<?= htmlspecialchars((string)($pagination['q'] ?? '')) ?>" class="form-control" placeholder="Buscar por nombre/clave" style="max-width:320px">
         <select name="carrera" class="form-select ms-2" style="max-width:180px">
           <?php $selCar = (string)($pagination['carrera'] ?? ''); ?>
@@ -74,7 +74,7 @@ ob_start();
 
   <div class="card mb-4">
     <div class="card-body">
-      <form method="post" action="<?php echo $base; ?>/app.php?r=/subjects/create" class="row g-2 needs-validation" novalidate>
+      <form method="post" action="/public/app.php?r=/subjects/create" class="row g-2 needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
         <div class="col-md-5"><input class="form-control" name="nombre" placeholder="Nombre" required><div class="invalid-feedback">Ingresa el nombre.</div></div>
         <div class="col-md-3"><input class="form-control" name="clave" placeholder="Clave" required><div class="invalid-feedback">Ingresa la clave.</div></div>
@@ -173,7 +173,7 @@ ob_start();
                 <div class="modal-body">¿Confirmas eliminar "<?= htmlspecialchars($s['nombre']) ?>"?</div>
                 <div class="modal-footer">
                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                  <form method="post" action="<?php echo $base; ?>/app.php?r=/subjects/delete">
+                  <form method="post" action="/public/app.php?r=/subjects/delete">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
                     <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
                     <button type="submit" class="btn btn-danger">Eliminar</button>
@@ -185,7 +185,7 @@ ob_start();
             <div class="modal fade" id="editSub<?= (int)$s['id'] ?>" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog"><div class="modal-content">
                 <div class="modal-header"><h5 class="modal-title">Editar materia</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <form method="post" action="<?php echo $base; ?>/app.php?r=/subjects/update" class="needs-validation" novalidate>
+                <form method="post" action="/public/app.php?r=/subjects/update" class="needs-validation" novalidate>
                   <div class="modal-body">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
                     <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">

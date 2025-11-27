@@ -7,7 +7,7 @@ $grupo = $grupo ?? [];
 <div class="modal fade" id="editProfModal" tabindex="-1" aria-labelledby="editProfModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form method="post" action="<?php echo $base; ?>/app.php?r=/groups/update_professor" class="needs-validation" novalidate>
+      <form method="post" action="/public/app.php?r=/groups/update_professor" class="needs-validation" novalidate>
         <div class="modal-header">
           <h5 class="modal-title" id="editProfModalLabel">Asignar/Cambiar Profesor</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
