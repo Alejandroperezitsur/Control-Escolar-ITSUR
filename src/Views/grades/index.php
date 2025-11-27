@@ -70,14 +70,128 @@ ob_start();
 (async function init() {
   const grupoSel = document.getElementById('grupo_id');
   const alumnoSel = document.getElementById('alumno_id');
-  // Poblar grupos del profesor actual
-  const gRes = await fetch('<?php echo $base; ?>/api/catalogs/groups');
-  const grupos = await gRes.json();
-  grupoSel.innerHTML = grupos.map(g => `<option value="${g.id}">${g.ciclo} · ${g.materia} · ${g.nombre}</option>`).join('');
-  // Poblar alumnos activos
-  const aRes = await fetch('<?php echo $base; ?>/api/catalogs/students');
-  const alumnos = await aRes.json();
-  alumnoSel.innerHTML = alumnos.map(a => `<option value="${a.id}">${a.matricula} · ${a.nombre}</option>`).join('');
+  
+  console.log('Iniciando carga de catálogos...');
+  console.log('Session info - Role:', '<?php echo $_SESSION['role'] ?? 'N/A'; ?>', 'User ID:', '<?php echo $_SESSION['user_id'] ?? 'N/A'; ?>');
+  
+  try {
+    // Poblar grupos del profesor actual
+    const gruposUrl = '<?php echo $base; ?>/app.php?r=/api/catalogs/groups';
+    console.log('Fetching grupos from:', gruposUrl);
+    const gRes = await fetch(gruposUrl);
+    console.log('Grupos response status:', gRes.status, gRes.statusText);
+    
+    if (!gRes.ok) {
+      console.error('Error fetching groups:', gRes.status, gRes.statusText);
+      const errorText = await gRes.text();
+      console.error('Error response:', errorText);
+      grupoSel.innerHTML = '<option value="">Error al cargar grupos</option>';
+    } else {
+      const grupos = await gRes.json();
+      console.log('Grupos cargados:', grupos);
+      console.log('Número de grupos:', grupos ? grupos.length : 0);
+      if (grupos && grupos.length > 0) {
+        grupoSel.innerHTML = '<option value="">Selecciona el grupo asignado...</option>';
+        const buckets = {};
+        for (const g of grupos) { const k = String(g.ciclo || ''); (buckets[k] = buckets[k] || []).push(g); }
+        const cycles = Object.keys(buckets).sort().reverse();
+        for (const c of cycles) {
+          const og = document.createElement('optgroup'); og.label = c;
+          og.innerHTML = buckets[c].map(g => `<option value="${g.id}">${g.materia} · ${g.nombre}</option>`).join('');
+          grupoSel.appendChild(og);
+        }
+        const firstOpt = Array.from(grupoSel.options).find(o => o.value);
+        if (firstOpt) { grupoSel.value = firstOpt.value; await loadStudentsByGroup(firstOpt.value); }
+      } else {
+        grupoSel.innerHTML = '<option value="">No tienes grupos asignados</option>';
+        console.warn('No se encontraron grupos para este profesor');
+      }
+    }
+    
+    // Cargar alumnos según el grupo seleccionado (propios del profesor)
+    async function loadStudentsByGroup(gid) {
+      if (!gid) { alumnoSel.innerHTML = '<option value="">Selecciona el alumno activo...</option>'; return; }
+      const url = '<?php echo $base; ?>/app.php?r=/api/catalogs/group_students&gid=' + encodeURIComponent(gid);
+      console.log('Fetching alumnos por grupo desde:', url);
+      try {
+        const res = await fetch(url);
+        console.log('Alumnos (grupo) response status:', res.status, res.statusText);
+        if (!res.ok) {
+          const t = await res.text();
+          console.error('Error alumnos por grupo:', res.status, res.statusText, t);
+          alumnoSel.innerHTML = '<option value="">Error al cargar alumnos</option>';
+          return;
+        }
+        const list = await res.json();
+        if (list.length > 0) {
+          alumnoSel.innerHTML = '<option value="">Selecciona el alumno activo...</option>';
+          const og = document.createElement('optgroup');
+          og.label = 'Alumnos del grupo';
+          og.innerHTML = list.map(a => `<option value="${a.id}">${a.matricula || ''} · ${a.nombre || ''} ${a.apellido || ''}</option>`).join('');
+          alumnoSel.appendChild(og);
+          const firstA = list[0]?.id;
+          if (firstA) { alumnoSel.value = String(firstA); }
+        } else {
+          alumnoSel.innerHTML = '<option value="">No hay alumnos en el grupo</option>';
+        }
+      } catch (e) {
+        console.error('Excepción cargando alumnos por grupo:', e);
+        alumnoSel.innerHTML = '<option value="">Error al cargar alumnos</option>';
+      }
+    }
+
+    async function loadProfessorStudentsMerge() {
+      const url = '<?php echo $base; ?>/app.php?r=/api/catalogs/professor_students';
+      try {
+        const res = await fetch(url);
+        if (!res.ok) { return; }
+        const profList = await res.json();
+        const seen = new Set(Array.from(alumnoSel.options).map(o => o.value).filter(Boolean));
+        const extras = profList.filter(a => !seen.has(String(a.id)));
+        if (extras.length > 0) {
+          let og = Array.from(alumnoSel.querySelectorAll('optgroup')).find(g => g.label === 'Todos mis alumnos');
+          if (!og) { og = document.createElement('optgroup'); og.label = 'Todos mis alumnos'; alumnoSel.appendChild(og); }
+          og.insertAdjacentHTML('beforeend', extras.map(a => `<option value="${a.id}">${a.matricula || ''} · ${a.nombre || ''} ${a.apellido || ''}</option>`).join(''));
+        }
+      } catch {}
+    }
+
+    grupoSel.addEventListener('change', (e) => {
+      loadStudentsByGroup(e.target.value);
+    });
+    grupoSel.addEventListener('focus', async () => {
+      try {
+        const res = await fetch(gruposUrl);
+        if (!res.ok) { return; }
+        const prev = grupoSel.value;
+        const grupos = await res.json();
+        grupoSel.innerHTML = '<option value="">Selecciona el grupo asignado...</option>';
+        const buckets = {};
+        for (const g of grupos) { const k = String(g.ciclo || ''); (buckets[k] = buckets[k] || []).push(g); }
+        const cycles = Object.keys(buckets).sort().reverse();
+        for (const c of cycles) {
+          const og = document.createElement('optgroup'); og.label = c;
+          og.innerHTML = buckets[c].map(g => `<option value="${g.id}">${g.materia} · ${g.nombre}</option>`).join('');
+          grupoSel.appendChild(og);
+        }
+        if (prev && Array.from(grupoSel.options).some(o => o.value === prev)) { grupoSel.value = prev; }
+      } catch {}
+    });
+    alumnoSel.addEventListener('focus', loadProfessorStudentsMerge);
+    // Si ya hay un grupo seleccionado, cargar sus alumnos; si no, seleccionar el primero
+    if (grupoSel.value) { loadStudentsByGroup(grupoSel.value); }
+    else {
+      const firstOpt = Array.from(grupoSel.options).find(o => o.value);
+      if (firstOpt) { grupoSel.value = firstOpt.value; loadStudentsByGroup(firstOpt.value); }
+    }
+  } catch (error) {
+    console.error('Error en init():', error);
+    console.error('Error stack:', error.stack);
+    grupoSel.innerHTML = '<option value="">Error al cargar datos</option>';
+    alumnoSel.innerHTML = '<option value="">Error al cargar datos</option>';
+  }
+  
+  console.log('Carga de catálogos completada');
 })();
 
 // Validación cliente ligera

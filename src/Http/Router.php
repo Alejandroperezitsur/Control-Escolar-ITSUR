@@ -59,6 +59,9 @@ class Router
             }
         }
 
-        echo $route['handler']();
+        $result = $route['handler']();
+        if (is_string($result)) {
+            echo $result;
+        }
     }
 }

@@ -16,7 +16,7 @@ class SecurityHeaders
             . "style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com 'unsafe-inline'; "
             . "script-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com 'unsafe-inline'; "
             . "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
-            . "connect-src 'self';"
+            . "connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;"
         );
     }
 }

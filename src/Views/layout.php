@@ -29,11 +29,8 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
     })();
   </script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://unpkg.com/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
   <link href="<?php echo $base; ?>/assets/css/styles.css" rel="stylesheet">
-  <link href="/Control-Escolar-ITSUR/public/assets/css/styles.css" rel="stylesheet">
   <style>
     .container{max-width:1200px;margin:0 auto;padding:0 1rem}
     .row{display:flex;flex-wrap:wrap;margin-left:-.5rem;margin-right:-.5rem}
@@ -123,10 +120,7 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
   </div>
   <?php unset($_SESSION['flash'], $_SESSION['flash_type']); endif; ?>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
-  <script src="https://unpkg.com/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="<?php echo $base; ?>/assets/js/main.js"></script>
-  <script src="/Control-Escolar-ITSUR/public/assets/js/main.js"></script>
   <script>
     (function(){
       document.addEventListener('click', function(e){

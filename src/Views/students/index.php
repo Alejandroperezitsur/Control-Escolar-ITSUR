@@ -9,7 +9,13 @@ ob_start();
         <p class="text-muted small mb-0">Gestión de estudiantes registrados</p>
     </div>
     <div class="d-flex gap-2">
-        <form class="d-flex" method="get">
+        <?php 
+        $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH); 
+        ?>
+        <form class="d-flex" method="get" action="<?= htmlspecialchars($currentPath) ?>">
+            <?php if (isset($_GET['r'])): ?>
+                <input type="hidden" name="r" value="<?= htmlspecialchars($_GET['r']) ?>">
+            <?php endif; ?>
             <input class="form-control form-control-sm me-2" type="search" name="q" placeholder="Buscar..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" aria-label="Search">
             <select name="status" class="form-select form-select-sm me-2" style="max-width: 120px;">
                 <option value="" <?= (!isset($_GET['status']) || $_GET['status'] === '' ) ? 'selected' : '' ?>>Todos</option>
@@ -36,7 +42,7 @@ ob_start();
             $baseParams = $_GET;
             unset($baseParams['sort'], $baseParams['order']);
             
-            function sortLink($col, $label, $currentSort, $currentOrder, $baseParams) {
+            function sortLink($col, $label, $currentSort, $currentOrder, $baseParams, $path) {
                 $newOrder = ($currentSort === $col && $currentOrder === 'ASC') ? 'DESC' : 'ASC';
                 $icon = '';
                 if ($currentSort === $col) {
@@ -45,16 +51,16 @@ ob_start();
                     $icon = '<i class="fa-solid fa-sort text-muted ms-1" style="opacity:0.3"></i>';
                 }
                 $params = array_merge($baseParams, ['sort' => $col, 'order' => $newOrder]);
-                $url = '?' . http_build_query($params);
+                $url = $path . '?' . http_build_query($params);
                 return "<a href=\"$url\" class=\"text-decoration-none text-dark fw-bold\">$label $icon</a>";
             }
             ?>
             <tr>
-              <th class="ps-4"><?= sortLink('matricula', 'Matrícula', $currentSort, $currentOrder, $baseParams) ?></th>
-              <th><?= sortLink('nombre', 'Nombre Completo', $currentSort, $currentOrder, $baseParams) ?></th>
-              <th><?= sortLink('email', 'Email', $currentSort, $currentOrder, $baseParams) ?></th>
+              <th class="ps-4"><?= sortLink('matricula', 'Matrícula', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
+              <th><?= sortLink('nombre', 'Nombre Completo', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
+              <th><?= sortLink('email', 'Email', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
 
-              <th><?= sortLink('activo', 'Estado', $currentSort, $currentOrder, $baseParams) ?></th>
+              <th><?= sortLink('activo', 'Estado', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th class="text-end pe-4">Acciones</th>
             </tr>
           </thead>
@@ -83,11 +89,9 @@ ob_start();
                         $statusLabel = $s['activo'] ? 'Activo' : 'Inactivo';
                         $badgeClass = $s['activo'] ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger';
                         // Build URL preserving current search and toggling status filter
-                        $url = $base . '/alumnos?';
-                        $params = [];
-                        if (!empty($_GET['q'])) $params['q'] = $_GET['q'];
+                        $params = $_GET;
                         $params['status'] = $s['activo'] ? 'active' : 'inactive';
-                        $url .= http_build_query($params);
+                        $url = $currentPath . '?' . http_build_query($params);
                     ?>
                     <a href="<?= $url ?>" class="badge <?= $badgeClass ?> rounded-pill text-decoration-none">
                         <?= $statusLabel ?>
@@ -113,10 +117,10 @@ ob_start();
                 <?php
                 $queryParams = $_GET;
                 $queryParams['page'] = max(1, $page - 1);
-                $prevUrl = '?' . http_build_query($queryParams);
+                $prevUrl = $currentPath . '?' . http_build_query($queryParams);
                 
                 $queryParams['page'] = min($totalPages ?? 1, $page + 1);
-                $nextUrl = '?' . http_build_query($queryParams);
+                $nextUrl = $currentPath . '?' . http_build_query($queryParams);
                 ?>
                 <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
                     <a class="page-link" href="<?= htmlspecialchars($prevUrl) ?>">Anterior</a>
@@ -129,7 +133,34 @@ ob_start();
         </nav>
     </div>
   </div>
+  </div>
 </div>
+
+<style>
+/* Fix modal z-index and interaction issues */
+.modal {
+    z-index: 1055 !important;
+}
+.modal-backdrop {
+    z-index: 1050 !important;
+}
+.modal-dialog {
+    z-index: 1056 !important;
+    pointer-events: auto !important;
+}
+.modal-content {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 1057 !important;
+}
+.modal-body input,
+.modal-body select,
+.modal-body textarea,
+.modal-body button,
+.modal-footer button {
+    pointer-events: auto !important;
+}
+</style>
 
 <!-- Modal Create/Edit -->
 <div class="modal fade" id="studentModal" tabindex="-1" aria-hidden="true">
@@ -188,7 +219,7 @@ ob_start();
 </div>
 
 <script>
-const BASE_URL = '<?php echo $base; ?>';
+const API_BASE_URL = '<?php echo $base; ?>';
 let modalInstance = null;
 
 function getModal() {
@@ -207,9 +238,14 @@ function getModal() {
 
 function openCreateModal() {
     try {
-        document.getElementById('studentForm').reset();
-        document.getElementById('studentId').value = '';
-        document.getElementById('modalTitle').textContent = 'Nuevo Alumno';
+        const form = document.getElementById('studentForm');
+        if (form) form.reset();
+        
+        const idEl = document.getElementById('studentId');
+        if (idEl) idEl.value = '';
+        
+        const title = document.getElementById('modalTitle');
+        if (title) title.textContent = 'Nuevo Alumno';
         
         const pwd = document.getElementById('password');
         if(pwd) {
@@ -232,8 +268,23 @@ function openCreateModal() {
 }
 
 function openEditModal(id) {
-    fetch(`${BASE_URL}/alumnos/get?id=${id}`)
-        .then(r => r.json())
+    const url = `${API_BASE_URL}/alumnos/get?id=${id}`;
+    console.log('Fetching student from:', url);
+    
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.text().then(text => {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('Raw response:', text);
+                    throw new Error('El servidor devolvió una respuesta inválida (no es JSON). Ver consola.');
+                }
+            });
+        })
         .then(data => {
             if(data.error) { alert(data.error); return; }
             
@@ -261,19 +312,23 @@ function openEditModal(id) {
             if(m) m.show();
         })
         .catch(e => {
-            console.error(e);
-            alert('Error de conexión al obtener datos');
+            console.error('Fetch error:', e);
+            alert('Error al cargar datos: ' + e.message);
         });
 }
 
 function saveStudent(e) {
     e.preventDefault();
-    console.log('Saving student...');
     const form = e.target;
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+
     const formData = new FormData(form);
     const id = formData.get('id');
-    const url = id ? `${BASE_URL}/alumnos/update` : `${BASE_URL}/alumnos/store`;
-    console.log('URL:', url);
+    const url = id ? `${API_BASE_URL}/alumnos/update` : `${API_BASE_URL}/alumnos/store`;
+    console.log('Saving to:', url);
     
     const btn = document.getElementById('saveBtn');
     const originalText = btn.textContent;
@@ -284,7 +339,16 @@ function saveStudent(e) {
         method: 'POST',
         body: formData
     })
-    .then(r => r.json())
+    .then(response => {
+        return response.text().then(text => {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Raw response:', text);
+                throw new Error('El servidor devolvió una respuesta inválida (no es JSON). Ver consola.');
+            }
+        });
+    })
     .then(data => {
         console.log('Response:', data);
         if(data.success) {
@@ -295,7 +359,7 @@ function saveStudent(e) {
     })
     .catch(err => {
         console.error(err);
-        alert('Error de red');
+        alert('Error: ' + err.message);
     })
     .finally(() => {
         btn.disabled = false;
@@ -310,17 +374,28 @@ function deleteStudent(id) {
     formData.append('id', id);
     formData.append('csrf_token', '<?= $_SESSION['csrf_token'] ?? '' ?>');
     
-    fetch(`${BASE_URL}/alumnos/delete`, {
+    fetch(`${API_BASE_URL}/alumnos/delete`, {
         method: 'POST',
         body: formData
     })
-    .then(r => r.json())
+    .then(response => response.text().then(text => {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Raw response:', text);
+            throw new Error('Respuesta inválida del servidor');
+        }
+    }))
     .then(data => {
         if(data.success) {
             location.reload();
         } else {
             alert(data.error || 'Error al eliminar');
         }
+    })
+    .catch(e => {
+        console.error(e);
+        alert('Error: ' + e.message);
     });
 }
 </script>

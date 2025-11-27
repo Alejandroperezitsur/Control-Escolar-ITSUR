@@ -115,11 +115,24 @@ $router->get('/api/catalogs/subjects', fn() => $catalogs->subjects(), [AuthMiddl
 $router->get('/api/catalogs/professors', fn() => $catalogs->professors(), [AuthMiddleware::requireRole('admin')]);
 $router->get('/api/catalogs/students', fn() => $catalogs->students(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 $router->get('/api/catalogs/groups', function () use ($catalogs) {
-    $profId = (int)($_GET['profesor'] ?? ($_SESSION['user_id'] ?? 0));
+    $role = $_SESSION['role'] ?? '';
+    // If profesor role, always use their own user_id
+    if ($role === 'profesor') {
+        $profId = (int)($_SESSION['user_id'] ?? 0);
+    } else {
+        // Admin can optionally filter by profesor parameter
+        $profId = (int)($_GET['profesor'] ?? ($_SESSION['user_id'] ?? 0));
+    }
     return $catalogs->groupsByProfessor($profId);
 }, [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 $router->get('/api/catalogs/groups_all', fn() => $catalogs->groupsAll(), [AuthMiddleware::requireRole('admin')]);
 $router->get('/api/catalogs/cycles', fn() => $catalogs->cycles(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
+$router->get('/api/catalogs/group_students', fn() => $catalogs->groupStudents((int)($_GET['gid'] ?? 0)), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
+$router->get('/api/catalogs/professor_students', function () use ($catalogs) {
+    $role = $_SESSION['role'] ?? '';
+    $pid = ($role === 'profesor') ? (int)($_SESSION['user_id'] ?? 0) : (int)($_GET['profesor'] ?? 0);
+    return $catalogs->studentsByProfessor($pid);
+}, [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 
 // Profesor
 $router->get('/grades', fn() => $grades->index(), [AuthMiddleware::requireRole('profesor')]);

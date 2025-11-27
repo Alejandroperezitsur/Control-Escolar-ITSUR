@@ -353,4 +353,26 @@ class CatalogsController
         $this->setCache('cycles', $cycles);
         echo json_encode($cycles);
     }
+
+    public function groupStudents(int $grupoId): void
+    {
+        header('Content-Type: application/json');
+        $this->ensureCompleteData();
+        if ($grupoId <= 0) { echo json_encode([]); return; }
+        $stmt = $this->pdo->prepare('SELECT a.id, a.matricula, a.nombre, a.apellido FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id WHERE c.grupo_id = :g ORDER BY a.apellido, a.nombre');
+        $stmt->execute([':g' => $grupoId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($rows);
+    }
+
+    public function studentsByProfessor(int $profesorId): void
+    {
+        header('Content-Type: application/json');
+        $this->ensureCompleteData();
+        if ($profesorId <= 0) { echo json_encode([]); return; }
+        $stmt = $this->pdo->prepare('SELECT DISTINCT a.id, a.matricula, a.nombre, a.apellido FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id JOIN grupos g ON g.id = c.grupo_id WHERE g.profesor_id = :p ORDER BY a.apellido, a.nombre');
+        $stmt->execute([':p' => $profesorId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        echo json_encode($rows);
+    }
 }
