@@ -81,13 +81,58 @@ ob_start();
   <div class="card mb-3">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <div class="h6 mb-0">Calificaciones del grupo</div>
-        <div class="d-flex align-items-center gap-2">
-          <?php $gid = (int)($grp['id'] ?? 0); ?>
-          <a class="btn btn-sm btn-outline-primary" href="<?php echo $base; ?>/grades/group/export/csv?grupo_id=<?= $gid ?>"><i class="fa-solid fa-file-csv me-1"></i> CSV</a>
-          <a class="btn btn-sm btn-outline-success" href="<?php echo $base; ?>/grades/group/export/xlsx?grupo_id=<?= $gid ?>"><i class="fa-solid fa-file-excel me-1"></i> XLSX</a>
-        </div>
+        <div class="h6 mb-0">Pendientes de evaluación</div>
+        <div class="text-muted small">Alumnos sin calificación final</div>
       </div>
+      <div class="table-responsive">
+        <table class="table table-striped table-hover table-sm align-middle">
+          <thead class="table-light"><tr><th>Matrícula</th><th>Alumno</th><th class="text-end">Acciones</th></tr></thead>
+          <tbody>
+            <?php if (!empty($rows)): $pendRows = array_filter($rows, fn($r) => ($r['final'] ?? '') === '' || $r['final'] === null); if (!empty($pendRows)): foreach ($pendRows as $r): ?>
+              <tr>
+                <td><?= htmlspecialchars($r['matricula'] ?? '') ?></td>
+                <td><?= htmlspecialchars(($r['nombre'] ?? '') . ' ' . ($r['apellido'] ?? '')) ?></td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-primary" href="<?php echo $base; ?>/grades?grupo_id=<?= (int)($grp['id'] ?? 0) ?>&alumno_id=<?= (int)($r['id'] ?? 0) ?>">
+                    <i class="fa-solid fa-pen-to-square"></i> Evaluar
+                  </a>
+                </td>
+              </tr>
+            <?php endforeach; else: ?>
+              <tr><td colspan="3" class="text-muted">No hay pendientes.</td></tr>
+            <?php endif; else: ?>
+              <tr><td colspan="3" class="text-muted">Sin alumnos en el grupo.</td></tr>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="d-flex align-items-center gap-3">
+            <div class="h6 mb-0">Calificaciones del grupo</div>
+            <div class="text-muted small">Mostrando: <span id="stateCount">0</span> · Promedio visible: <span id="stateAvg">—</span></div>
+            <select id="avgSel" class="form-select form-select-sm" style="width:auto">
+              <option value="final">Final</option>
+              <option value="promedio">Promedio</option>
+            </select>
+            <select id="stateSel" class="form-select form-select-sm" style="width:auto">
+              <option value="todos">Todos</option>
+              <option value="pendiente">Pendientes</option>
+              <option value="aprobado">Aprobados</option>
+              <option value="reprobado">Reprobados</option>
+            </select>
+          </div>
+          <div class="d-flex align-items-center gap-2">
+            <?php $gid = (int)($grp['id'] ?? 0); ?>
+            <a id="csvLink" class="btn btn-sm btn-outline-primary" href="<?php echo $base; ?>/grades/group/export/csv?grupo_id=<?= $gid ?>"><i class="fa-solid fa-file-csv me-1"></i> CSV</a>
+            <a id="xlsxLink" class="btn btn-sm btn-outline-success" href="<?php echo $base; ?>/grades/group/export/xlsx?grupo_id=<?= $gid ?>"><i class="fa-solid fa-file-excel me-1"></i> XLSX</a>
+            <a class="btn btn-sm btn-outline-warning" href="<?php echo $base; ?>/grades/group/export/pendingcsv?grupo_id=<?= $gid ?>"><i class="fa-solid fa-clock me-1"></i> Pendientes CSV</a>
+          </div>
+        </div>
       <div class="table-responsive">
         <table class="table table-striped table-hover table-bordered table-sm align-middle">
           <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
@@ -100,7 +145,7 @@ ob_start();
               <th class="text-end">Promedio</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="grpTableBody">
             <?php if (!empty($rows)): foreach ($rows as $r): ?>
             <?php
               $p1 = isset($r['parcial1']) && $r['parcial1'] !== '' ? (float)$r['parcial1'] : null;
@@ -108,8 +153,9 @@ ob_start();
               $fin = isset($r['final']) && $r['final'] !== '' ? (float)$r['final'] : null;
               $prom = isset($r['promedio']) && $r['promedio'] !== '' ? (float)$r['promedio'] : null;
               $cls = function($v){ if ($v === null) return 'text-muted'; return $v >= 70 ? 'text-success' : 'text-danger'; };
+              $state = $fin === null ? 'pendiente' : ($fin >= 70 ? 'aprobado' : 'reprobado');
             ?>
-            <tr>
+            <tr data-state="<?= $state ?>">
               <td><?= htmlspecialchars($r['matricula'] ?? '') ?></td>
               <td><?= htmlspecialchars(($r['nombre'] ?? '') . ' ' . ($r['apellido'] ?? '')) ?></td>
               <td class="text-end"><span class="<?= $cls($p1) ?>"><?= htmlspecialchars($r['parcial1'] ?? '') ?></span></td>
@@ -247,6 +293,11 @@ document.addEventListener('DOMContentLoaded', loadSchedules);
           }]
         };
         new Chart(perfEl, { type: 'bar', data: perfData, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, suggestedMax: 100 } }, plugins: { legend: { display: false } } } });
+        try {
+          var initSel = document.getElementById('avgSel');
+          var initIdx = (initSel && initSel.value === 'promedio') ? 5 : 4;
+          updateChart(initIdx);
+        } catch(e) {}
       }
       if (distEl) {
         var distLabels = <?= json_encode($distLabels) ?>;
@@ -265,6 +316,97 @@ document.addEventListener('DOMContentLoaded', loadSchedules);
       }
     };
     document.body.appendChild(s);
+  })();
+  function updateChart(colIdx) {
+    if (typeof Chart === 'undefined') { return; }
+    var perfEl = document.getElementById('grpPerf');
+    if (!perfEl) { return; }
+    var chart = Chart.getChart(perfEl);
+    if (!chart) { return; }
+    var tb = document.getElementById('grpTableBody');
+    if (!tb) { return; }
+    var rows = tb.querySelectorAll('tr');
+    var sumP1 = 0, cntP1 = 0;
+    var sumP2 = 0, cntP2 = 0;
+    var sumSel = 0, cntSel = 0;
+    rows.forEach(function (r) {
+      if (r.style.display === 'none') { return; }
+      var cells = r.querySelectorAll('td');
+      if (cells.length < 6) { return; }
+      var p1 = cells[2] ? String(cells[2].textContent || '').trim() : '';
+      var p2 = cells[3] ? String(cells[3].textContent || '').trim() : '';
+      var sel = cells[colIdx] ? String(cells[colIdx].textContent || '').trim() : '';
+      if (p1 !== '') { var v1 = Number(p1.replace(',', '.')); if (!isNaN(v1)) { sumP1 += v1; cntP1++; } }
+      if (p2 !== '') { var v2 = Number(p2.replace(',', '.')); if (!isNaN(v2)) { sumP2 += v2; cntP2++; } }
+      if (sel !== '') { var vs = Number(sel.replace(',', '.')); if (!isNaN(vs)) { sumSel += vs; cntSel++; } }
+    });
+    var avgP1 = cntP1 > 0 ? Math.round((sumP1 / cntP1) * 100) / 100 : 0;
+    var avgP2 = cntP2 > 0 ? Math.round((sumP2 / cntP2) * 100) / 100 : 0;
+    var avgSel = cntSel > 0 ? Math.round((sumSel / cntSel) * 100) / 100 : 0;
+    chart.data.labels = ['Parcial 1','Parcial 2', (colIdx === 5 ? 'Promedio' : 'Final')];
+    chart.data.datasets[0].data = [avgP1, avgP2, avgSel];
+    chart.update();
+  }
+  (function(){
+    var sel = document.getElementById('stateSel');
+    var tb = document.getElementById('grpTableBody');
+    var csv = document.getElementById('csvLink');
+    var avgSel = document.getElementById('avgSel');
+    if (sel && tb) {
+      var key = 'grpStateSel_' + String(GID);
+      var initial = localStorage.getItem(key);
+      if (initial) { sel.value = initial; }
+      var apply = function(){
+        var v = sel.value;
+        var colIdx = (avgSel && avgSel.value === 'promedio') ? 5 : 4;
+        var rows = tb.querySelectorAll('tr');
+        var count = 0;
+        var sum = 0;
+        var cfin = 0;
+        rows.forEach(function(r){
+          var s = r.getAttribute('data-state') || 'todos';
+          var show = (v === 'todos' || v === s);
+          r.style.display = show ? '' : 'none';
+          if (show) { count++; }
+          if (show) {
+            var cells = r.querySelectorAll('td');
+            var txt = cells && cells[colIdx] ? String(cells[colIdx].textContent || '').trim() : '';
+            var val = txt !== '' ? Number(txt.replace(',', '.')) : NaN;
+            if (!isNaN(val)) { sum += val; cfin++; }
+          }
+        });
+        if (csv) {
+          var href = '<?php echo $base; ?>/grades/group/export/csv?grupo_id=' + String(GID);
+          if (v !== 'todos') { href += '&estado=' + encodeURIComponent(v); }
+          csv.setAttribute('href', href);
+        }
+        var xlsx = document.getElementById('xlsxLink');
+        if (xlsx) {
+          var xhref = '<?php echo $base; ?>/grades/group/export/xlsx?grupo_id=' + String(GID);
+          if (v !== 'todos') { xhref += '&estado=' + encodeURIComponent(v); }
+          xlsx.setAttribute('href', xhref);
+        }
+        var cntEl = document.getElementById('stateCount');
+        if (cntEl) { cntEl.textContent = String(count); }
+        var avgEl = document.getElementById('stateAvg');
+        if (avgEl) {
+          var avg = cfin > 0 ? Math.round((sum / cfin) * 100) / 100 : null;
+          avgEl.textContent = avg === null ? '—' : String(avg);
+          avgEl.classList.remove('text-success','text-danger');
+          if (avg !== null) { avgEl.classList.add(avg >= 70 ? 'text-success' : 'text-danger'); }
+        }
+        updateChart(colIdx);
+        try { localStorage.setItem(key, v); } catch(e) {}
+      };
+      sel.addEventListener('change', apply);
+      if (avgSel) {
+        var avgKey = 'grpAvgSel_' + String(GID);
+        var aInit = localStorage.getItem(avgKey);
+        if (aInit) { avgSel.value = aInit; }
+        avgSel.addEventListener('change', function(){ try { localStorage.setItem(avgKey, avgSel.value); } catch(e) {} apply(); });
+      }
+      apply();
+    }
   })();
 </script>
 <?php

@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_server_view'])) 
   }
 }
 // Acceso: Admin puede consultar cualquier matrícula; Alumno solo su propio Kardex
-$role = $_SESSION['user_role'] ?? '';
+$role = $_SESSION['role'] ?? '';
 $isAdmin = ($role === 'admin');
 $isAlumno = ($role === 'alumno');
 if (!$isAdmin && !$isAlumno) {

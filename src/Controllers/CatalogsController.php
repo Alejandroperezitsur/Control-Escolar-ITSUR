@@ -359,7 +359,9 @@ class CatalogsController
         header('Content-Type: application/json');
         $this->ensureCompleteData();
         if ($grupoId <= 0) { echo json_encode([]); return; }
-        $stmt = $this->pdo->prepare('SELECT a.id, a.matricula, a.nombre, a.apellido FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id WHERE c.grupo_id = :g ORDER BY a.apellido, a.nombre');
+        $pending = isset($_GET['pending']) ? (int)$_GET['pending'] : 0;
+        $sql = 'SELECT a.id, a.matricula, a.nombre, a.apellido FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id WHERE c.grupo_id = :g' . ($pending === 1 ? ' AND c.final IS NULL' : '') . ' ORDER BY a.apellido, a.nombre';
+        $stmt = $this->pdo->prepare($sql);
         $stmt->execute([':g' => $grupoId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         echo json_encode($rows);

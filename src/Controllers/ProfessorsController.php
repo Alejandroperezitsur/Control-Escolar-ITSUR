@@ -13,6 +13,8 @@ class ProfessorsController
 
     public function index(): void
     {
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         $page = (int)($_GET['page'] ?? 1);
         $limit = 20;
         $q = trim((string)($_GET['q'] ?? ''));
@@ -69,6 +71,7 @@ class ProfessorsController
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
         $token = $_POST['csrf_token'] ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
+        if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
 
         $nombre = trim((string)($_POST['nombre'] ?? ''));
         $email = filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL);
@@ -101,6 +104,7 @@ class ProfessorsController
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
         $token = $_POST['csrf_token'] ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
+        if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if (!$id) { $_SESSION['flash'] = 'ID inválido'; $_SESSION['flash_type'] = 'danger'; header('Location: /professors'); return; }
         $stmt = $this->pdo->prepare("DELETE FROM usuarios WHERE id = :id AND rol = 'profesor'");
@@ -116,6 +120,7 @@ class ProfessorsController
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
         $token = $_POST['csrf_token'] ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
+        if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if (!$id) { $_SESSION['flash'] = 'ID inválido'; $_SESSION['flash_type'] = 'danger'; header('Location: /professors'); return; }
         $nombre = trim((string)($_POST['nombre'] ?? ''));

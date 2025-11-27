@@ -21,7 +21,7 @@ $controlGrupos = new ControlGrupos();
 $controlMaterias = new ControlMaterias();
 $controlUsuarios = new ControlUsuarios();
 
-$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
+$isAdmin = ($_SESSION['role'] ?? '') === 'admin';
 $msg = '';
 $error = '';
 // Para edición

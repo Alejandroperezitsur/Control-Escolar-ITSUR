@@ -17,6 +17,8 @@ class GroupsController
     // Lista de grupos (index)
     public function index(): void
     {
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         $groups = $this->service->count() ? $this->listAll() : [];
         include __DIR__ . '/../Views/groups/index.php';
     }
@@ -24,6 +26,7 @@ class GroupsController
     // Asignar, quitar o cambiar profesor de un grupo
     public function updateProfessor(): void
     {
+        if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
         $this->assertCsrf();
         $grupo_id = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
@@ -82,7 +85,7 @@ class GroupsController
         $sql = "SELECT g.id, g.nombre, g.ciclo, g.cupo, m.nombre AS materia, m.id AS materia_id, u.nombre AS profesor, u.id AS profesor_id
                 FROM grupos g
                 JOIN materias m ON m.id = g.materia_id
-                JOIN usuarios u ON u.id = g.profesor_id
+                LEFT JOIN usuarios u ON u.id = g.profesor_id
                 ORDER BY g.ciclo DESC, m.nombre, g.nombre";
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute();
@@ -92,6 +95,7 @@ class GroupsController
     public function create(): void
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
             $this->assertCsrf();
             $ok = $this->service->create($_POST);
             \App\Utils\Logger::info('group_create', [
@@ -111,6 +115,7 @@ class GroupsController
     public function update(): void
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
             $this->assertCsrf();
             $id = (int)($_POST['id'] ?? 0);
             $ok = $this->service->update($id, $_POST);
@@ -126,6 +131,7 @@ class GroupsController
     public function delete(): void
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
             $this->assertCsrf();
             $id = (int)($_POST['id'] ?? 0);
             $ok = $this->service->delete($id);

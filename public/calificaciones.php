@@ -1,6 +1,6 @@
 <?php
 if (session_status() !== PHP_SESSION_ACTIVE) { session_start(); }
-$role = $_SESSION['role'] ?? ($_SESSION['user_role'] ?? '');
+$role = $_SESSION['role'] ?? '';
 if ($role === 'profesor') {
     header('Location: app.php?r=/grades');
 } else {

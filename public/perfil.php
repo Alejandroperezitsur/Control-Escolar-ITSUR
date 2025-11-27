@@ -2,7 +2,7 @@
 header('Location: app.php?r=/dashboard');
 exit;
 ?>
-$isAlumno = ($_SESSION['user_role'] ?? '') === 'alumno';
+$isAlumno = ($_SESSION['role'] ?? '') === 'alumno';
 ?>
 <!doctype html>
 <html lang="es">
@@ -37,7 +37,7 @@ $isAlumno = ($_SESSION['user_role'] ?? '') === 'alumno';
             <div class="table-responsive">
               <table class="table table-sm">
                 <tbody>
-                  <tr><th>Rol</th><td><?= htmlspecialchars(ucfirst($_SESSION['user_role'] ?? '')) ?></td></tr>
+                  <tr><th>Rol</th><td><?= htmlspecialchars(ucfirst($_SESSION['role'] ?? '')) ?></td></tr>
                   <?php if ($isAlumno): ?>
                   <tr><th>Nombre</th><td><?= htmlspecialchars(($user['nombre'] ?? '') . ' ' . ($user['apellido'] ?? '')) ?></td></tr>
                   <tr><th>Matrícula</th><td><?= htmlspecialchars($user['matricula'] ?? '') ?></td></tr>

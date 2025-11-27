@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../../app/init.php';
 $base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
-$role = $_SESSION['role'] ?? ($_SESSION['user_role'] ?? null);
+$role = $_SESSION['role'] ?? null;
 ?>
 <aside class="app-sidebar">
   <div class="brand">

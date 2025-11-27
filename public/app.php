@@ -91,6 +91,7 @@ $router->get('/api/charts/desempeño-grupo', fn() => $charts->performanceByProfe
 $router->get('/api/charts/reprobados', fn() => $charts->failRateBySubject(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 
 $router->get('/grades/group/export/csv', fn() => $grades->exportGroupCsv(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
+$router->get('/grades/group/export/pendingcsv', fn() => $grades->exportGroupPendingCsv(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 $router->get('/grades/group/export/xlsx', fn() => $grades->exportGroupXlsx(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 
 // Admin: Ajustes de siembra
@@ -135,12 +136,13 @@ $router->get('/api/catalogs/professor_students', function () use ($catalogs) {
 }, [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 
 // Profesor
-$router->get('/grades', fn() => $grades->index(), [AuthMiddleware::requireRole('profesor')]);
+$router->get('/grades', fn() => $grades->index(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 $router->get('/grades/bulk', fn() => $grades->showBulkForm(), [AuthMiddleware::requireRole('profesor')]);
 $router->post('/grades/bulk', fn() => $grades->processBulkUpload(), [AuthMiddleware::requireRole('profesor'), RateLimitMiddleware::limit('grades_bulk', 20, 600)]);
 $router->get('/grades/bulk-log', fn() => $grades->downloadBulkLog(), [AuthMiddleware::requireRole('profesor')]);
-$router->post('/grades/create', fn() => $grades->create(), [AuthMiddleware::requireRole('profesor'), RateLimitMiddleware::limit('grades_create', 30, 600)]);
+$router->post('/grades/create', fn() => $grades->create(), [AuthMiddleware::requireAnyRole(['admin','profesor']), RateLimitMiddleware::limit('grades_create', 30, 600)]);
 $router->get('/grades/group', fn() => $grades->groupGrades(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
+$router->get('/api/grades/row', fn() => $grades->gradeRow(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 $router->get('/api/kpis/profesor', fn() => $kpi->profesorDashboard((int)($_SESSION['user_id'] ?? 0)), [AuthMiddleware::requireRole('profesor')]);
 $router->get('/api/profesor/perfil', fn() => $professorApi->perfil(), [AuthMiddleware::requireRole('profesor')]);
 

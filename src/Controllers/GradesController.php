@@ -112,9 +112,10 @@ class GradesController
             http_response_code(400);
             return 'Archivo CSV inválido';
         }
+        try { $this->pdo->exec("ALTER TABLE calificaciones ADD COLUMN promedio DECIMAL(5,2) NULL AFTER final"); } catch (\Throwable $e) {}
         $fp = fopen($_FILES['csv']['tmp_name'], 'r');
         $headers = fgetcsv($fp);
-        $stmt = $this->pdo->prepare("UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin WHERE alumno_id = :alumno AND grupo_id = :grupo");
+        $stmt = $this->pdo->prepare("UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin, promedio = :prom WHERE alumno_id = :alumno AND grupo_id = :grupo");
         $count = 0;
         $skipped = 0;
         $processed = 0;
@@ -142,12 +143,14 @@ class GradesController
             if (!$grupoRow) { $skipped++; $processed++; continue; }
             if ($role === 'profesor' && (int)$grupoRow['profesor_id'] !== $profId) { $skipped++; $processed++; continue; }
 
+            $prom = ($fin !== null) ? (float)$fin : (($p1 !== null && $p2 !== null) ? round(($p1 + $p2) / 2, 2) : null);
             $stmt->execute([
                 ':alumno' => $alumnoId,
                 ':grupo' => $grupoId,
                 ':p1' => $p1,
                 ':p2' => $p2,
                 ':fin' => $fin,
+                ':prom' => $prom,
             ]);
             $count += $stmt->rowCount();
             $processed++;
@@ -171,6 +174,12 @@ class GradesController
             return 'CSRF inválido';
         }
 
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'admin' && $role !== 'profesor') {
+            http_response_code(403);
+            return 'No autorizado';
+        }
+
         $alumnoId = filter_input(INPUT_POST, 'alumno_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $grupoId = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $p1 = ($_POST['parcial1'] ?? '') !== '' ? filter_var($_POST['parcial1'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
@@ -185,22 +194,84 @@ class GradesController
             return '';
         }
 
-        // Upsert
-        $stmt = $this->pdo->prepare('SELECT 1 FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g');
+        // Validar alumno activo
+        $chkAlumno = $this->pdo->prepare('SELECT 1 FROM alumnos WHERE id = :id AND activo = 1');
+        $chkAlumno->execute([':id' => $alumnoId]);
+        if (!$chkAlumno->fetchColumn()) {
+            http_response_code(400);
+            $_SESSION['flash'] = 'Alumno no existe o está inactivo';
+            $_SESSION['flash_type'] = 'danger';
+            header('Location: /grades');
+            return '';
+        }
+
+        // Validar grupo existente y pertenencia del profesor si aplica
+        $grpStmt = $this->pdo->prepare('SELECT profesor_id FROM grupos WHERE id = :id');
+        $grpStmt->execute([':id' => $grupoId]);
+        $grpRow = $grpStmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$grpRow) {
+            http_response_code(400);
+            $_SESSION['flash'] = 'Grupo inválido';
+            $_SESSION['flash_type'] = 'danger';
+            header('Location: /grades');
+            return '';
+        }
+        if ($role === 'profesor') {
+            $pid = (int)($_SESSION['user_id'] ?? 0);
+            if ((int)$grpRow['profesor_id'] !== $pid) {
+                http_response_code(403);
+                $_SESSION['flash'] = 'No autorizado para este grupo';
+                $_SESSION['flash_type'] = 'danger';
+                header('Location: /grades');
+                return '';
+            }
+        }
+
+        // Upsert con control de permisos: profesor solo actualiza existentes; admin puede insertar
+        try { $this->pdo->exec("ALTER TABLE calificaciones ADD COLUMN promedio DECIMAL(5,2) NULL AFTER final"); } catch (\Throwable $e) {}
+        $stmt = $this->pdo->prepare('SELECT id FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g');
         $stmt->execute([':a' => $alumnoId, ':g' => $grupoId]);
-        if ($stmt->fetchColumn()) {
-            $upd = $this->pdo->prepare('UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin WHERE alumno_id = :a AND grupo_id = :g');
-            $upd->execute([':p1' => $p1, ':p2' => $p2, ':fin' => $fin, ':a' => $alumnoId, ':g' => $grupoId]);
+        $existingId = $stmt->fetchColumn();
+
+        $prom = ($fin !== null) ? (float)$fin : (($p1 !== null && $p2 !== null) ? round(($p1 + $p2) / 2, 2) : null);
+        $message = 'Calificación registrada correctamente';
+        if ($existingId) {
+            $prevStmt = $this->pdo->prepare('SELECT parcial1, parcial2, final, promedio FROM calificaciones WHERE id = :id');
+            $prevStmt->execute([':id' => (int)$existingId]);
+            $prev = $prevStmt->fetch(PDO::FETCH_ASSOC);
+            $prevP1 = ($prev['parcial1'] !== null ? (int)$prev['parcial1'] : null);
+            $prevP2 = ($prev['parcial2'] !== null ? (int)$prev['parcial2'] : null);
+            $prevFin = ($prev['final'] !== null ? (int)$prev['final'] : null);
+            $prevProm = ($prev['promedio'] !== null ? (float)$prev['promedio'] : null);
+            $noChange = ($prevP1 === $p1) && ($prevP2 === $p2) && ($prevFin === $fin) && ($prevProm === $prom);
+            if ($noChange) {
+                $message = 'Sin cambios';
+            } else {
+                $upd = $this->pdo->prepare('UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin, promedio = :prom WHERE id = :id');
+                $upd->execute([':p1' => $p1, ':p2' => $p2, ':fin' => $fin, ':prom' => $prom, ':id' => (int)$existingId]);
+            }
         } else {
-            $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final) VALUES (:a, :g, :p1, :p2, :fin)');
-            $ins->execute([':a' => $alumnoId, ':g' => $grupoId, ':p1' => $p1, ':p2' => $p2, ':fin' => $fin]);
+            if ($role !== 'admin') {
+                http_response_code(403);
+                $_SESSION['flash'] = 'Solo un administrador puede inscribir alumnos al grupo';
+                $_SESSION['flash_type'] = 'danger';
+                header('Location: /grades');
+                return '';
+            }
+            $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final, promedio) VALUES (:a, :g, :p1, :p2, :fin, :prom)');
+            $ins->execute([':a' => $alumnoId, ':g' => $grupoId, ':p1' => $p1, ':p2' => $p2, ':fin' => $fin, ':prom' => $prom]);
         }
 
         \App\Utils\Logger::info('grade_upsert', ['alumno_id' => $alumnoId, 'grupo_id' => $grupoId]);
-        $_SESSION['flash'] = 'Calificación registrada correctamente';
-        $_SESSION['flash_type'] = 'success';
-        
         $redirect = $_POST['redirect_to'] ?? '/grades';
+        $redirect = is_string($redirect) ? $redirect : '/grades';
+        if (!preg_match('#^/[a-zA-Z0-9/_?=&%-]+$#', $redirect)) { $redirect = '/grades'; }
+        if ($message === 'Calificación registrada correctamente') {
+            if (preg_match('#^/grades\?grupo_id=[^&]+&alumno_id=[^&]+#', $redirect)) { $message = 'Calificación registrada, avanzando al siguiente alumno'; }
+            elseif (preg_match('#^/grades/group\?grupo_id=#', $redirect)) { $message = 'Calificación registrada, regresando al grupo'; }
+        }
+        $_SESSION['flash'] = $message;
+        $_SESSION['flash_type'] = ($message === 'Sin cambios') ? 'warning' : 'success';
         header('Location: ' . $redirect);
         return '';
     }
@@ -248,12 +319,20 @@ class GradesController
         if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
         $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
+        $estado = strtolower(trim((string)($_GET['estado'] ?? '')));
         $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
         $stmt->execute([':id' => $grupoId]);
         $grp = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
         if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
         $rows = (new \App\Services\GroupsService($this->pdo))->studentsInGroup($grupoId);
+        if ($estado === 'pendiente') {
+            $rows = array_values(array_filter($rows, fn($r) => ($r['final'] ?? null) === null));
+        } elseif ($estado === 'aprobado') {
+            $rows = array_values(array_filter($rows, fn($r) => ($r['final'] ?? null) !== null && (float)$r['final'] >= 70));
+        } elseif ($estado === 'reprobado') {
+            $rows = array_values(array_filter($rows, fn($r) => ($r['final'] ?? null) !== null && (float)$r['final'] < 70));
+        }
         header('Content-Type: text/csv; charset=UTF-8');
         $fname = 'grupo_' . (int)$grupoId . '_calificaciones.csv';
         header('Content-Disposition: attachment; filename="' . $fname . '"');
@@ -269,7 +348,7 @@ class GradesController
         return (string)$csv;
     }
 
-    public function exportGroupXlsx(): string
+    public function exportGroupPendingCsv(): string
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
@@ -280,7 +359,44 @@ class GradesController
         $grp = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
         if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
+        $q = $this->pdo->prepare('SELECT a.matricula, a.nombre, a.apellido FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id WHERE c.grupo_id = :gid AND c.final IS NULL ORDER BY a.apellido, a.nombre');
+        $q->execute([':gid' => $grupoId]);
+        $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+        header('Content-Type: text/csv; charset=UTF-8');
+        $fname = 'grupo_' . (int)$grupoId . '_pendientes.csv';
+        header('Content-Disposition: attachment; filename="' . $fname . '"');
+        $fp = fopen('php://temp', 'w+');
+        fputcsv($fp, ['Matrícula','Alumno']);
+        foreach ($rows as $r) {
+            $al = trim((string)($r['nombre'] ?? '')); $ap = trim((string)($r['apellido'] ?? ''));
+            fputcsv($fp, [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap) ]);
+        }
+        rewind($fp);
+        $csv = stream_get_contents($fp);
+        fclose($fp);
+        return (string)$csv;
+    }
+
+    public function exportGroupXlsx(): string
+    {
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
+        $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
+        if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
+        $estado = strtolower(trim((string)($_GET['estado'] ?? '')));
+        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
+        $stmt->execute([':id' => $grupoId]);
+        $grp = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
+        if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
         $rowsDb = (new \App\Services\GroupsService($this->pdo))->studentsInGroup($grupoId);
+        if ($estado === 'pendiente') {
+            $rowsDb = array_values(array_filter($rowsDb, fn($r) => ($r['final'] ?? null) === null));
+        } elseif ($estado === 'aprobado') {
+            $rowsDb = array_values(array_filter($rowsDb, fn($r) => ($r['final'] ?? null) !== null && (float)$r['final'] >= 70));
+        } elseif ($estado === 'reprobado') {
+            $rowsDb = array_values(array_filter($rowsDb, fn($r) => ($r['final'] ?? null) !== null && (float)$r['final'] < 70));
+        }
         $headers = ['Matrícula','Alumno','Parcial 1','Parcial 2','Final','Promedio'];
         $rows = [];
         foreach ($rowsDb as $r) { $al = trim((string)($r['nombre'] ?? '')); $ap = trim((string)($r['apellido'] ?? '')); $rows[] = [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap), (string)($r['parcial1'] ?? ''), (string)($r['parcial2'] ?? ''), (string)($r['final'] ?? ''), (string)($r['promedio'] ?? '') ]; }
@@ -309,6 +425,50 @@ class GradesController
         readfile($tmp);
         @unlink($tmp);
         return '';
+    }
+
+    public function gradeRow(): string
+    {
+        $role = $_SESSION['role'] ?? '';
+        if ($role !== 'admin' && $role !== 'profesor') {
+            header('Content-Type: application/json');
+            http_response_code(403);
+            return json_encode(['ok' => false, 'message' => 'No autorizado']);
+        }
+        $alumnoId = isset($_GET['alumno_id']) ? (int)$_GET['alumno_id'] : 0;
+        $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
+        if ($alumnoId <= 0 || $grupoId <= 0) {
+            header('Content-Type: application/json');
+            http_response_code(400);
+            return json_encode(['ok' => false, 'message' => 'Parámetros inválidos']);
+        }
+        $stmt = $this->pdo->prepare('SELECT profesor_id FROM grupos WHERE id = :id');
+        $stmt->execute([':id' => $grupoId]);
+        $grp = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$grp) {
+            header('Content-Type: application/json');
+            http_response_code(404);
+            return json_encode(['ok' => false, 'message' => 'Grupo no encontrado']);
+        }
+        if ($role === 'profesor') {
+            $pid = (int)($_SESSION['user_id'] ?? 0);
+            if ((int)$grp['profesor_id'] !== $pid) {
+                header('Content-Type: application/json');
+                http_response_code(403);
+                return json_encode(['ok' => false, 'message' => 'No autorizado para este grupo']);
+            }
+        }
+        $q = $this->pdo->prepare('SELECT parcial1, parcial2, final, promedio FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g');
+        $q->execute([':a' => $alumnoId, ':g' => $grupoId]);
+        $row = $q->fetch(PDO::FETCH_ASSOC);
+        header('Content-Type: application/json');
+        if (!$row) { return json_encode(['ok' => true, 'data' => null]); }
+        return json_encode(['ok' => true, 'data' => [
+            'parcial1' => isset($row['parcial1']) ? (int)$row['parcial1'] : null,
+            'parcial2' => isset($row['parcial2']) ? (int)$row['parcial2'] : null,
+            'final' => isset($row['final']) ? (int)$row['final'] : null,
+            'promedio' => isset($row['promedio']) ? (float)$row['promedio'] : null,
+        ]]);
     }
 
     private function buildSimpleSheetXml(array $headers, array $rows, array $options = []): string
