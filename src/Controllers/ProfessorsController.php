@@ -20,11 +20,13 @@ class ProfessorsController
         $q = trim((string)($_GET['q'] ?? ''));
         $status = trim((string)($_GET['status'] ?? ''));
         $career = (int)($_GET['career'] ?? 0);
+        $group = (int)($_GET['group'] ?? 0);
         $conds = ["rol = 'profesor'"]; $params = [];
         if ($q !== '') { $conds[] = '(nombre LIKE :q1 OR email LIKE :q2)'; $params[':q1'] = '%' . $q . '%'; $params[':q2'] = '%' . $q . '%'; }
         if ($status === 'active') { $conds[] = 'activo = 1'; }
         elseif ($status === 'inactive') { $conds[] = 'activo = 0'; }
         if ($career > 0) { $conds[] = 'carrera_id = :career'; $params[':career'] = $career; }
+        if ($group > 0) { $conds[] = 'id IN (SELECT profesor_id FROM grupos WHERE id = :group)'; $params[':group'] = $group; }
         $where = $conds ? ('WHERE ' . implode(' AND ', $conds)) : '';
         $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM usuarios $where");
         foreach ($params as $k=>$v) { $countStmt->bindValue($k, $v); }
@@ -54,6 +56,15 @@ class ProfessorsController
         // Fetch careers for filter
         $careersStmt = $this->pdo->query("SELECT id, nombre FROM carreras WHERE activo = 1 ORDER BY nombre");
         $careers = $careersStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fetch groups for filter
+        $groupsStmt = $this->pdo->query("
+            SELECT g.id, g.nombre, m.nombre AS materia_nombre 
+            FROM grupos g 
+            JOIN materias m ON m.id = g.materia_id 
+            ORDER BY g.nombre
+        ");
+        $groups = $groupsStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $pagination = ['page'=>$page,'pages'=>$totalPages,'total'=>$total,'limit'=>$limit,'q'=>$q,'status'=>$status,'sort'=>$sort,'order'=>$order];
         include __DIR__ . '/../Views/professors/index.php';

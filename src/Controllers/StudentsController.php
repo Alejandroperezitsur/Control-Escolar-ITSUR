@@ -19,6 +19,7 @@ class StudentsController
         $search = $_GET['q'] ?? '';
         $status = $_GET['status'] ?? '';
         $career = (int)($_GET['career'] ?? 0);
+        $group = (int)($_GET['group'] ?? 0);
         
         $where = '';
         $params = [];
@@ -38,6 +39,10 @@ class StudentsController
         if ($career > 0) {
             $conditions[] = "carrera_id = :career";
             $params[':career'] = $career;
+        }
+        if ($group > 0) {
+            $conditions[] = "EXISTS (SELECT 1 FROM inscripciones i WHERE i.alumno_id = a.id AND i.grupo_id = :group)";
+            $params[':group'] = $group;
         }
         if ($conditions) {
             $where = 'WHERE ' . implode(' AND ', $conditions);
@@ -82,6 +87,15 @@ class StudentsController
         // Fetch careers for filter
         $careersStmt = $this->pdo->query("SELECT id, nombre FROM carreras WHERE activo = 1 ORDER BY nombre");
         $careers = $careersStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Fetch groups for filter
+        $groupsStmt = $this->pdo->query("
+            SELECT g.id, g.nombre, m.nombre AS materia_nombre 
+            FROM grupos g 
+            JOIN materias m ON m.id = g.materia_id 
+            ORDER BY g.nombre
+        ");
+        $groups = $groupsStmt->fetchAll(PDO::FETCH_ASSOC);
         
         include __DIR__ . '/../Views/students/index.php';
     }
