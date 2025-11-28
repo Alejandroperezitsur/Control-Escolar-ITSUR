@@ -27,16 +27,8 @@ class Database {
         }
 
         try {
-            // Crear conexión temporal (sin DB) para crear la base si no existe
-            $tempDsn = 'mysql:host=' . $hostOnly;
-            if ($port) {
-                $tempDsn .= ';port=' . $port;
-            }
-
-            $tempConn = new PDO($tempDsn, $user, $pass, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-            $tempConn->exec("CREATE DATABASE IF NOT EXISTS `" . str_replace("`", "", $dbname) . "` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
-
-            // Ahora conectar a la base de datos específica
+            // Conectar directamente a la base de datos (sin intentar crearla)
+            // Los servidores remotos como InfinityFree no permiten CREATE DATABASE
             $dsn = 'mysql:host=' . $hostOnly;
             if ($port) {
                 $dsn .= ';port=' . $port;
