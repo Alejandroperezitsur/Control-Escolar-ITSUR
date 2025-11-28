@@ -7,57 +7,22 @@ ob_start();
     <div>
         <h2 class="mb-1">Alumnos <span class="badge bg-primary rounded-pill fs-6 align-middle ms-2">Total: <?= $total ?? 0 ?></span></h2>
         <p class="text-muted small mb-0">Gestión de estudiantes registrados</p>
-        <?php $careerSel = strtoupper($_GET['career'] ?? ''); $gidSel = (int)($_GET['grupo_id'] ?? 0); $qSel = trim((string)($_GET['q'] ?? '')); $statusSel = $_GET['status'] ?? ''; ?>
-        <?php if ($qSel !== '' || $statusSel !== '' || $careerSel !== '' || $gidSel > 0): ?>
-          <div class="mt-1">
-            <?php if ($qSel !== ''): ?><span class="badge bg-light text-dark me-1">Búsqueda: '<?= htmlspecialchars($qSel) ?>'</span><?php endif; ?>
-            <?php if ($statusSel === 'active'): ?><span class="badge bg-success-subtle text-success me-1">Estado: Activos</span><?php elseif ($statusSel === 'inactive'): ?><span class="badge bg-danger-subtle text-danger me-1">Estado: Inactivos</span><?php endif; ?>
-            <?php if ($careerSel !== ''): ?>
-              <?php $cName = ''; if (!empty($careers)) { foreach ($careers as $c) { if (strtoupper($c['clave']) === $careerSel) { $cName = $c['nombre']; break; } } } ?>
-              <span class="badge bg-light text-dark me-1">Carrera: <?= htmlspecialchars($cName ?: $careerSel) ?></span>
-            <?php endif; ?>
-            <?php if ($gidSel > 0): ?>
-              <?php $gName = ''; if (!empty($grupos)) { foreach ($grupos as $g) { if ((int)$g['id'] === $gidSel) { $gName = (($g['materia'] ?? '') . ' — ' . ($g['nombre'] ?? '') . ' (' . ($g['ciclo'] ?? '') . ')'); break; } } } ?>
-              <span class="badge bg-light text-dark me-1">Grupo: <?= htmlspecialchars($gName) ?></span>
-            <?php endif; ?>
-          </div>
-        <?php endif; ?>
     </div>
     <div class="d-flex gap-2">
         <?php 
         $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH); 
         ?>
-        <form class="d-flex flex-wrap gap-2" method="get" action="<?= htmlspecialchars($currentPath) ?>">
+        <form class="d-flex" method="get" action="<?= htmlspecialchars($currentPath) ?>">
             <?php if (isset($_GET['r'])): ?>
                 <input type="hidden" name="r" value="<?= htmlspecialchars($_GET['r']) ?>">
             <?php endif; ?>
-            <input class="form-control form-control-sm" style="max-width:180px" type="search" name="q" placeholder="Buscar..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" aria-label="Search">
-            <select name="status" class="form-select form-select-sm" style="max-width: 140px;">
+            <input class="form-control form-control-sm me-2" type="search" name="q" placeholder="Buscar..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" aria-label="Search">
+            <select name="status" class="form-select form-select-sm me-2" style="max-width: 120px;">
                 <option value="" <?= (!isset($_GET['status']) || $_GET['status'] === '' ) ? 'selected' : '' ?>>Todos</option>
                 <option value="active" <?= (isset($_GET['status']) && $_GET['status'] === 'active') ? 'selected' : '' ?>>Activos</option>
                 <option value="inactive" <?= (isset($_GET['status']) && $_GET['status'] === 'inactive') ? 'selected' : '' ?>>Inactivos</option>
             </select>
-            <select name="career" class="form-select form-select-sm" style="max-width: 220px;">
-                <?php $careerSel = strtoupper($_GET['career'] ?? ''); ?>
-                <option value="" <?= ($careerSel === '') ? 'selected' : '' ?>>Todas las carreras</option>
-                <?php foreach (($careers ?? []) as $c): ?>
-                    <option value="<?= htmlspecialchars($c['clave']) ?>" <?= ($careerSel === strtoupper($c['clave'])) ? 'selected' : '' ?>><?= htmlspecialchars($c['nombre']) ?></option>
-                <?php endforeach; ?>
-            </select>
-            <select name="grupo_id" class="form-select form-select-sm" style="max-width: 260px;">
-                <?php $gidSel = (int)($_GET['grupo_id'] ?? 0); ?>
-                <option value="0" <?= ($gidSel <= 0) ? 'selected' : '' ?>>Todos los grupos</option>
-                <?php foreach (($grupos ?? []) as $g): ?>
-                    <option value="<?= (int)$g['id'] ?>" <?= ($gidSel === (int)$g['id']) ? 'selected' : '' ?>><?= htmlspecialchars(($g['materia'] ?? '') . ' — ' . ($g['nombre'] ?? '') . ' (' . ($g['ciclo'] ?? '') . ')') ?></option>
-                <?php endforeach; ?>
-            </select>
             <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
-            <?php 
-              $clearUrl = $currentPath . '?' . http_build_query(array_filter([
-                'r' => $_GET['r'] ?? null
-              ]));
-            ?>
-            <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($clearUrl ?: $currentPath) ?>">Limpiar</a>
         </form>
         <button class="btn btn-sm btn-primary" onclick="openCreateModal()">
             <i class="fa-solid fa-plus me-1"></i> Nuevo Alumno
@@ -94,7 +59,7 @@ ob_start();
               <th class="ps-4"><?= sortLink('matricula', 'Matrícula', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th><?= sortLink('nombre', 'Nombre Completo', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th><?= sortLink('email', 'Email', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
-              <th>Carrera</th>
+
               <th><?= sortLink('activo', 'Estado', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th class="text-end pe-4">Acciones</th>
             </tr>
@@ -118,15 +83,6 @@ ob_start();
                     </div>
                 </td>
                 <td class="text-dark small"><a href="/public/app.php?r=/alumnos/detalle&id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['email'] ?? '—') ?></a></td>
-
-                <td>
-                    <?php
-                        $mPrefix = strtoupper(substr((string)($s['matricula'] ?? ''), 0, 1));
-                        $mapCode = ['S'=>'ISC','I'=>'II','A'=>'IGE','E'=>'IE','M'=>'IM','Q'=>'IER','C'=>'CP'];
-                        $code = $mapCode[$mPrefix] ?? '';
-                    ?>
-                    <span class="badge bg-light text-dark"><?= htmlspecialchars($code ?: '—') ?></span>
-                </td>
 
                 <td>
                     <?php
