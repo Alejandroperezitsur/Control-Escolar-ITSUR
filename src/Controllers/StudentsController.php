@@ -25,19 +25,19 @@ class StudentsController
         $params = [];
         $conditions = [];
         if ($search) {
-            $conditions[] = "(matricula LIKE :s1 OR nombre LIKE :s2 OR apellido LIKE :s3 OR email LIKE :s4)";
+            $conditions[] = "(a.matricula LIKE :s1 OR a.nombre LIKE :s2 OR a.apellido LIKE :s3 OR a.email LIKE :s4)";
             $params[':s1'] = "%$search%";
             $params[':s2'] = "%$search%";
             $params[':s3'] = "%$search%";
             $params[':s4'] = "%$search%";
         }
         if ($status === 'active') {
-            $conditions[] = "activo = 1";
+            $conditions[] = "a.activo = 1";
         } elseif ($status === 'inactive') {
-            $conditions[] = "activo = 0";
+            $conditions[] = "a.activo = 0";
         }
         if ($career > 0) {
-            $conditions[] = "carrera_id = :career";
+            $conditions[] = "a.carrera_id = :career";
             $params[':career'] = $career;
         }
         if ($group > 0) {
@@ -49,7 +49,7 @@ class StudentsController
         }
         
         // Count total for pagination
-        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM alumnos $where");
+        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM alumnos a $where");
         if (!empty($params)) {
             $countStmt->execute($params);
         } else {
@@ -67,8 +67,8 @@ class StudentsController
         if (!in_array($order, ['ASC', 'DESC'])) { $order = 'ASC'; }
         
         // Secondary sort for name consistency
-        $orderBy = "$sort $order";
-        if ($sort === 'apellido') { $orderBy .= ", nombre ASC"; }
+        $orderBy = "a.$sort $order";
+        if ($sort === 'apellido') { $orderBy .= ", a.nombre ASC"; }
         
         // Fetch students
         $sql = "SELECT a.id, a.matricula, a.nombre, a.apellido, a.email, a.activo, c.nombre AS carrera_nombre 

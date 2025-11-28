@@ -21,14 +21,16 @@ class StudentsService
 
     private function existsStudentActive(int $id): bool
     {
-        if ($id <= 0) { return false; }
+        if ($id <= 0) {
+            return false;
+        }
         $stmt = $this->pdo->prepare('SELECT 1 FROM alumnos WHERE id = :id AND activo = 1 LIMIT 1');
         $stmt->execute([':id' => $id]);
-        return (bool)$stmt->fetchColumn();
+        return (bool) $stmt->fetchColumn();
     }
 
     /**
-     * Server-side guard: ensure the session user matches requested id
+     * Ensure the session user matches the requested student ID.
      */
     public function assertSelfAccess(int $sessionUserId, int $requestedId): bool
     {
@@ -46,8 +48,8 @@ class StudentsService
     }
 
     /**
-     * Materias/grupos donde el alumno tiene inscripción (calificaciones registradas)
-     * Retorna filas con materia, grupo, ciclo y estado/calificación.
+     * Retrieve the academic load (subjects, groups, cycle, grades) for a student.
+     * If $ciclo is null the method returns all cycles; otherwise it filters by the given ciclo.
      */
     public function getAcademicLoad(int $idAlumno, ?string $ciclo = null): array
     {
@@ -56,9 +58,14 @@ class StudentsService
             Logger::info('student_load_failed', ['reason' => 'alumno_missing_or_inactive', 'alumno_id' => $idAlumno]);
             return [];
         }
+
         $params = [':alumno_id' => $idAlumno];
         $whereCiclo = '';
-        if ($ciclo) { $whereCiclo = ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
+        if ($ciclo) {
+            $whereCiclo = ' AND g.ciclo = :ciclo';
+            $params[':ciclo'] = $ciclo;
+        }
+
         $sql = "SELECT m.nombre AS materia, m.clave, g.id AS grupo_id, g.nombre AS grupo, g.ciclo,
                        c.parcial1, c.parcial2, c.final
                 FROM calificaciones c
@@ -67,29 +74,35 @@ class StudentsService
                 WHERE c.alumno_id = :alumno_id $whereCiclo
                 ORDER BY g.ciclo, m.nombre, g.nombre";
         $stmt = $this->pdo->prepare($sql);
-        foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
         $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        // Derivar estado y calificación visible
+
         $out = [];
         foreach ($rows as $r) {
-            $final = $r['final'] !== null ? (int)$r['final'] : null;
+            $final = $r['final'] !== null ? (int) $r['final'] : null;
             $estado = 'Pendiente';
-            if ($final !== null) { $estado = ($final >= 70) ? 'Aprobado' : 'Reprobado'; }
+            if ($final !== null) {
+                $estado = ($final >= 70) ? 'Aprobado' : 'Reprobado';
+            }
             $out[] = [
-                'materia' => (string)($r['materia'] ?? ''),
-                'grupo_id' => (int)($r['grupo_id'] ?? 0),
-                'grupo' => (string)($r['grupo'] ?? ''),
-                'ciclo' => (string)($r['ciclo'] ?? ''),
+                'materia'      => (string) ($r['materia'] ?? ''),
+                'clave'        => (string) ($r['clave'] ?? ''),
+                'grupo_id'     => (int) ($r['grupo_id'] ?? 0),
+                'grupo'        => (string) ($r['grupo'] ?? ''),
+                'ciclo'        => (string) ($r['ciclo'] ?? ''),
                 'calificacion' => $final,
-                'estado' => $estado,
+                'estado'       => $estado,
             ];
         }
         return $out;
     }
 
     /**
-     * Resumen de calificaciones del alumno: promedio general, total de materias y aprobadas/pendientes
+     * Summary of grades for a student. Returns average, total subjects, approved and pending counts.
+     * If $ciclo is null it summarises the whole history; otherwise it limits to the specified ciclo.
      */
     public function getGradesSummary(int $idAlumno, ?string $ciclo = null): array
     {
@@ -98,45 +111,69 @@ class StudentsService
             Logger::info('student_stats_failed', ['reason' => 'alumno_missing_or_inactive', 'alumno_id' => $idAlumno]);
             return ['promedio' => 0.0, 'total' => 0, 'aprobadas' => 0, 'pendientes' => 0];
         }
+
         $params = [':alumno_id' => $idAlumno];
         $whereCiclo = '';
-        if ($ciclo) { $whereCiclo = ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
+        if ($ciclo) {
+            $whereCiclo = ' AND g.ciclo = :ciclo';
+            $params[':ciclo'] = $ciclo;
+        }
 
-        // Promedio sobre final no nulos
+        // Average grade (only where final is not null)
         $stmt = $this->pdo->prepare("SELECT AVG(c.final) AS avg_final
-                                      FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id
-                                      WHERE c.alumno_id = :alumno_id $whereCiclo AND c.final IS NOT NULL");
-        foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
+                                    FROM calificaciones c
+                                    JOIN grupos g ON g.id = c.grupo_id
+                                    WHERE c.alumno_id = :alumno_id $whereCiclo AND c.final IS NOT NULL");
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
         $stmt->execute();
         $avg = $stmt->fetchColumn();
-        $promedio = $avg !== null ? round((float)$avg, 2) : 0.0;
+        $promedio = $avg !== null ? round((float) $avg, 2) : 0.0;
 
-        // Totales
-        $stmt = $this->pdo->prepare("SELECT COUNT(DISTINCT c.grupo_id) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id WHERE c.alumno_id = :alumno_id $whereCiclo");
-        foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
+        // Total distinct subjects (by grupo_id)
+        $stmt = $this->pdo->prepare("SELECT COUNT(DISTINCT c.grupo_id)
+                                    FROM calificaciones c
+                                    JOIN grupos g ON g.id = c.grupo_id
+                                    WHERE c.alumno_id = :alumno_id $whereCiclo");
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
         $stmt->execute();
-        $total = (int)$stmt->fetchColumn();
+        $total = (int) $stmt->fetchColumn();
 
-        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id WHERE c.alumno_id = :alumno_id $whereCiclo AND c.final IS NOT NULL AND c.final >= 70");
-        foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
+        // Approved subjects (final >= 70)
+        $stmt = $this->pdo->prepare("SELECT COUNT(*)
+                                    FROM calificaciones c
+                                    JOIN grupos g ON g.id = c.grupo_id
+                                    WHERE c.alumno_id = :alumno_id $whereCiclo AND c.final IS NOT NULL AND c.final >= 70");
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
         $stmt->execute();
-        $aprobadas = (int)$stmt->fetchColumn();
+        $aprobadas = (int) $stmt->fetchColumn();
 
-        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id WHERE c.alumno_id = :alumno_id $whereCiclo AND c.final IS NULL");
-        foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
+        // Pending subjects (final is null)
+        $stmt = $this->pdo->prepare("SELECT COUNT(*)
+                                    FROM calificaciones c
+                                    JOIN grupos g ON g.id = c.grupo_id
+                                    WHERE c.alumno_id = :alumno_id $whereCiclo AND c.final IS NULL");
+        foreach ($params as $k => $v) {
+            $stmt->bindValue($k, $v);
+        }
         $stmt->execute();
-        $pendientes = (int)$stmt->fetchColumn();
+        $pendientes = (int) $stmt->fetchColumn();
 
         return [
-            'promedio' => $promedio,
-            'total' => $total,
-            'aprobadas' => $aprobadas,
+            'promedio'   => $promedio,
+            'total'      => $total,
+            'aprobadas'  => $aprobadas,
             'pendientes' => $pendientes,
         ];
     }
 
     /**
-     * Datos para gráfica de rendimiento por ciclo (labels = ciclos, data = promedios finales)
+     * Data for performance chart: average final grade per ciclo.
      */
     public function getChartData(int $idAlumno): array
     {
@@ -146,13 +183,15 @@ class StudentsService
             return ['labels' => [], 'data' => []];
         }
         $stmt = $this->pdo->prepare("SELECT g.ciclo, ROUND(AVG(c.final), 2) AS promedio
-                                      FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id
-                                      WHERE c.alumno_id = :alumno_id AND c.final IS NOT NULL
-                                      GROUP BY g.ciclo ORDER BY g.ciclo");
+                                    FROM calificaciones c
+                                    JOIN grupos g ON g.id = c.grupo_id
+                                    WHERE c.alumno_id = :alumno_id AND c.final IS NOT NULL
+                                    GROUP BY g.ciclo
+                                    ORDER BY g.ciclo");
         $stmt->execute([':alumno_id' => $idAlumno]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $labels = array_map(fn($r) => (string)$r['ciclo'], $rows);
-        $data = array_map(fn($r) => (float)$r['promedio'], $rows);
+        $labels = array_map(fn($r) => (string) $r['ciclo'], $rows);
+        $data   = array_map(fn($r) => (float) $r['promedio'], $rows);
         return ['labels' => $labels, 'data' => $data];
     }
 }
