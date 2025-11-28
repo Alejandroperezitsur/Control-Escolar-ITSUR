@@ -70,6 +70,10 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
   </style>
 </head>
 <body data-theme="dark">
+<?php
+$isLogin = (isset($_GET['r']) && $_GET['r'] === '/login') || (strpos($_SERVER['REQUEST_URI'], '/login') !== false);
+?>
+<?php if (!$isLogin): ?>
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
     <div class="container-fluid">
       <a class="navbar-brand" href="/public/app.php?r=/dashboard"><i class="fa-solid fa-graduation-cap me-2"></i>ITSUR</a>
@@ -109,6 +113,7 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
       </div>
     </div>
   </nav>
+<?php endif; ?>
   <main class="container py-4">
     <?php echo $content ?? ''; ?>
   </main>

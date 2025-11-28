@@ -141,7 +141,7 @@ fetch('<?php echo $base; ?>/api/kpis/admin')
     document.getElementById('kpi-profesores').textContent = d.profesores ?? '—';
     document.getElementById('kpi-pendientes').textContent = d.pendientes_evaluacion ?? '—';
   });
-
+  
 // Chart.js con datos reales
 fetch('<?php echo $base; ?>/api/charts/promedios-materias')
   .then(r=>r.json())
