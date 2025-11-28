@@ -112,10 +112,10 @@ class GradesController
             http_response_code(400);
             return 'Archivo CSV inválido';
         }
-        try { $this->pdo->exec("ALTER TABLE calificaciones ADD COLUMN promedio DECIMAL(5,2) NULL AFTER final"); } catch (\Throwable $e) {}
+        // try { $this->pdo->exec("ALTER TABLE calificaciones ADD COLUMN promedio DECIMAL(5,2) NULL AFTER final"); } catch (\Throwable $e) {}
         $fp = fopen($_FILES['csv']['tmp_name'], 'r');
         $headers = fgetcsv($fp);
-        $stmt = $this->pdo->prepare("UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin, promedio = :prom WHERE alumno_id = :alumno AND grupo_id = :grupo");
+        $stmt = $this->pdo->prepare("UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin WHERE alumno_id = :alumno AND grupo_id = :grupo");
         $count = 0;
         $skipped = 0;
         $processed = 0;
@@ -150,7 +150,6 @@ class GradesController
                 ':p1' => $p1,
                 ':p2' => $p2,
                 ':fin' => $fin,
-                ':prom' => $prom,
             ]);
             $count += $stmt->rowCount();
             $processed++;
@@ -180,8 +179,8 @@ class GradesController
             return 'No autorizado';
         }
 
-        $alumnoId = filter_input(INPUT_POST, 'alumno_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $grupoId = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $alumnoId = isset($_POST['alumno_id']) ? filter_var($_POST['alumno_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : null;
+        $grupoId = isset($_POST['grupo_id']) ? filter_var($_POST['grupo_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : null;
         $p1 = ($_POST['parcial1'] ?? '') !== '' ? filter_var($_POST['parcial1'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
         $p2 = ($_POST['parcial2'] ?? '') !== '' ? filter_var($_POST['parcial2'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
         $fin = ($_POST['final'] ?? '') !== '' ? filter_var($_POST['final'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
@@ -228,7 +227,7 @@ class GradesController
         }
 
         // Upsert con control de permisos: profesor solo actualiza existentes; admin puede insertar
-        try { $this->pdo->exec("ALTER TABLE calificaciones ADD COLUMN promedio DECIMAL(5,2) NULL AFTER final"); } catch (\Throwable $e) {}
+        // try { $this->pdo->exec("ALTER TABLE calificaciones ADD COLUMN promedio DECIMAL(5,2) NULL AFTER final"); } catch (\Throwable $e) {}
         $stmt = $this->pdo->prepare('SELECT id FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g');
         $stmt->execute([':a' => $alumnoId, ':g' => $grupoId]);
         $existingId = $stmt->fetchColumn();
@@ -247,8 +246,8 @@ class GradesController
             if ($noChange) {
                 $message = 'Sin cambios';
             } else {
-                $upd = $this->pdo->prepare('UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin, promedio = :prom WHERE id = :id');
-                $upd->execute([':p1' => $p1, ':p2' => $p2, ':fin' => $fin, ':prom' => $prom, ':id' => (int)$existingId]);
+                $upd = $this->pdo->prepare('UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin WHERE id = :id');
+                $upd->execute([':p1' => $p1, ':p2' => $p2, ':fin' => $fin, ':id' => (int)$existingId]);
             }
         } else {
             if ($role !== 'admin') {
@@ -258,11 +257,15 @@ class GradesController
                 header('Location: /grades');
                 return '';
             }
-            $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final, promedio) VALUES (:a, :g, :p1, :p2, :fin, :prom)');
-            $ins->execute([':a' => $alumnoId, ':g' => $grupoId, ':p1' => $p1, ':p2' => $p2, ':fin' => $fin, ':prom' => $prom]);
+            $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final) VALUES (:a, :g, :p1, :p2, :fin)');
+            $ins->execute([':a' => $alumnoId, ':g' => $grupoId, ':p1' => $p1, ':p2' => $p2, ':fin' => $fin]);
         }
 
-        \App\Utils\Logger::info('grade_upsert', ['alumno_id' => $alumnoId, 'grupo_id' => $grupoId]);
+        try {
+            \App\Utils\Logger::info('grade_upsert', ['alumno_id' => $alumnoId, 'grupo_id' => $grupoId]);
+        } catch (\Throwable $e) {
+            // Logger may not be available in all contexts
+        }
         $redirect = $_POST['redirect_to'] ?? '/grades';
         $redirect = is_string($redirect) ? $redirect : '/grades';
         if (!preg_match('#^/[a-zA-Z0-9/_?=&%-]+$#', $redirect)) { $redirect = '/grades'; }

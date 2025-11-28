@@ -372,3 +372,4 @@
 {"ts":"2025-11-24T23:39:40+01:00","user_id":90,"role":"admin","path":"\/Control-Escolar-ITSUR\/public\/api\/charts\/promedios-ciclo?ciclo=2025-2&grupo_id=803","msg":"chart_query","ctx":{"type":"promedios_ciclo"}}
 {"ts":"2025-11-24T23:39:46+01:00","user_id":90,"role":"admin","path":"\/Control-Escolar-ITSUR\/public\/api\/charts\/promedios-ciclo?ciclo=2025-2&grupo_id=800","msg":"chart_query","ctx":{"type":"promedios_ciclo"}}
 {"ts":"2025-11-24T23:39:46+01:00","user_id":90,"role":"admin","path":"\/Control-Escolar-ITSUR\/public\/api\/charts\/reprobados?ciclo=2025-2&grupo_id=800","msg":"chart_query","ctx":{"type":"reprobados_materia"}}
+{"ts":"2025-11-28T22:22:45+00:00","user_id":2,"role":"profesor","path":null,"msg":"grade_upsert","ctx":{"alumno_id":1,"grupo_id":797}}

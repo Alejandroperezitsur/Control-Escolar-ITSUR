@@ -477,21 +477,23 @@ class StudentsController
                         (SELECT COUNT(*) FROM calificaciones cc WHERE cc.grupo_id = g.id) AS ocupados,
                         EXISTS (
                             SELECT 1 FROM calificaciones c2 JOIN grupos g2 ON g2.id = c2.grupo_id
-                            WHERE c2.alumno_id = :a AND g2.materia_id = m.id AND c2.final IS NOT NULL AND c2.final >= 70
+                            WHERE c2.alumno_id = :a1 AND g2.materia_id = m.id AND c2.final IS NOT NULL AND c2.final >= 70
                         ) AS ya_aprobada,
                         EXISTS (
-                            SELECT 1 FROM calificaciones c3 WHERE c3.alumno_id = :a AND c3.grupo_id = g.id
+                            SELECT 1 FROM calificaciones c3 WHERE c3.alumno_id = :a2 AND c3.grupo_id = g.id
                         ) AS ya_inscrito,
                         EXISTS (
                             SELECT 1 FROM calificaciones c4 JOIN grupos g4 ON g4.id = c4.grupo_id
-                            WHERE c4.alumno_id = :a AND c4.final IS NULL AND g4.materia_id = m.id AND g4.ciclo = g.ciclo AND g4.id <> g.id
+                            WHERE c4.alumno_id = :a3 AND c4.final IS NULL AND g4.materia_id = m.id AND g4.ciclo = g.ciclo AND g4.id <> g.id
                         ) AS tiene_pendiente_misma
                 FROM grupos g
                 JOIN materias m ON m.id = g.materia_id
                 $where
                 ORDER BY g.ciclo DESC, m.nombre, g.nombre";
         $stmt = $this->pdo->prepare($sql);
-        $stmt->bindValue(':a', $aid, PDO::PARAM_INT);
+        $stmt->bindValue(':a1', $aid, PDO::PARAM_INT);
+        $stmt->bindValue(':a2', $aid, PDO::PARAM_INT);
+        $stmt->bindValue(':a3', $aid, PDO::PARAM_INT);
         foreach ($params as $k=>$v) { $stmt->bindValue($k, $v); }
         $stmt->execute();
         $rowsOfferAll = $stmt->fetchAll(PDO::FETCH_ASSOC);
