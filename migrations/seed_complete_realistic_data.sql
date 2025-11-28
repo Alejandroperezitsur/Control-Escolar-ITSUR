@@ -23,16 +23,28 @@ START TRANSACTION;
 -- =====================================================
 -- 1. LIMPIAR DATOS EXISTENTES
 -- =====================================================
+-- Nota: Usamos DELETE FROM en lugar de TRUNCATE para evitar problemas
+-- con foreign keys en servidores remotos que no permiten TRUNCATE
 
-TRUNCATE TABLE `calificaciones`;
-TRUNCATE TABLE `inscripciones`;
-TRUNCATE TABLE `horarios`;
-TRUNCATE TABLE `grupos`;
-TRUNCATE TABLE `materias_carrera`;
-TRUNCATE TABLE `materias`;
-TRUNCATE TABLE `alumnos`;
+DELETE FROM `calificaciones`;
+DELETE FROM `inscripciones`;
+DELETE FROM `horarios`;
+DELETE FROM `grupos`;
+DELETE FROM `materias_carrera`;
+DELETE FROM `materias`;
+DELETE FROM `alumnos`;
 DELETE FROM `usuarios` WHERE `rol` != 'admin';
-TRUNCATE TABLE `carreras`;
+DELETE FROM `carreras`;
+
+-- Reiniciar auto_increment en las tablas principales
+ALTER TABLE `carreras` AUTO_INCREMENT = 1;
+ALTER TABLE `usuarios` AUTO_INCREMENT = 1;
+ALTER TABLE `alumnos` AUTO_INCREMENT = 1;
+ALTER TABLE `materias` AUTO_INCREMENT = 1;
+ALTER TABLE `grupos` AUTO_INCREMENT = 1;
+ALTER TABLE `horarios` AUTO_INCREMENT = 1;
+ALTER TABLE `inscripciones` AUTO_INCREMENT = 1;
+ALTER TABLE `calificaciones` AUTO_INCREMENT = 1;
 
 -- =====================================================
 -- 2. INSERTAR CARRERAS
