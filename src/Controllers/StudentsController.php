@@ -85,7 +85,7 @@ class StudentsController
         $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Fetch careers for filter
-        $careersStmt = $this->pdo->query("SELECT id, nombre FROM carreras WHERE activo = 1 ORDER BY nombre");
+        $careersStmt = $this->pdo->query("SELECT id, nombre, clave FROM carreras WHERE activo = 1 ORDER BY nombre");
         $careers = $careersStmt->fetchAll(PDO::FETCH_ASSOC);
         
         // Fetch groups for filter

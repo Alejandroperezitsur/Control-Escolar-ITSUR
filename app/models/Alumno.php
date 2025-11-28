@@ -22,7 +22,7 @@ class Alumno extends Model {
     
     private $allowedFields = [
         'matricula', 'nombre', 'apellido', 
-        'email', 'fecha_nac', 'foto', 'password', 'activo'
+        'email', 'fecha_nac', 'foto', 'password', 'activo', 'carrera_id'
     ];
 
     public function __construct() {
@@ -213,6 +213,33 @@ class Alumno extends Model {
         }
         $stmt->execute();
         return $stmt->fetchAll();
+    }
+
+    public function carrera(int $alumnoId) {
+        $sql = "SELECT c.* FROM carreras c JOIN alumnos a ON a.carrera_id = c.id WHERE a.id = :id LIMIT 1";
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':id', $alumnoId, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetch();
+    }
+
+    public function getCareerIdFromMatricula(string $matricula): ?int {
+        $prefix = strtoupper(substr($matricula, 0, 1));
+        $clave = '';
+        switch ($prefix) {
+            case 'S': $clave = 'ISC'; break;
+            case 'I': $clave = 'II'; break;
+            case 'A': $clave = 'IGE'; break;
+            case 'E': $clave = 'IE'; break;
+            case 'M': $clave = 'IM'; break;
+            case 'Q': $clave = 'IER'; break;
+            case 'C': $clave = 'CP'; break;
+            default: return null;
+        }
+        $stmt = $this->db->prepare("SELECT id FROM carreras WHERE clave = :clave LIMIT 1");
+        $stmt->execute([':clave' => $clave]);
+        $id = $stmt->fetchColumn();
+        return $id ? (int)$id : null;
     }
 
     public function search($term, $page = 1, $limit = 10) {

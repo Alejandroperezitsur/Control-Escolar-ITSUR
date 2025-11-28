@@ -253,6 +253,8 @@ ob_start();
 <script>
 const API_BASE_URL = window.location.origin + '/public';
 let modalInstance = null;
+const careerClaveToId = <?php echo json_encode((function($careers){ $m=[]; foreach(($careers??[]) as $c){ if(isset($c['clave'])) $m[$c['clave']]=$c['id']; } return $m; })($careers)); ?>;
+function inferCareerIdFromMatricula(m){ if(!m||typeof m!=='string'||m.length<1) return ''; const p=m.trim().toUpperCase().charAt(0); let clave=''; switch(p){ case 'S': clave='ISC'; break; case 'I': clave='II'; break; case 'A': clave='IGE'; break; case 'E': clave='IE'; break; case 'M': clave='IM'; break; case 'Q': clave='IER'; break; case 'C': clave='CP'; break; default: return ''; } return careerClaveToId[clave]||''; }
 
 function getModal() {
     const el = document.getElementById('studentModal');
@@ -295,6 +297,9 @@ function openCreateModal() {
         
         const m = getModal();
         if(m) m.show();
+        const mat = document.getElementById('matricula');
+        const carSel = document.getElementById('carrera_id');
+        if(mat && carSel){ mat.addEventListener('input', function(){ const cid = inferCareerIdFromMatricula(mat.value); if(cid){ carSel.value = String(cid); } }); }
     } catch (e) {
         console.error(e);
         alert('Error: ' + e.message);
