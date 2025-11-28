@@ -18,13 +18,13 @@ ob_start();
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label">Grupo</label>
-            <select name="grupo_id" id="grupo_id" class="form-select" required></select>
+            <select name="grupo_id" id="grupo_id" class="form-select" required data-bs-toggle="tooltip" title="Selecciona el grupo a calificar"></select>
             <div class="form-text">Selecciona el grupo asignado.</div>
             <div class="invalid-feedback">Selecciona un grupo.</div>
           </div>
           <div class="col-md-4">
             <label class="form-label">Alumno</label>
-            <select name="alumno_id" id="alumno_id" class="form-select" required></select>
+            <select name="alumno_id" id="alumno_id" class="form-select" required data-bs-toggle="tooltip" title="Selecciona el alumno a calificar"></select>
             <div class="form-text">Selecciona el alumno activo.</div>
             <div class="invalid-feedback">Selecciona un alumno.</div>
           </div>
@@ -37,29 +37,29 @@ ob_start();
           </div>
           <div class="col-md-4">
             <label class="form-label">Parcial 1</label>
-            <input type="number" min="0" max="100" step="1" name="parcial1" class="form-control" placeholder="0-100">
+            <input type="number" min="0" max="100" step="1" name="parcial1" class="form-control" placeholder="0-100" data-bs-toggle="tooltip" title="Calificación del primer parcial">
             <div class="invalid-feedback">Ingresa un número entre 0 y 100.</div>
           </div>
         <div class="col-md-4">
           <label class="form-label">Parcial 2</label>
-          <input type="number" min="0" max="100" step="1" name="parcial2" class="form-control" placeholder="0-100">
+          <input type="number" min="0" max="100" step="1" name="parcial2" class="form-control" placeholder="0-100" data-bs-toggle="tooltip" title="Calificación del segundo parcial">
           <div class="invalid-feedback">Ingresa un número entre 0 y 100.</div>
         </div>
         <div class="col-md-4">
           <label class="form-label">Final</label>
           <div class="input-group">
-            <input type="number" min="0" max="100" step="1" name="final" class="form-control" placeholder="0-100">
-            <button type="button" id="btnCalcFinal" class="btn btn-outline-secondary"><i class="fa-solid fa-calculator me-1"></i> Calcular</button>
+            <input type="number" min="0" max="100" step="1" name="final" class="form-control" placeholder="0-100" data-bs-toggle="tooltip" title="Calificación final">
+            <button type="button" id="btnCalcFinal" class="btn btn-outline-secondary" data-bs-toggle="tooltip" title="Calcular promedio final"><i class="fa-solid fa-calculator me-1"></i> Calcular</button>
           </div>
           <div class="invalid-feedback">Ingresa un número entre 0 y 100.</div>
         </div>
         </div>
 
         <div class="mt-4 d-flex gap-2">
-          <button type="button" id="openConfirm" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#confirmModal"><i class="fa-solid fa-floppy-disk me-1"></i> Guardar</button>
-          <button type="button" id="openConfirmNext" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#confirmModal"><i class="fa-solid fa-forward-step me-1"></i> Guardar y siguiente</button>
-          <button type="button" id="btnReset" class="btn btn-outline-secondary"><i class="fa-solid fa-broom me-1"></i> Limpiar</button>
-          <a href="<?php echo $base; ?>/grades/bulk" class="btn btn-outline-info"><i class="fa-solid fa-file-csv me-1"></i> Carga Masiva</a>
+          <button type="button" id="openConfirm" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#confirmModal" data-bs-toggle="tooltip" title="Guardar calificación"><i class="fa-solid fa-floppy-disk me-1"></i> Guardar</button>
+          <button type="button" id="openConfirmNext" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#confirmModal" data-bs-toggle="tooltip" title="Guardar y pasar al siguiente alumno"><i class="fa-solid fa-forward-step me-1"></i> Guardar y siguiente</button>
+          <button type="button" id="btnReset" class="btn btn-outline-secondary" data-bs-toggle="tooltip" title="Limpiar formulario"><i class="fa-solid fa-broom me-1"></i> Limpiar</button>
+          <a href="<?php echo $base; ?>/grades/bulk" class="btn btn-outline-info" data-bs-toggle="tooltip" title="Subir calificaciones masivamente"><i class="fa-solid fa-file-csv me-1"></i> Carga Masiva</a>
           <span class="badge bg-secondary" id="promedioBadge" role="status" aria-live="polite">Promedio actual: —</span>
           <span class="badge bg-info text-dark" id="draftBadge" style="display:none">Borrador restaurado</span>
         </div>

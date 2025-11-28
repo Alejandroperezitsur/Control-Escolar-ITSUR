@@ -25,7 +25,7 @@ ob_start();
 
 <div class="row g-3">
   <div class="col-md-4">
-    <div class="card position-relative">
+    <div class="card position-relative" data-bs-toggle="tooltip" title="Ver detalle de calificaciones">
       <div class="card-body">
         <div class="d-flex align-items-center">
           <i class="fa-solid fa-chart-line fa-2x me-3 text-primary"></i>
@@ -42,7 +42,7 @@ ob_start();
     </div>
   </div>
   <div class="col-md-4">
-    <div class="card position-relative">
+    <div class="card position-relative" data-bs-toggle="tooltip" title="Ver carga académica actual">
       <div class="card-body">
         <div class="d-flex align-items-center">
           <i class="fa-solid fa-book-open fa-2x me-3 text-success"></i>
@@ -56,7 +56,7 @@ ob_start();
     </div>
   </div>
   <div class="col-md-4">
-    <div class="card position-relative">
+    <div class="card position-relative" data-bs-toggle="tooltip" title="Ver materias pendientes">
       <div class="card-body">
         <div class="d-flex align-items-center">
           <i class="fa-solid fa-hourglass-half fa-2x me-3 text-warning"></i>
@@ -77,7 +77,7 @@ ob_start();
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h5 class="card-title mb-0">Mi Carga Académica</h5>
-          <input type="text" id="carga-filter" class="form-control form-control-sm" style="max-width: 240px" placeholder="Filtrar por materia/grupo">
+          <input type="text" id="carga-filter" class="form-control form-control-sm" style="max-width: 240px" placeholder="Filtrar por materia/grupo" data-bs-toggle="tooltip" title="Escribe para buscar en tu carga">
         </div>
         <div class="table-responsive">
           <table class="table table-sm">

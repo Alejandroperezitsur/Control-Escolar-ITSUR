@@ -93,7 +93,7 @@ ob_start();
                 <td><?= htmlspecialchars($r['matricula'] ?? '') ?></td>
                 <td><?= htmlspecialchars(($r['nombre'] ?? '') . ' ' . ($r['apellido'] ?? '')) ?></td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-primary" href="<?php echo $base; ?>/grades?grupo_id=<?= (int)($grp['id'] ?? 0) ?>&alumno_id=<?= (int)($r['id'] ?? 0) ?>">
+                  <a class="btn btn-sm btn-primary" href="<?php echo $base; ?>/grades?grupo_id=<?= (int)($grp['id'] ?? 0) ?>&alumno_id=<?= (int)($r['id'] ?? 0) ?>" data-bs-toggle="tooltip" title="Evaluar alumno">
                     <i class="fa-solid fa-pen-to-square"></i> Evaluar
                   </a>
                 </td>
@@ -128,9 +128,9 @@ ob_start();
           </div>
           <div class="d-flex align-items-center gap-2">
             <?php $gid = (int)($grp['id'] ?? 0); ?>
-            <a id="csvLink" class="btn btn-sm btn-outline-primary" href="<?php echo $base; ?>/grades/group/export/csv?grupo_id=<?= $gid ?>"><i class="fa-solid fa-file-csv me-1"></i> CSV</a>
-            <a id="xlsxLink" class="btn btn-sm btn-outline-success" href="<?php echo $base; ?>/grades/group/export/xlsx?grupo_id=<?= $gid ?>"><i class="fa-solid fa-file-excel me-1"></i> XLSX</a>
-            <a class="btn btn-sm btn-outline-warning" href="<?php echo $base; ?>/grades/group/export/pendingcsv?grupo_id=<?= $gid ?>"><i class="fa-solid fa-clock me-1"></i> Pendientes CSV</a>
+            <a id="csvLink" class="btn btn-sm btn-outline-primary" href="<?php echo $base; ?>/grades/group/export/csv?grupo_id=<?= $gid ?>" data-bs-toggle="tooltip" title="Exportar a CSV"><i class="fa-solid fa-file-csv me-1"></i> CSV</a>
+            <a id="xlsxLink" class="btn btn-sm btn-outline-success" href="<?php echo $base; ?>/grades/group/export/xlsx?grupo_id=<?= $gid ?>" data-bs-toggle="tooltip" title="Exportar a Excel"><i class="fa-solid fa-file-excel me-1"></i> XLSX</a>
+            <a class="btn btn-sm btn-outline-warning" href="<?php echo $base; ?>/grades/group/export/pendingcsv?grupo_id=<?= $gid ?>" data-bs-toggle="tooltip" title="Exportar pendientes a CSV"><i class="fa-solid fa-clock me-1"></i> Pendientes CSV</a>
           </div>
         </div>
       <div class="table-responsive">
@@ -252,7 +252,7 @@ function loadSchedules(){
     if (!j || !j.success) { tb.innerHTML = '<tr><td colspan="5" class="text-danger">Error al cargar horarios</td></tr>'; return; }
     const rows = j.data || [];
     if (rows.length === 0) { tb.innerHTML = '<tr><td colspan="5" class="text-muted">Sin horarios</td></tr>'; return; }
-    tb.innerHTML = rows.map(r => `<tr><td>${esc(r.dia)}</td><td>${esc(r.hora_inicio)}</td><td>${esc(r.hora_fin)}</td><td>${esc(r.salon||'')}</td><td class="text-end"><?php echo ($_SESSION['role'] ?? '') === 'admin' ? '<button class=\"btn btn-sm btn-outline-danger\" onclick=\"delSchedule('+"${r.id}"+')\">Eliminar</button>' : '' ?></td></tr>`).join('');
+    tb.innerHTML = rows.map(r => `<tr><td>${esc(r.dia)}</td><td>${esc(r.hora_inicio)}</td><td>${esc(r.hora_fin)}</td><td>${esc(r.salon||'')}</td><td class="text-end"><?php echo ($_SESSION['role'] ?? '') === 'admin' ? '<button class=\"btn btn-sm btn-outline-danger\" onclick=\"delSchedule('+"${r.id}"+')\" data-bs-toggle=\"tooltip\" title=\"Eliminar horario\">Eliminar</button>' : '' ?></td></tr>`).join('');
   }).catch(()=>{
     document.getElementById('sched-body').innerHTML = '<tr><td colspan="5" class="text-danger">Error de red</td></tr>';
   });

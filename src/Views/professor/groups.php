@@ -18,7 +18,7 @@ ob_start();
               <td><?= htmlspecialchars($x['ciclo'] ?? '') ?></td>
               <td><?= htmlspecialchars($x['materia'] ?? '') ?></td>
               <td><?= htmlspecialchars($x['nombre'] ?? '') ?></td>
-              <td class="text-end"><a class="btn btn-outline-success btn-sm" href="<?php echo $base; ?>/grades"><i class="fa-solid fa-pen"></i> Calificar</a></td>
+              <td class="text-end"><a class="btn btn-outline-success btn-sm" href="<?php echo $base; ?>/grades" data-bs-toggle="tooltip" title="Ir a calificar este grupo"><i class="fa-solid fa-pen"></i> Calificar</a></td>
             </tr>
             <?php endforeach; else: ?>
             <tr><td colspan="4" class="text-muted">No tienes grupos asignados.</td></tr>

@@ -7,21 +7,21 @@ ob_start();
     <h3>Mis Calificaciones</h3>
     <div class="d-flex align-items-center gap-2">
       <form method="get" action="<?php echo $base; ?>/alumno/calificaciones" class="d-flex align-items-center">
-        <select name="materia" class="form-select form-select-sm" style="max-width: 220px">
+        <select name="materia" class="form-select form-select-sm" style="max-width: 220px" data-bs-toggle="tooltip" title="Filtrar por materia">
           <option value="">Todas las materias</option>
           <?php foreach (($materias ?? []) as $m): $sel = isset($_GET['materia']) && $_GET['materia'] === $m ? 'selected' : ''; ?>
             <option value="<?= htmlspecialchars($m) ?>" <?= $sel ?>><?= htmlspecialchars($m) ?></option>
           <?php endforeach; ?>
         </select>
-        <select name="ciclo" class="form-select form-select-sm ms-2" style="max-width: 160px">
+        <select name="ciclo" class="form-select form-select-sm ms-2" style="max-width: 160px" data-bs-toggle="tooltip" title="Filtrar por ciclo escolar">
           <option value="">Todos los ciclos</option>
           <?php foreach (($ciclos ?? []) as $c): $sel = isset($_GET['ciclo']) && $_GET['ciclo'] === $c ? 'selected' : ''; ?>
             <option value="<?= htmlspecialchars($c) ?>" <?= $sel ?>><?= htmlspecialchars($c) ?></option>
           <?php endforeach; ?>
         </select>
-        <button class="btn btn-sm btn-primary ms-2" type="submit">Filtrar</button>
+        <button class="btn btn-sm btn-primary ms-2" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros">Filtrar</button>
       </form>
-      <a href="<?php echo $base; ?>/alumno/calificaciones/export<?= isset($_GET['materia'])||isset($_GET['ciclo']) ? ('?'.http_build_query(['materia'=>($_GET['materia'] ?? ''),'ciclo'=>($_GET['ciclo'] ?? '')])) : '' ?>" class="btn btn-sm btn-outline-secondary"><i class="fa-solid fa-file-csv me-1"></i> Exportar CSV</a>
+      <a href="<?php echo $base; ?>/alumno/calificaciones/export<?= isset($_GET['materia'])||isset($_GET['ciclo']) ? ('?'.http_build_query(['materia'=>($_GET['materia'] ?? ''),'ciclo'=>($_GET['ciclo'] ?? '')])) : '' ?>" class="btn btn-sm btn-outline-secondary" data-bs-toggle="tooltip" title="Exportar calificaciones a CSV"><i class="fa-solid fa-file-csv me-1"></i> Exportar CSV</a>
       <a href="<?php echo $base; ?>/dashboard" class="btn btn-sm btn-outline-secondary">Volver</a>
     </div>
 </div>

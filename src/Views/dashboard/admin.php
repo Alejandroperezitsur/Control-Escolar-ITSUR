@@ -8,7 +8,7 @@ ob_start();
 <div class="row g-3 mb-4">
   <!-- Total Alumnos -->
   <div class="col-12 col-sm-6 col-md-4 col-lg-2">
-    <div class="card text-bg-primary position-relative h-100">
+    <div class="card text-bg-primary position-relative h-100" data-bs-toggle="tooltip" title="Ver lista de alumnos">
       <div class="card-body">
         <div class="d-flex flex-column align-items-center text-center">
           <i class="fa-solid fa-users fa-2x mb-2"></i>
@@ -22,7 +22,7 @@ ob_start();
 
   <!-- Materias -->
   <div class="col-12 col-sm-6 col-md-4 col-lg-2">
-    <div class="card text-bg-success position-relative h-100">
+    <div class="card text-bg-success position-relative h-100" data-bs-toggle="tooltip" title="Ver catálogo de materias">
       <div class="card-body">
         <div class="d-flex flex-column align-items-center text-center">
           <i class="fa-solid fa-book fa-2x mb-2"></i>
@@ -36,7 +36,7 @@ ob_start();
 
   <!-- Carreras -->
   <div class="col-12 col-sm-6 col-md-4 col-lg-2">
-    <div class="card text-bg-secondary position-relative h-100">
+    <div class="card text-bg-secondary position-relative h-100" data-bs-toggle="tooltip" title="Ver carreras y planes de estudio">
       <div class="card-body">
         <div class="d-flex flex-column align-items-center text-center">
           <i class="fa-solid fa-graduation-cap fa-2x mb-2"></i>
@@ -50,7 +50,7 @@ ob_start();
 
   <!-- Profesores -->
   <div class="col-12 col-sm-6 col-md-4 col-lg-2">
-    <div class="card text-bg-info position-relative h-100">
+    <div class="card text-bg-info position-relative h-100" data-bs-toggle="tooltip" title="Ver lista de profesores">
       <div class="card-body">
         <div class="d-flex flex-column align-items-center text-center">
           <i class="fa-solid fa-user-tie fa-2x mb-2"></i>
@@ -64,7 +64,7 @@ ob_start();
 
   <!-- Grupos Activos -->
   <div class="col-12 col-sm-6 col-md-4 col-lg-2">
-    <div class="card text-bg-warning position-relative h-100">
+    <div class="card text-bg-warning position-relative h-100" data-bs-toggle="tooltip" title="Ver grupos activos">
       <div class="card-body">
         <div class="d-flex flex-column align-items-center text-center">
           <i class="fa-solid fa-people-group fa-2x mb-2"></i>
@@ -78,7 +78,7 @@ ob_start();
 
   <!-- Promedio General -->
   <div class="col-12 col-sm-6 col-md-4 col-lg-2">
-    <div class="card text-bg-primary position-relative h-100">
+    <div class="card text-bg-primary position-relative h-100" data-bs-toggle="tooltip" title="Ver reportes generales">
       <div class="card-body">
         <div class="d-flex flex-column align-items-center text-center">
           <i class="fa-solid fa-chart-line fa-2x mb-2"></i>
@@ -93,14 +93,14 @@ ob_start();
 
 <!-- Action Buttons -->
 <div class="mb-4">
-  <a class="btn btn-outline-secondary me-2" href="<?php echo $base; ?>/reports/export/csv"><i class="fa-solid fa-file-csv me-1"></i> Exportar CSV</a>
-  <a class="btn btn-outline-primary" href="<?php echo $base; ?>/dashboard"><i class="fa-solid fa-arrows-rotate me-1"></i> Refrescar</a>
+  <a class="btn btn-outline-secondary me-2" href="<?php echo $base; ?>/reports/export/csv" data-bs-toggle="tooltip" title="Descargar reporte general en CSV"><i class="fa-solid fa-file-csv me-1"></i> Exportar CSV</a>
+  <a class="btn btn-outline-primary" href="<?php echo $base; ?>/dashboard" data-bs-toggle="tooltip" title="Recargar datos del dashboard"><i class="fa-solid fa-arrows-rotate me-1"></i> Refrescar</a>
 </div>
 
 <!-- Secondary KPI Row -->
 <div class="row g-3 mb-4">
   <div class="col-12 col-md-6 col-lg-4">
-    <div class="card text-bg-danger position-relative h-100">
+    <div class="card text-bg-danger position-relative h-100" data-bs-toggle="tooltip" title="Ver alumnos pendientes de evaluación">
       <div class="card-body">
         <div class="d-flex align-items-center">
           <i class="fa-solid fa-hourglass-half fa-2x me-3"></i>

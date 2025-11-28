@@ -8,14 +8,14 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     <h3>Profesores</h3>
     <div class="d-flex align-items-center gap-2">
       <form method="get" action="<?php echo $base; ?>/professors" class="d-flex align-items-center">
-        <input type="text" name="q" value="<?= htmlspecialchars((string)($pagination['q'] ?? '')) ?>" class="form-control" placeholder="Buscar por nombre/email" style="max-width:260px">
-        <select name="status" class="form-select ms-2" style="max-width:180px">
+        <input type="text" name="q" value="<?= htmlspecialchars((string)($pagination['q'] ?? '')) ?>" class="form-control" placeholder="Buscar por nombre/email" style="max-width:260px" data-bs-toggle="tooltip" title="Buscar por nombre o email">
+        <select name="status" class="form-select ms-2" style="max-width:180px" data-bs-toggle="tooltip" title="Filtrar por estado">
           <?php $status = (string)($pagination['status'] ?? ''); ?>
           <option value="" <?= $status===''?'selected':'' ?>>Todos</option>
           <option value="active" <?= $status==='active'?'selected':'' ?>>Activos</option>
           <option value="inactive" <?= $status==='inactive'?'selected':'' ?>>Inactivos</option>
         </select>
-        <button class="btn btn-outline-primary ms-2" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+        <button class="btn btn-outline-primary ms-2" type="submit" data-bs-toggle="tooltip" title="Buscar"><i class="fa-solid fa-magnifying-glass"></i></button>
       </form>
       <a href="<?php echo $base; ?>/dashboard" class="btn btn-outline-secondary">Volver</a>
     </div>
@@ -60,10 +60,10 @@ $csrf = $_SESSION['csrf_token'] ?? '';
           <td><a href="<?= $base; ?>/professors/detail?id=<?= (int)$p['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($p['email']) ?></a></td>
           <td><?= (int)$p['activo'] === 1 ? 'Sí' : 'No' ?></td>
           <td class="text-end">
-            <button class="btn btn-outline-primary btn-sm me-1" data-bs-toggle="modal" data-bs-target="#editProf<?= (int)$p['id'] ?>">
+            <button class="btn btn-outline-primary btn-sm me-1" data-bs-toggle="modal" data-bs-target="#editProf<?= (int)$p['id'] ?>" title="Editar profesor" data-bs-toggle="tooltip">
               <i class="fa-solid fa-pen"></i>
             </button>
-            <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#delModal<?= (int)$p['id'] ?>">
+            <button class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#delModal<?= (int)$p['id'] ?>" title="Eliminar profesor" data-bs-toggle="tooltip">
               <i class="fa-solid fa-trash"></i>
             </button>
             <div class="modal fade" id="delModal<?= (int)$p['id'] ?>" tabindex="-1" aria-hidden="true">

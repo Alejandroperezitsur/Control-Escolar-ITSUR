@@ -16,15 +16,15 @@ ob_start();
             <?php if (isset($_GET['r'])): ?>
                 <input type="hidden" name="r" value="<?= htmlspecialchars($_GET['r']) ?>">
             <?php endif; ?>
-            <input class="form-control form-control-sm me-2" type="search" name="q" placeholder="Buscar..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" aria-label="Search">
-            <select name="status" class="form-select form-select-sm me-2" style="max-width: 120px;">
+            <input class="form-control form-control-sm me-2" type="search" name="q" placeholder="Buscar..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" aria-label="Search" data-bs-toggle="tooltip" title="Buscar por matrícula, nombre o email">
+            <select name="status" class="form-select form-select-sm me-2" style="max-width: 120px;" data-bs-toggle="tooltip" title="Filtrar por estado">
                 <option value="" <?= (!isset($_GET['status']) || $_GET['status'] === '' ) ? 'selected' : '' ?>>Todos</option>
                 <option value="active" <?= (isset($_GET['status']) && $_GET['status'] === 'active') ? 'selected' : '' ?>>Activos</option>
                 <option value="inactive" <?= (isset($_GET['status']) && $_GET['status'] === 'inactive') ? 'selected' : '' ?>>Inactivos</option>
             </select>
-            <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" type="submit" data-bs-toggle="tooltip" title="Buscar"><i class="fa-solid fa-magnifying-glass"></i></button>
         </form>
-        <button class="btn btn-sm btn-primary" onclick="openCreateModal()">
+        <button class="btn btn-sm btn-primary" onclick="openCreateModal()" data-bs-toggle="tooltip" title="Registrar un nuevo alumno">
             <i class="fa-solid fa-plus me-1"></i> Nuevo Alumno
         </button>
         <a href="/public/app.php?r=/dashboard" class="btn btn-sm btn-outline-secondary">Volver</a>
@@ -98,10 +98,10 @@ ob_start();
                     </a>
                 </td>
                 <td class="text-end pe-4">
-                    <button class="btn btn-sm btn-link text-decoration-none p-0 me-2" data-bs-toggle="modal" data-bs-target="#studentModal" onclick="openEditModal(<?= $s['id'] ?>)" title="Editar">
+                    <button class="btn btn-sm btn-link text-decoration-none p-0 me-2" data-bs-toggle="modal" data-bs-target="#studentModal" onclick="openEditModal(<?= $s['id'] ?>)" title="Editar alumno" data-bs-toggle="tooltip">
                         <i class="fa-solid fa-pen-to-square"></i>
                     </button>
-                    <button class="btn btn-sm btn-link text-danger text-decoration-none p-0" onclick="deleteStudent(<?= $s['id'] ?>)" title="Eliminar">
+                    <button class="btn btn-sm btn-link text-danger text-decoration-none p-0" onclick="deleteStudent(<?= $s['id'] ?>)" title="Eliminar alumno" data-bs-toggle="tooltip">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>

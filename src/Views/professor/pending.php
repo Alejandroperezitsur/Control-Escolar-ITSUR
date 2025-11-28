@@ -7,8 +7,8 @@ ob_start();
     <h3>Evaluaciones Pendientes</h3>
     <div class="d-flex align-items-center gap-2">
       <form method="get" action="<?php echo $base; ?>/profesor/pendientes" class="d-flex align-items-center">
-        <input type="text" name="ciclo" value="<?= htmlspecialchars($_GET['ciclo'] ?? '') ?>" class="form-control form-control-sm" placeholder="Ciclo" style="max-width: 160px">
-        <button class="btn btn-sm btn-primary ms-2" type="submit">Filtrar</button>
+        <input type="text" name="ciclo" value="<?= htmlspecialchars($_GET['ciclo'] ?? '') ?>" class="form-control form-control-sm" placeholder="Ciclo" style="max-width: 160px" data-bs-toggle="tooltip" title="Filtrar por ciclo escolar">
+        <button class="btn btn-sm btn-primary ms-2" type="submit" data-bs-toggle="tooltip" title="Aplicar filtro">Filtrar</button>
       </form>
       <a href="<?php echo $base; ?>/dashboard" class="btn btn-sm btn-outline-secondary">Volver</a>
     </div>

@@ -9,9 +9,9 @@
       <div class="d-flex justify-content-between align-items-center mb-2">
         <div class="h6 mb-0">Mi carga actual</div>
         <form method="get" class="d-flex align-items-center">
-          <input type="text" name="ciclo" value="<?php echo htmlspecialchars($_GET['ciclo'] ?? ''); ?>" class="form-control form-control-sm" placeholder="Filtrar por ciclo" style="max-width: 200px">
-          <input type="text" name="career" value="<?php echo htmlspecialchars($_GET['career'] ?? ''); ?>" class="form-control form-control-sm ms-2" placeholder="Carrera (p.ej. ISC)" style="max-width: 160px">
-          <button class="btn btn-sm btn-outline-primary ms-2" type="submit">Aplicar</button>
+          <input type="text" name="ciclo" value="<?php echo htmlspecialchars($_GET['ciclo'] ?? ''); ?>" class="form-control form-control-sm" placeholder="Filtrar por ciclo" style="max-width: 200px" data-bs-toggle="tooltip" title="Filtrar por ciclo">
+          <input type="text" name="career" value="<?php echo htmlspecialchars($_GET['career'] ?? ''); ?>" class="form-control form-control-sm ms-2" placeholder="Carrera (p.ej. ISC)" style="max-width: 160px" data-bs-toggle="tooltip" title="Filtrar por carrera">
+          <button class="btn btn-sm btn-outline-primary ms-2" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros">Aplicar</button>
         </form>
       </div>
       <div class="table-responsive">
@@ -30,7 +30,7 @@
                   <form method="post" action="<?php echo $base; ?>/alumno/unenroll" onsubmit="return confirm('¿Desinscribirte de este grupo?');" class="d-inline">
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
                     <input type="hidden" name="grupo_id" value="<?php echo htmlspecialchars($x['grupo_id'] ?? ''); ?>">
-                    <button type="submit" class="btn btn-sm btn-outline-danger">Desinscribir</button>
+                    <button type="submit" class="btn btn-sm btn-outline-danger" data-bs-toggle="tooltip" title="Darse de baja de este grupo">Desinscribir</button>
                   </form>
                 <?php endif; ?>
               </td>
@@ -64,7 +64,7 @@
                 <form method="post" action="<?php echo $base; ?>/alumno/enroll" class="d-inline">
                   <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrf); ?>">
                   <input type="hidden" name="grupo_id" value="<?php echo (int)($r['id'] ?? 0); ?>">
-                  <button type="submit" class="btn btn-sm btn-outline-primary">Inscribir</button>
+                  <button type="submit" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Inscribirse en este grupo">Inscribir</button>
                 </form>
               </td>
             </tr>

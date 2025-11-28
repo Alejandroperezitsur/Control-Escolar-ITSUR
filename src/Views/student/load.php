@@ -10,7 +10,7 @@ ob_start();
   <div class="card">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <input type="text" id="carga-filter" class="form-control form-control-sm" style="max-width: 240px" placeholder="Filtrar por materia/grupo">
+        <input type="text" id="carga-filter" class="form-control form-control-sm" style="max-width: 240px" placeholder="Filtrar por materia/grupo" data-bs-toggle="tooltip" title="Filtrar por nombre de materia o grupo">
       </div>
       <div class="table-responsive">
         <table class="table table-sm">

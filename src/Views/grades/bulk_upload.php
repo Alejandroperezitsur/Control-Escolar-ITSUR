@@ -7,12 +7,12 @@ ob_start();
 <form method="post" action="<?php echo $base; ?>/grades/bulk" enctype="multipart/form-data" id="bulkForm" class="needs-validation" novalidate>
   <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
   <div class="mb-3">
-    <input type="file" name="csv" accept="text/csv" class="form-control" required>
+    <input type="file" name="csv" accept="text/csv" class="form-control" required data-bs-toggle="tooltip" title="Selecciona el archivo CSV">
     <div class="invalid-feedback">Selecciona un archivo CSV válido.</div>
   </div>
-  <button class="btn btn-primary" type="submit"><i class="fa-solid fa-upload me-1"></i> Subir CSV</button>
-  <a class="btn btn-outline-secondary ms-2" href="<?php echo $base; ?>/dashboard">Cancelar</a>
-  <a class="btn btn-outline-success ms-2" href="<?php echo $base; ?>/reports/export/csv"><i class="fa-solid fa-file-csv me-1"></i> Descargar CSV ejemplo</a>
+  <button class="btn btn-primary" type="submit" data-bs-toggle="tooltip" title="Iniciar carga masiva"><i class="fa-solid fa-upload me-1"></i> Subir CSV</button>
+  <a class="btn btn-outline-secondary ms-2" href="<?php echo $base; ?>/dashboard" data-bs-toggle="tooltip" title="Cancelar operación">Cancelar</a>
+  <a class="btn btn-outline-success ms-2" href="<?php echo $base; ?>/reports/export/csv" data-bs-toggle="tooltip" title="Descargar plantilla de ejemplo"><i class="fa-solid fa-file-csv me-1"></i> Descargar CSV ejemplo</a>
   <div class="mt-3 small text-muted">Tip: Puedes exportar CSV y ajustarlo para la carga masiva.</div>
 </form>
 

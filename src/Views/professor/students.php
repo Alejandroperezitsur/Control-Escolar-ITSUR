@@ -7,19 +7,19 @@ ob_start();
     <h3>Mis Alumnos</h3>
     <div class="d-flex align-items-center gap-2">
       <form method="get" action="<?php echo $base; ?>/profesor/alumnos" class="d-flex align-items-center gap-2">
-        <select name="ciclo" class="form-select form-select-sm" style="max-width: 180px">
+        <select name="ciclo" class="form-select form-select-sm" style="max-width: 180px" data-bs-toggle="tooltip" title="Filtrar por ciclo">
           <option value="">Todos los ciclos</option>
           <?php foreach (($ciclos ?? []) as $c): ?>
             <option value="<?= htmlspecialchars($c) ?>" <?= (($c === ($_GET['ciclo'] ?? '')) ? 'selected' : '') ?>><?= htmlspecialchars($c) ?></option>
           <?php endforeach; ?>
         </select>
-        <select name="grupo_id" class="form-select form-select-sm" style="max-width: 260px">
+        <select name="grupo_id" class="form-select form-select-sm" style="max-width: 260px" data-bs-toggle="tooltip" title="Filtrar por grupo">
           <option value="0">Todos los grupos</option>
           <?php foreach (($grupos ?? []) as $g): ?>
             <option value="<?= (int)$g['id'] ?>" <?= (((int)($g['id'])) === (int)($_GET['grupo_id'] ?? 0) ? 'selected' : '') ?>><?= htmlspecialchars($g['ciclo'].' · '.$g['materia'].' · '.$g['nombre']) ?></option>
           <?php endforeach; ?>
         </select>
-        <button class="btn btn-sm btn-primary" type="submit">Filtrar</button>
+        <button class="btn btn-sm btn-primary" type="submit" data-bs-toggle="tooltip" title="Aplicar filtros">Filtrar</button>
       </form>
       <a href="<?php echo $base; ?>/dashboard" class="btn btn-sm btn-outline-secondary">Volver</a>
     </div>

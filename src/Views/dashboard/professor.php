@@ -23,7 +23,7 @@ ob_start();
 </div>
 <div class="row g-3">
   <div class="col-md-4">
-    <div class="card position-relative">
+    <div class="card position-relative" data-bs-toggle="tooltip" title="Ver mis grupos asignados">
       <div class="card-body">
         <div class="d-flex align-items-center">
           <i class="fa-solid fa-people-group fa-2x me-3 text-primary"></i>
@@ -37,7 +37,7 @@ ob_start();
     </div>
   </div>
   <div class="col-md-4">
-    <div class="card position-relative">
+    <div class="card position-relative" data-bs-toggle="tooltip" title="Ver lista de mis alumnos">
       <div class="card-body">
         <div class="d-flex align-items-center">
           <i class="fa-solid fa-user-graduate fa-2x me-3 text-success"></i>
@@ -51,7 +51,7 @@ ob_start();
     </div>
   </div>
   <div class="col-md-4">
-    <div class="card position-relative">
+    <div class="card position-relative" data-bs-toggle="tooltip" title="Ver evaluaciones pendientes">
       <div class="card-body">
         <div class="d-flex align-items-center">
           <i class="fa-solid fa-clipboard-check fa-2x me-3 text-warning"></i>
@@ -67,7 +67,7 @@ ob_start();
 </div>
 
 <div class="mt-4">
-  <a class="btn btn-outline-primary" href="<?php echo $base; ?>/grades/bulk"><i class="fa-solid fa-file-import me-1"></i> Carga masiva de calificaciones (CSV)</a>
+  <a class="btn btn-outline-primary" href="<?php echo $base; ?>/grades/bulk" data-bs-toggle="tooltip" title="Subir calificaciones desde un archivo CSV"><i class="fa-solid fa-file-import me-1"></i> Carga masiva de calificaciones (CSV)</a>
 </div>
 
 <script>
@@ -89,7 +89,7 @@ fetch('<?php echo $base; ?>/api/kpis/profesor').then(r=>r.json()).then(d=>{
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="card-title mb-0">Mis Grupos</h5>
-        <input type="text" id="grp-filter" class="form-control form-control-sm" style="max-width: 240px" placeholder="Filtrar por materia/grupo">
+        <input type="text" id="grp-filter" class="form-control form-control-sm" style="max-width: 240px" placeholder="Filtrar por materia/grupo" data-bs-toggle="tooltip" title="Escribe para filtrar la lista">
       </div>
       <div class="table-responsive">
         <table class="table table-sm">

@@ -14,27 +14,27 @@ ob_start();
       <form method="post" action="<?php echo $base; ?>/groups/create" class="row g-2 needs-validation" novalidate id="groupForm">
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
         <div class="col-md-3">
-          <select class="form-select" name="materia_id" id="materiaSelect" required disabled>
+          <select class="form-select" name="materia_id" id="materiaSelect" required disabled data-bs-toggle="tooltip" title="Selecciona la materia">
             <option value="">Cargando materias...</option>
           </select>
           <div class="invalid-feedback">Selecciona una materia.</div>
         </div>
         <div class="col-md-3">
-          <select class="form-select" name="profesor_id" id="profesorSelect" required disabled>
+          <select class="form-select" name="profesor_id" id="profesorSelect" required disabled data-bs-toggle="tooltip" title="Asigna un profesor">
             <option value="">Cargando profesores...</option>
           </select>
           <div class="invalid-feedback">Selecciona un profesor.</div>
         </div>
         <div class="col-md-2">
-          <input class="form-control" name="nombre" placeholder="Grupo" required>
+          <input class="form-control" name="nombre" placeholder="Grupo" required data-bs-toggle="tooltip" title="Nombre del grupo (ej. A, B, 101)">
           <div class="invalid-feedback">Ingresa el nombre del grupo.</div>
         </div>
         <div class="col-md-2">
-          <input class="form-control" name="ciclo" placeholder="Ciclo (YYYY-1 o YYYY-2)" required pattern="\d{4}-(1|2)" title="Formato YYYY-1 o YYYY-2">
+          <input class="form-control" name="ciclo" placeholder="Ciclo (YYYY-1 o YYYY-2)" required pattern="\d{4}-(1|2)" title="Formato YYYY-1 o YYYY-2" data-bs-toggle="tooltip">
           <div class="invalid-feedback">Ingresa el ciclo con formato válido.</div>
         </div>
         <div class="col-md-2">
-          <input class="form-control" type="number" min="1" max="100" name="cupo" placeholder="Cupo" value="30" required>
+          <input class="form-control" type="number" min="1" max="100" name="cupo" placeholder="Cupo" value="30" required data-bs-toggle="tooltip" title="Capacidad máxima de alumnos">
           <div class="invalid-feedback">Ingresa cupo (1-100).</div>
         </div>
         <div class="col-12"><button class="btn btn-primary" type="submit" id="btnCreate" disabled><i class="fa-solid fa-plus me-1"></i> Crear grupo</button></div>

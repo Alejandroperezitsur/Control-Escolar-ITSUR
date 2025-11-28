@@ -14,34 +14,34 @@ ob_start();
   <div class="card mb-3">
     <div class="card-body">
       <form method="get" action="/public/app.php?r=/subjects" class="d-flex align-items-center">
-        <input type="text" name="q" value="<?= htmlspecialchars((string)($pagination['q'] ?? '')) ?>" class="form-control" placeholder="Buscar por nombre/clave" style="max-width:320px">
-        <select name="carrera" class="form-select ms-2" style="max-width:180px">
+        <input type="text" name="q" value="<?= htmlspecialchars((string)($pagination['q'] ?? '')) ?>" class="form-control" placeholder="Buscar por nombre/clave" style="max-width:320px" data-bs-toggle="tooltip" title="Buscar por nombre o clave de materia">
+        <select name="carrera" class="form-select ms-2" style="max-width:180px" data-bs-toggle="tooltip" title="Filtrar por carrera">
           <?php $selCar = (string)($pagination['carrera'] ?? ''); ?>
           <option value="" <?= $selCar===''?'selected':'' ?>>Todas las carreras</option>
           <?php foreach (($carrerasList ?? []) as $car): $cl = (string)($car['clave'] ?? ''); ?>
             <option value="<?= htmlspecialchars($cl) ?>" <?= $selCar === $cl ? 'selected' : '' ?>><?= htmlspecialchars($car['nombre'] ?? $cl) ?></option>
           <?php endforeach; ?>
         </select>
-        <select name="estado" class="form-select ms-2" style="max-width:180px">
+        <select name="estado" class="form-select ms-2" style="max-width:180px" data-bs-toggle="tooltip" title="Filtrar por estado de oferta">
           <?php $selEstado = (string)($pagination['estado'] ?? ''); ?>
           <option value="" <?= $selEstado===''?'selected':'' ?>>Todos</option>
           <option value="con_grupos" <?= $selEstado==='con_grupos'?'selected':'' ?>>Con grupos</option>
           <option value="sin_grupos" <?= $selEstado==='sin_grupos'?'selected':'' ?>>Sin grupos</option>
         </select>
-        <select name="ciclo" class="form-select ms-2" style="max-width:160px">
+        <select name="ciclo" class="form-select ms-2" style="max-width:160px" data-bs-toggle="tooltip" title="Filtrar por ciclo escolar">
           <?php $selCiclo = (string)($pagination['ciclo'] ?? ''); ?>
           <option value="" <?= $selCiclo===''?'selected':'' ?>>Todos los ciclos</option>
           <?php foreach (($cyclesList ?? []) as $c): ?>
             <option value="<?= htmlspecialchars($c) ?>" <?= $selCiclo === (string)$c ? 'selected' : '' ?>><?= htmlspecialchars($c) ?></option>
           <?php endforeach; ?>
         </select>
-        <select name="per_page" class="form-select ms-2" style="max-width:120px">
+        <select name="per_page" class="form-select ms-2" style="max-width:120px" data-bs-toggle="tooltip" title="Resultados por página">
           <?php $selPer = (int)($pagination['per_page'] ?? 10); ?>
           <option value="10" <?= $selPer===10?'selected':'' ?>>10</option>
           <option value="25" <?= $selPer===25?'selected':'' ?>>25</option>
           <option value="50" <?= $selPer===50?'selected':'' ?>>50</option>
         </select>
-        <button class="btn btn-outline-primary ms-2" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+        <button class="btn btn-outline-primary ms-2" type="submit" data-bs-toggle="tooltip" title="Buscar"><i class="fa-solid fa-magnifying-glass"></i></button>
       </form>
     </div>
   </div>
@@ -50,13 +50,13 @@ ob_start();
     <?php $qv = urlencode((string)($pagination['q'] ?? '')); $carv = urlencode((string)($pagination['carrera'] ?? '')); $cicv = urlencode((string)($pagination['ciclo'] ?? '')); $estv = urlencode((string)($pagination['estado'] ?? '')); $ppv = urlencode((string)($pagination['per_page'] ?? '')); ?>
     <a class="btn btn-sm btn-outline-primary me-2" href="<?php echo $base; ?>/subjects/export/csv<?= ($qv!==''||$carv!==''||$cicv!==''||$estv!=='')?('?'.implode('&', array_filter([
       $qv!==''?('q='.$qv):'', $carv!==''?('carrera='.$carv):'', $cicv!==''?('ciclo='.$cicv):'', $estv!==''?('estado='.$estv):'', $ppv!==''?('per_page='.$ppv):''
-    ]))):'' ?>"><i class="bi bi-filetype-csv"></i> Exportar CSV</a>
+    ]))):'' ?>" data-bs-toggle="tooltip" title="Exportar a CSV"><i class="bi bi-filetype-csv"></i> Exportar CSV</a>
     <a class="btn btn-sm btn-outline-success me-2" href="<?php echo $base; ?>/subjects/export/xlsx<?= ($qv!==''||$carv!==''||$cicv!==''||$estv!=='')?('?'.implode('&', array_filter([
       $qv!==''?('q='.$qv):'', $carv!==''?('carrera='.$carv):'', $cicv!==''?('ciclo='.$cicv):'', $estv!==''?('estado='.$estv):'', $ppv!==''?('per_page='.$ppv):''
-    ]))):'' ?>"><i class="bi bi-filetype-xlsx"></i> Exportar XLSX</a>
+    ]))):'' ?>" data-bs-toggle="tooltip" title="Exportar a Excel"><i class="bi bi-filetype-xlsx"></i> Exportar XLSX</a>
     <a class="btn btn-sm btn-outline-secondary" href="<?php echo $base; ?>/subjects/export/pdf<?= ($qv!==''||$carv!==''||$cicv!==''||$estv!=='')?('?'.implode('&', array_filter([
       $qv!==''?('q='.$qv):'', $carv!==''?('carrera='.$carv):'', $cicv!==''?('ciclo='.$cicv):'', $estv!==''?('estado='.$estv):'', $ppv!==''?('per_page='.$ppv):''
-    ]))):'' ?>"><i class="bi bi-filetype-pdf"></i> Exportar PDF</a>
+    ]))):'' ?>" data-bs-toggle="tooltip" title="Exportar a PDF"><i class="bi bi-filetype-pdf"></i> Exportar PDF</a>
   </div>
 
   <?php if ((string)($pagination['estado'] ?? '') === 'sin_grupos'): ?>
@@ -76,9 +76,9 @@ ob_start();
     <div class="card-body">
       <form method="post" action="/public/app.php?r=/subjects/create" class="row g-2 needs-validation" novalidate>
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
-        <div class="col-md-5"><input class="form-control" name="nombre" placeholder="Nombre" required><div class="invalid-feedback">Ingresa el nombre.</div></div>
-        <div class="col-md-3"><input class="form-control" name="clave" placeholder="Clave" required><div class="invalid-feedback">Ingresa la clave.</div></div>
-        <div class="col-md-4"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-plus me-1"></i> Agregar materia</button></div>
+        <div class="col-md-5"><input class="form-control" name="nombre" placeholder="Nombre" required data-bs-toggle="tooltip" title="Nombre de la materia"><div class="invalid-feedback">Ingresa el nombre.</div></div>
+        <div class="col-md-3"><input class="form-control" name="clave" placeholder="Clave" required data-bs-toggle="tooltip" title="Clave única de la materia"><div class="invalid-feedback">Ingresa la clave.</div></div>
+        <div class="col-md-4"><button class="btn btn-primary" type="submit" data-bs-toggle="tooltip" title="Guardar nueva materia"><i class="fa-solid fa-plus me-1"></i> Agregar materia</button></div>
       </form>
     </div>
   </div>
@@ -140,8 +140,8 @@ ob_start();
         <th><a href="<?php echo $base; ?>/subjects?page=<?= $pg ?>&sort=nombre&order=<?= $sort==='nombre'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $selCar!==''?"&carrera=$selCar":'' ?><?= $selCiclo!==''?"&ciclo=$selCiclo":'' ?><?= $selEstado!==''?"&estado=$selEstado":'' ?><?= $ppv!==''?"&per_page=$ppv":'' ?>">Nombre<?= $sort==='nombre' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
         <th><a href="<?php echo $base; ?>/subjects?page=<?= $pg ?>&sort=clave&order=<?= $sort==='clave'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $selCar!==''?"&carrera=$selCar":'' ?><?= $selCiclo!==''?"&ciclo=$selCiclo":'' ?><?= $selEstado!==''?"&estado=$selEstado":'' ?><?= $ppv!==''?"&per_page=$ppv":'' ?>">Clave<?= $sort==='clave' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
         <th><a href="<?php echo $base; ?>/subjects?page=<?= $pg ?>&sort=carreras&order=<?= $sort==='carreras'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $selCar!==''?"&carrera=$selCar":'' ?><?= $selCiclo!==''?"&ciclo=$selCiclo":'' ?><?= $selEstado!==''?"&estado=$selEstado":'' ?><?= $ppv!==''?"&per_page=$ppv":'' ?>">Carreras<?= $sort==='carreras' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
-        <th><a href="<?php echo $base; ?>/subjects?page=<?= $pg ?>&sort=grupos&order=<?= $sort==='grupos'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $selCar!==''?"&carrera=$selCar":'' ?><?= $selCiclo!==''?"&ciclo=$selCiclo":'' ?><?= $selEstado!==''?"&estado=$selEstado":'' ?><?= $ppv!==''?"&per_page=$ppv":'' ?>" title="Número de grupos activos">Grupos<?= $sort==='grupos' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
-        <th><a href="<?php echo $base; ?>/subjects?page=<?= $pg ?>&sort=promedio&order=<?= $sort==='promedio'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $selCar!==''?"&carrera=$selCar":'' ?><?= $selCiclo!==''?"&ciclo=$selCiclo":'' ?><?= $selEstado!==''?"&estado=$selEstado":'' ?><?= $ppv!==''?"&per_page=$ppv":'' ?>" title="Promedio general de la materia">Promedio<?= $sort==='promedio' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
+        <th><a href="<?php echo $base; ?>/subjects?page=<?= $pg ?>&sort=grupos&order=<?= $sort==='grupos'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $selCar!==''?"&carrera=$selCar":'' ?><?= $selCiclo!==''?"&ciclo=$selCiclo":'' ?><?= $selEstado!==''?"&estado=$selEstado":'' ?><?= $ppv!==''?"&per_page=$ppv":'' ?>" data-bs-toggle="tooltip" title="Número de grupos activos">Grupos<?= $sort==='grupos' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
+        <th><a href="<?php echo $base; ?>/subjects?page=<?= $pg ?>&sort=promedio&order=<?= $sort==='promedio'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $selCar!==''?"&carrera=$selCar":'' ?><?= $selCiclo!==''?"&ciclo=$selCiclo":'' ?><?= $selEstado!==''?"&estado=$selEstado":'' ?><?= $ppv!==''?"&per_page=$ppv":'' ?>" data-bs-toggle="tooltip" title="Promedio general de la materia">Promedio<?= $sort==='promedio' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
         <th class="text-end">Acciones</th>
       </tr></thead>
       <tbody>
@@ -163,9 +163,9 @@ ob_start();
           </td>
           <td><?= isset($s['promedio']) && $s['promedio'] !== null ? number_format((float)$s['promedio'],2) : '—' ?></td>
           <td class="text-end">
-            <a class="btn btn-sm btn-outline-primary me-1" href="<?= $base; ?>/subjects/detail?id=<?= (int)$s['id'] ?>"><i class="fa-solid fa-eye"></i></a>
-            <button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editSub<?= (int)$s['id'] ?>"><i class="fa-solid fa-pen"></i></button>
-            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delSub<?= (int)$s['id'] ?>"><i class="fa-solid fa-trash"></i></button>
+            <a class="btn btn-sm btn-outline-primary me-1" href="<?= $base; ?>/subjects/detail?id=<?= (int)$s['id'] ?>" data-bs-toggle="tooltip" title="Ver detalles"><i class="fa-solid fa-eye"></i></a>
+            <button class="btn btn-sm btn-outline-primary me-1" data-bs-toggle="modal" data-bs-target="#editSub<?= (int)$s['id'] ?>" data-bs-toggle="tooltip" title="Editar materia"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delSub<?= (int)$s['id'] ?>" data-bs-toggle="tooltip" title="Eliminar materia"><i class="fa-solid fa-trash"></i></button>
 
             <div class="modal fade" id="delSub<?= (int)$s['id'] ?>" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog"><div class="modal-content">

@@ -40,7 +40,8 @@ ob_start();
           <button 
             class="nav-link <?php echo $index === 0 ? 'active' : ''; ?>" 
             id="career-<?php echo $carrera['id']; ?>-tab" 
-            data-bs-toggle="tab" 
+            data-bs-toggle="tooltip" 
+            title="Ver plan de estudios de <?php echo htmlspecialchars($carrera['nombre']); ?>"
             data-bs-target="#career-<?php echo $carrera['id']; ?>" 
             type="button" 
             role="tab">
@@ -352,7 +353,7 @@ function renderSubjectCard(subject, isResidencias) {
                    subject.type === 'residencia' ? 'success' : 'secondary';
   
   return `
-    <div class="card subject-card ${typeClass} mb-3" onclick="showSubjectDetails('${subject.code}', '${subject.name.replace(/'/g, "\\'")}')">
+    <div class="card subject-card ${typeClass} mb-3" onclick="showSubjectDetails('${subject.code}', '${subject.name.replace(/'/g, "\\'")}')" data-bs-toggle="tooltip" title="Ver detalles de ${subject.name}">
       <div class="card-body p-3">
         <h6 class="card-title mb-2" style="color: #000000 !important;">${subject.name}</h6>
         <div class="d-flex justify-content-between align-items-center flex-wrap">

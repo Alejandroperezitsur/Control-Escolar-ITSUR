@@ -102,7 +102,8 @@ $isLogin = (isset($_GET['r']) && $_GET['r'] === '/login') || (strpos($_SERVER['R
           <?php if ($role === 'admin'): ?>
           <button id="nav-refresh-kpis" class="btn btn-outline-primary btn-sm me-2" type="button" data-bs-toggle="tooltip" title="Actualizar ahora">↻</button>
           <?php endif; ?>
-          <button id="theme-toggle" class="btn btn-outline-secondary me-2" type="button" aria-label="Cambiar tema">🌙</button>
+          <button class="btn btn-outline-info me-2" type="button" data-bs-toggle="modal" data-bs-target="#helpModal" aria-label="Ayuda" title="Ayuda"><i class="fa-solid fa-question"></i></button>
+          <button id="theme-toggle" class="btn btn-outline-secondary me-2" type="button" aria-label="Cambiar tema" data-bs-toggle="tooltip" title="Cambiar tema">🌙</button>
           <?php if ($role !== 'guest'): ?>
             <span class="navbar-text me-3"><i class="fa-regular fa-user me-1"></i><?php echo htmlspecialchars($name ?: $role); ?></span>
             <a href="/public/app.php?r=/logout" class="btn btn-exit">Salir</a>
@@ -241,5 +242,62 @@ $isLogin = (isset($_GET['r']) && $_GET['r'] === '/login') || (strpos($_SERVER['R
   })();
   </script>
   <?php endif; ?>
+  
+  <!-- Global Help Modal -->
+  <div class="modal fade" id="helpModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fa-solid fa-circle-question me-2 text-primary"></i>Ayuda</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <?php if ($role === 'admin'): ?>
+            <p><strong>Bienvenido Administrador.</strong></p>
+            <p>Desde aquí puedes gestionar:</p>
+            <ul>
+              <li><strong>Alumnos, Profesores y Materias:</strong> Altas, bajas y cambios.</li>
+              <li><strong>Grupos:</strong> Crear oferta académica y asignar profesores.</li>
+              <li><strong>Reportes:</strong> Consultar estadísticas y exportar datos.</li>
+              <li><strong>Ajustes:</strong> Configurar parámetros del sistema.</li>
+            </ul>
+          <?php elseif ($role === 'profesor'): ?>
+            <p><strong>Bienvenido Profesor.</strong></p>
+            <p>Tus herramientas principales son:</p>
+            <ul>
+              <li><strong>Mis Grupos:</strong> Ver tus grupos asignados y listas de alumnos.</li>
+              <li><strong>Calificar:</strong> Registrar calificaciones parciales y finales.</li>
+              <li><strong>Reportes:</strong> Ver el desempeño de tus grupos.</li>
+            </ul>
+          <?php elseif ($role === 'alumno'): ?>
+            <p><strong>Bienvenido Alumno.</strong></p>
+            <p>Aquí puedes consultar:</p>
+            <ul>
+              <li><strong>Mi Tablero:</strong> Resumen de tu avance y promedios.</li>
+              <li><strong>Carga Académica:</strong> Materias actuales y calificaciones.</li>
+              <li><strong>Kardex:</strong> Historial completo de materias cursadas.</li>
+            </ul>
+          <?php else: ?>
+            <p>Por favor inicia sesión para acceder a las funciones del sistema.</p>
+          <?php endif; ?>
+          <hr>
+          <p class="small text-muted mb-0">Si necesitas soporte técnico, contacta al departamento de sistemas.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Entendido</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global Tooltip Initialization
+    (function(){
+      var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+      });
+    })();
+  </script>
 </body>
 </html>
