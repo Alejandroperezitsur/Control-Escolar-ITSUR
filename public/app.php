@@ -163,6 +163,8 @@ $router->get('/alumno/reticula', fn() => (new App\Controllers\StudentsController
 $router->get('/alumno/reinscripcion', fn() => (new App\Controllers\StudentsController($pdo))->myReinscripcion(), [AuthMiddleware::requireRole('alumno')]);
 $router->post('/alumno/enroll', fn() => (new App\Controllers\StudentsController($pdo))->selfEnroll(), [AuthMiddleware::requireRole('alumno'), RateLimitMiddleware::limit('alumno_enroll', 20, 600)]);
 $router->post('/alumno/unenroll', fn() => (new App\Controllers\StudentsController($pdo))->selfUnenroll(), [AuthMiddleware::requireRole('alumno'), RateLimitMiddleware::limit('alumno_unenroll', 20, 600)]);
+$router->get('/alumno/horarios', fn() => (new App\Controllers\StudentsController($pdo))->mySchedule(), [AuthMiddleware::requireRole('alumno')]);
+
 
 // Migración de alumnos.php → nueva ruta
 $router->get('/alumnos', fn() => $students->index(), [AuthMiddleware::requireRole('admin')]);

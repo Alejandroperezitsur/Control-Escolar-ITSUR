@@ -72,6 +72,50 @@ ob_start();
 </div>
 
 <div class="row g-3 mt-3">
+  <div class="col-md-6 col-lg-3">
+    <div class="card position-relative" data-bs-toggle="tooltip" title="Ver mi horario del semestre actual">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <i class="fa-solid fa-calendar-days fa-2x me-3 text-info"></i>
+          <div>
+            <div class="small">Mi Horario</div>
+            <div class="small text-muted">Semestre Actual</div>
+          </div>
+        </div>
+        <a href="<?php echo $base; ?>/app.php?r=/alumno/horarios" class="stretched-link"></a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-lg-3">
+    <div class="card position-relative" data-bs-toggle="tooltip" title="Proceso de reinscripción">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <i class="fa-solid fa-arrow-rotate-right fa-2x me-3 text-secondary"></i>
+          <div>
+            <div class="small">Reinscripción</div>
+            <div class="small text-muted">Inscribe materias</div>
+          </div>
+        </div>
+        <a href="<?php echo $base; ?>/app.php?r=/alumno/reinscripcion" class="stretched-link"></a>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-lg-3">
+    <div class="card position-relative" data-bs-toggle="tooltip" title="Ver mi retícula académica">
+      <div class="card-body">
+        <div class="d-flex align-items-center">
+          <i class="fa-solid fa-diagram-project fa-2x me-3 text-primary"></i>
+          <div>
+            <div class="small">Mi Retícula</div>
+            <div class="small text-muted">Plan de estudios</div>
+          </div>
+        </div>
+        <a href="<?php echo $base; ?>/app.php?r=/alumno/reticula" class="stretched-link"></a>
+      </div>
+    </div>
+  </div>
+
+<div class="row g-3 mt-3">
   <div class="col-md-6">
     <div class="card">
       <div class="card-body">

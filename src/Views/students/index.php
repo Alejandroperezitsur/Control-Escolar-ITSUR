@@ -28,6 +28,14 @@ ob_start();
                     <option value="<?= $c['id'] ?>" <?= ((int)($_GET['career'] ?? 0) === $c['id']) ? 'selected' : '' ?>><?= htmlspecialchars($c['nombre']) ?></option>
                 <?php endforeach; ?>
             </select>
+            <select name="group" class="form-select form-select-sm me-2" style="max-width: 180px;" data-bs-toggle="tooltip" title="Filtrar por grupo">
+                <option value="0">Todos los grupos</option>
+                <?php foreach (($groups ?? []) as $g): ?>
+                    <option value="<?= $g['id'] ?>" <?= ((int)($_GET['group'] ?? 0) === $g['id']) ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($g['nombre']) ?> - <?= htmlspecialchars($g['materia_nombre']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
             <button class="btn btn-sm btn-outline-secondary" type="submit" data-bs-toggle="tooltip" title="Buscar"><i class="fa-solid fa-magnifying-glass"></i></button>
         </form>
         <button class="btn btn-sm btn-primary" onclick="openCreateModal()" data-bs-toggle="tooltip" title="Registrar un nuevo alumno">

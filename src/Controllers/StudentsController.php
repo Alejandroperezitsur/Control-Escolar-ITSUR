@@ -633,6 +633,54 @@ class StudentsController
         return '';
     }
 
+    public function mySchedule(): string
+    {
+        $aid = (int)($_SESSION['user_id'] ?? 0);
+        
+        // Obtener ciclo actual (el más reciente)
+        $currentCycleStmt = $this->pdo->query("SELECT DISTINCT ciclo FROM grupos ORDER BY ciclo DESC LIMIT 1");
+        $currentCycle = $currentCycleStmt->fetchColumn() ?: '';
+        
+        // Obtener horarios del alumno para el ciclo actual
+        $sql = "SELECT 
+                    m.nombre AS materia,
+                    g.nombre AS grupo,
+                    g.ciclo,
+                    h.dia_semana,
+                    h.hora_inicio,
+                    h.hora_fin,
+                    h.aula
+                FROM inscripciones i
+                JOIN grupos g ON g.id = i.grupo_id
+                JOIN materias m ON m.id = g.materia_id
+                LEFT JOIN horarios h ON h.grupo_id = g.id
+                WHERE i.alumno_id = :aid 
+                AND i.estatus = 'inscrito'
+                AND g.ciclo = :ciclo
+                ORDER BY 
+                    FIELD(h.dia_semana, 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'),
+                    h.hora_inicio,
+                    m.nombre";
+        
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':aid' => $aid, ':ciclo' => $currentCycle]);
+        $horarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Organizar por día de la semana
+        $scheduleByDay = [];
+        foreach ($horarios as $h) {
+            $dia = ucfirst($h['dia_semana'] ?? 'Sin día');
+            if (!isset($scheduleByDay[$dia])) {
+                $scheduleByDay[$dia] = [];
+            }
+            $scheduleByDay[$dia][] = $h;
+        }
+        
+        ob_start();
+        include __DIR__ . '/../Views/student/schedule.php';
+        return ob_get_clean();
+    }
+
     public function myGradesSummary(): string
     {
         $role = $_SESSION['role'] ?? '';

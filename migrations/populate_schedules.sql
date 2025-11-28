@@ -35,12 +35,12 @@ UPDATE grupos SET aula_default = 'B302' WHERE id % 22 = 14;
 UPDATE grupos g
 JOIN materias m ON m.id = g.materia_id
 SET g.aula_default = 'LAB-COMP1'
-WHERE m.clave LIKE 'INF%' AND id % 4 = 0;
+WHERE m.clave LIKE 'INF%' AND g.id % 4 = 0;
 
 UPDATE grupos g
 JOIN materias m ON m.id = g.materia_id
 SET g.aula_default = 'LAB-COMP2'
-WHERE m.clave LIKE 'INF%' AND id % 4 = 1;
+WHERE m.clave LIKE 'INF%' AND g.id % 4 = 1;
 
 -- Asignar aulas del Edificio D para el resto
 UPDATE grupos SET aula_default = 'D101' WHERE aula_default IS NULL AND id % 4 = 0;
