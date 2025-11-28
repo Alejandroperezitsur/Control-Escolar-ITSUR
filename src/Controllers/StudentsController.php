@@ -18,6 +18,8 @@ class StudentsController
         $offset = max(0, ($page - 1) * $limit);
         $search = $_GET['q'] ?? '';
         $status = $_GET['status'] ?? '';
+        $career = strtoupper(trim((string)($_GET['career'] ?? '')));
+        $grupoId = (int)($_GET['grupo_id'] ?? 0);
         
         $where = '';
         $params = [];
@@ -33,6 +35,25 @@ class StudentsController
             $conditions[] = "activo = 1";
         } elseif ($status === 'inactive') {
             $conditions[] = "activo = 0";
+        }
+        if ($career !== '') {
+            $map = [
+                'ISC' => 'S',
+                'II'  => 'I',
+                'IGE' => 'A',
+                'IE'  => 'E',
+                'IM'  => 'M',
+                'IER' => 'Q',
+                'CP'  => 'C',
+            ];
+            if (isset($map[$career])) {
+                $conditions[] = "matricula LIKE :m_prefix";
+                $params[':m_prefix'] = $map[$career] . '%';
+            }
+        }
+        if ($grupoId > 0) {
+            $conditions[] = 'EXISTS (SELECT 1 FROM calificaciones c WHERE c.alumno_id = alumnos.id AND c.grupo_id = :gid)';
+            $params[':gid'] = $grupoId;
         }
         if ($conditions) {
             $where = 'WHERE ' . implode(' AND ', $conditions);
@@ -68,7 +89,34 @@ class StudentsController
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+        if ($career !== '') {
+            $grSql = "SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia
+                      FROM grupos g JOIN materias m ON m.id = g.materia_id
+                      JOIN materias_carrera mc ON mc.materia_id = m.id
+                      JOIN carreras c ON c.id = mc.carrera_id
+                      WHERE c.clave = :car
+                      ORDER BY g.ciclo DESC, m.nombre, g.nombre";
+            $grStmt = $this->pdo->prepare($grSql);
+            $grStmt->bindValue(':car', $career);
+            $grStmt->execute();
+            $grupos = $grStmt->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            $grStmt = $this->pdo->query('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia FROM grupos g JOIN materias m ON m.id = g.materia_id ORDER BY g.ciclo DESC, m.nombre, g.nombre');
+            $grupos = $grStmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        $careersStmt = $this->pdo->query('SELECT clave, nombre FROM carreras WHERE activo = 1 ORDER BY nombre');
+        $careers = $careersStmt ? $careersStmt->fetchAll(PDO::FETCH_ASSOC) : [];
+        if (!$careers) {
+            $careers = [
+                ['clave' => 'ISC', 'nombre' => 'Ingeniería en Sistemas Computacionales'],
+                ['clave' => 'II',  'nombre' => 'Ingeniería Industrial'],
+                ['clave' => 'IGE', 'nombre' => 'Ingeniería en Gestión Empresarial'],
+                ['clave' => 'IE',  'nombre' => 'Ingeniería Electrónica'],
+                ['clave' => 'IM',  'nombre' => 'Ingeniería Mecatrónica'],
+                ['clave' => 'IER', 'nombre' => 'Ingeniería en Energías Renovables'],
+                ['clave' => 'CP',  'nombre' => 'Contador Público'],
+            ];
+        }
         include __DIR__ . '/../Views/students/index.php';
     }
 

@@ -7,22 +7,57 @@ ob_start();
     <div>
         <h2 class="mb-1">Alumnos <span class="badge bg-primary rounded-pill fs-6 align-middle ms-2">Total: <?= $total ?? 0 ?></span></h2>
         <p class="text-muted small mb-0">Gestión de estudiantes registrados</p>
+        <?php $careerSel = strtoupper($_GET['career'] ?? ''); $gidSel = (int)($_GET['grupo_id'] ?? 0); $qSel = trim((string)($_GET['q'] ?? '')); $statusSel = $_GET['status'] ?? ''; ?>
+        <?php if ($qSel !== '' || $statusSel !== '' || $careerSel !== '' || $gidSel > 0): ?>
+          <div class="mt-1">
+            <?php if ($qSel !== ''): ?><span class="badge bg-light text-dark me-1">Búsqueda: '<?= htmlspecialchars($qSel) ?>'</span><?php endif; ?>
+            <?php if ($statusSel === 'active'): ?><span class="badge bg-success-subtle text-success me-1">Estado: Activos</span><?php elseif ($statusSel === 'inactive'): ?><span class="badge bg-danger-subtle text-danger me-1">Estado: Inactivos</span><?php endif; ?>
+            <?php if ($careerSel !== ''): ?>
+              <?php $cName = ''; if (!empty($careers)) { foreach ($careers as $c) { if (strtoupper($c['clave']) === $careerSel) { $cName = $c['nombre']; break; } } } ?>
+              <span class="badge bg-light text-dark me-1">Carrera: <?= htmlspecialchars($cName ?: $careerSel) ?></span>
+            <?php endif; ?>
+            <?php if ($gidSel > 0): ?>
+              <?php $gName = ''; if (!empty($grupos)) { foreach ($grupos as $g) { if ((int)$g['id'] === $gidSel) { $gName = (($g['materia'] ?? '') . ' — ' . ($g['nombre'] ?? '') . ' (' . ($g['ciclo'] ?? '') . ')'); break; } } } ?>
+              <span class="badge bg-light text-dark me-1">Grupo: <?= htmlspecialchars($gName) ?></span>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
     </div>
     <div class="d-flex gap-2">
         <?php 
         $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH); 
         ?>
-        <form class="d-flex" method="get" action="<?= htmlspecialchars($currentPath) ?>">
+        <form class="d-flex flex-wrap gap-2" method="get" action="<?= htmlspecialchars($currentPath) ?>">
             <?php if (isset($_GET['r'])): ?>
                 <input type="hidden" name="r" value="<?= htmlspecialchars($_GET['r']) ?>">
             <?php endif; ?>
-            <input class="form-control form-control-sm me-2" type="search" name="q" placeholder="Buscar..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" aria-label="Search">
-            <select name="status" class="form-select form-select-sm me-2" style="max-width: 120px;">
+            <input class="form-control form-control-sm" style="max-width:180px" type="search" name="q" placeholder="Buscar..." value="<?= htmlspecialchars($_GET['q'] ?? '') ?>" aria-label="Search">
+            <select name="status" class="form-select form-select-sm" style="max-width: 140px;">
                 <option value="" <?= (!isset($_GET['status']) || $_GET['status'] === '' ) ? 'selected' : '' ?>>Todos</option>
                 <option value="active" <?= (isset($_GET['status']) && $_GET['status'] === 'active') ? 'selected' : '' ?>>Activos</option>
                 <option value="inactive" <?= (isset($_GET['status']) && $_GET['status'] === 'inactive') ? 'selected' : '' ?>>Inactivos</option>
             </select>
+            <select name="career" class="form-select form-select-sm" style="max-width: 220px;">
+                <?php $careerSel = strtoupper($_GET['career'] ?? ''); ?>
+                <option value="" <?= ($careerSel === '') ? 'selected' : '' ?>>Todas las carreras</option>
+                <?php foreach (($careers ?? []) as $c): ?>
+                    <option value="<?= htmlspecialchars($c['clave']) ?>" <?= ($careerSel === strtoupper($c['clave'])) ? 'selected' : '' ?>><?= htmlspecialchars($c['nombre']) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <select name="grupo_id" class="form-select form-select-sm" style="max-width: 260px;">
+                <?php $gidSel = (int)($_GET['grupo_id'] ?? 0); ?>
+                <option value="0" <?= ($gidSel <= 0) ? 'selected' : '' ?>>Todos los grupos</option>
+                <?php foreach (($grupos ?? []) as $g): ?>
+                    <option value="<?= (int)$g['id'] ?>" <?= ($gidSel === (int)$g['id']) ? 'selected' : '' ?>><?= htmlspecialchars(($g['materia'] ?? '') . ' — ' . ($g['nombre'] ?? '') . ' (' . ($g['ciclo'] ?? '') . ')') ?></option>
+                <?php endforeach; ?>
+            </select>
             <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+            <?php 
+              $clearUrl = $currentPath . '?' . http_build_query(array_filter([
+                'r' => $_GET['r'] ?? null
+              ]));
+            ?>
+            <a class="btn btn-sm btn-outline-secondary" href="<?= htmlspecialchars($clearUrl ?: $currentPath) ?>">Limpiar</a>
         </form>
         <button class="btn btn-sm btn-primary" onclick="openCreateModal()">
             <i class="fa-solid fa-plus me-1"></i> Nuevo Alumno
@@ -59,7 +94,7 @@ ob_start();
               <th class="ps-4"><?= sortLink('matricula', 'Matrícula', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th><?= sortLink('nombre', 'Nombre Completo', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th><?= sortLink('email', 'Email', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
-
+              <th>Carrera</th>
               <th><?= sortLink('activo', 'Estado', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th class="text-end pe-4">Acciones</th>
             </tr>
@@ -86,6 +121,15 @@ ob_start();
 
                 <td>
                     <?php
+                        $mPrefix = strtoupper(substr((string)($s['matricula'] ?? ''), 0, 1));
+                        $mapCode = ['S'=>'ISC','I'=>'II','A'=>'IGE','E'=>'IE','M'=>'IM','Q'=>'IER','C'=>'CP'];
+                        $code = $mapCode[$mPrefix] ?? '';
+                    ?>
+                    <span class="badge bg-light text-dark"><?= htmlspecialchars($code ?: '—') ?></span>
+                </td>
+
+                <td>
+                    <?php
                         $statusLabel = $s['activo'] ? 'Activo' : 'Inactivo';
                         $badgeClass = $s['activo'] ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger';
                         // Build URL preserving current search and toggling status filter
@@ -98,7 +142,14 @@ ob_start();
                     </a>
                 </td>
                 <td class="text-end pe-4">
-                    <button class="btn btn-sm btn-link text-decoration-none p-0 me-2" data-bs-toggle="modal" data-bs-target="#studentModal" onclick="openEditModal(<?= $s['id'] ?>)" title="Editar">
+                    <button class="btn btn-sm btn-link text-decoration-none p-0 me-2" data-bs-toggle="modal" data-bs-target="#studentModal" onclick="openEditModal(this)" title="Editar"
+                      data-id="<?= (int)$s['id'] ?>"
+                      data-matricula="<?= htmlspecialchars($s['matricula']) ?>"
+                      data-nombre="<?= htmlspecialchars($s['nombre']) ?>"
+                      data-apellido="<?= htmlspecialchars($s['apellido']) ?>"
+                      data-email="<?= htmlspecialchars($s['email'] ?? '') ?>"
+                      data-activo="<?= (int)$s['activo'] ?>"
+                    >
                         <i class="fa-solid fa-pen-to-square"></i>
                     </button>
                     <button class="btn btn-sm btn-link text-danger text-decoration-none p-0" onclick="deleteStudent(<?= $s['id'] ?>)" title="Eliminar">
@@ -272,70 +323,55 @@ function openCreateModal() {
     }
 }
 
-function openEditModal(id) {
-    const url = `${API_BASE_URL}/app.php?r=/alumnos/get&id=${id}`;
-    console.log('Fetching student from:', url);
-
+function openEditModal(source) {
     try {
         const m = getModal();
         if (m) m.show();
         const title = document.getElementById('modalTitle');
-        if (title) title.textContent = 'Cargando alumno...';
-        const btn = document.getElementById('saveBtn');
-        if (btn) { btn.disabled = true; btn.textContent = 'Cargando...'; }
-    } catch {}
+        if (title) title.textContent = 'Editar Alumno';
 
-    fetch(url, { credentials: 'same-origin' })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.text().then(text => {
-                try {
-                    return JSON.parse(text);
-                } catch (e) {
-                    console.error('Raw response:', text);
-                    throw new Error('El servidor devolvió una respuesta inválida (no es JSON). Ver consola.');
-                }
-            });
-        })
-        .then(data => {
-            if(data.error) { alert(data.error); return; }
-            
+        let data = null;
+        if (source && source.dataset) {
+            data = {
+                id: source.dataset.id,
+                matricula: source.dataset.matricula || '',
+                nombre: source.dataset.nombre || '',
+                apellido: source.dataset.apellido || '',
+                email: source.dataset.email || '',
+                activo: Number(source.dataset.activo || 0)
+            };
+        }
+
+        if (data) {
             document.getElementById('studentId').value = data.id;
             document.getElementById('matricula').value = data.matricula;
             document.getElementById('nombre').value = data.nombre;
             document.getElementById('apellido').value = data.apellido;
             document.getElementById('email').value = data.email || '';
+            const act = document.getElementById('activo'); if (act) act.checked = data.activo === 1;
+            const pwd = document.getElementById('password'); if (pwd) { pwd.placeholder = 'Dejar en blanco para mantener actual'; pwd.required = false; }
+            const help = document.getElementById('passwordHelp'); if (help) help.style.display = 'block';
+            const btn = document.getElementById('saveBtn'); if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
+            return;
+        }
 
-            const act = document.getElementById('activo');
-            if(act) act.checked = data.activo == 1;
-            
-            document.getElementById('modalTitle').textContent = 'Editar Alumno';
-            
-            const pwd = document.getElementById('password');
-            if(pwd) {
-                pwd.placeholder = 'Dejar en blanco para mantener actual';
-                pwd.required = false;
-            }
-            
-            const help = document.getElementById('passwordHelp');
-            if(help) help.style.display = 'block';
-            
-            const title = document.getElementById('modalTitle');
-            if (title) title.textContent = 'Editar Alumno';
-            const btn = document.getElementById('saveBtn');
-            if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
-            showToast('Datos del alumno cargados', 'success');
-        })
-        .catch(e => {
-            console.error('Fetch error:', e);
-            const title = document.getElementById('modalTitle');
-            if (title) title.textContent = 'Editar Alumno';
-            const btn = document.getElementById('saveBtn');
-            if (btn) { btn.disabled = false; btn.textContent = 'Guardar'; }
-            showToast('Error de conexión al obtener datos', 'danger');
-        });
+        const id = typeof source === 'number' ? source : null;
+        if (!id) return;
+        const url = `${API_BASE_URL}/app.php?r=/alumnos/get&id=${id}`;
+        fetch(url, { credentials: 'same-origin' })
+          .then(r => r.json())
+          .then(j => {
+            document.getElementById('studentId').value = j.id;
+            document.getElementById('matricula').value = j.matricula;
+            document.getElementById('nombre').value = j.nombre;
+            document.getElementById('apellido').value = j.apellido;
+            document.getElementById('email').value = j.email || '';
+            const act = document.getElementById('activo'); if (act) act.checked = Number(j.activo) === 1;
+            const pwd = document.getElementById('password'); if (pwd) { pwd.placeholder = 'Dejar en blanco para mantener actual'; pwd.required = false; }
+            const help = document.getElementById('passwordHelp'); if (help) help.style.display = 'block';
+          })
+          .catch(() => {});
+    } catch (e) { console.error(e); }
 }
 
 function saveStudent(e) {

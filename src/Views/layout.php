@@ -29,7 +29,7 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
       } catch(e) {}
     })();
   </script>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="<?php echo $base; ?>/assets/vendor/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
   <link href="<?php echo $base; ?>/assets/css/styles.css" rel="stylesheet">
   <style>
@@ -125,7 +125,7 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
     </div>
   </div>
   <?php unset($_SESSION['flash'], $_SESSION['flash_type']); endif; ?>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="<?php echo $base; ?>/assets/vendor/bootstrap.bundle.min.js"></script>
   <script src="<?php echo $base; ?>/assets/js/main.js"></script>
   <script>
     (function(){
