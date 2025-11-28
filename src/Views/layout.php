@@ -70,28 +70,44 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
   </style>
 </head>
 <body data-theme="dark">
-  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+<?php
+$isLogin = (isset($_GET['r']) && $_GET['r'] === '/login') || (strpos($_SERVER['REQUEST_URI'], '/login') !== false);
+?>
+<?php if (!$isLogin): ?>
+  <!-- Header institucional compacto -->
+  <header class="institutional-header">
     <div class="container-fluid">
-      <a class="navbar-brand" href="/public/app.php?r=/dashboard"><i class="fa-solid fa-graduation-cap me-2"></i>ITSUR</a>
+      <a href="<?php echo $base; ?>/app.php?r=/dashboard" class="institutional-brand">
+        <img src="<?php echo $base; ?>/assets/ITSUR-LOGO.webp" alt="ITSUR Logo" class="institutional-logo">
+        <div class="institutional-text">
+          <h1 class="institutional-title">SICEnet · ITSUR</h1>
+          <p class="institutional-subtitle">Sistema Integral de Control Escolar</p>
+        </div>
+      </a>
+    </div>
+  </header>
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="nav">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <?php if ($role === 'admin'): ?>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/dashboard">Dashboard</a></li>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/reports">Reportes</a></li>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/alumnos">Alumnos <span class="badge bg-light text-dark ms-1" id="nav-count-alumnos" data-bs-toggle="tooltip" title="Alumnos activos">—</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/subjects">Materias <span class="badge bg-light text-dark ms-1" id="nav-count-materias" data-bs-toggle="tooltip" title="Materias registradas">—</span><span class="badge bg-warning text-dark ms-1" id="nav-count-sinoferta" data-bs-toggle="tooltip" title="Materias sin oferta">—</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/professors">Profesores <span class="badge bg-light text-dark ms-1" id="nav-count-profesores" data-bs-toggle="tooltip" title="Profesores activos">—</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/groups">Grupos <span class="badge bg-light text-dark ms-1" id="nav-count-grupos" data-bs-toggle="tooltip" title="Grupos activos con calificaciones">—</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/admin/settings">Ajustes</a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/dashboard"><i class="fa-solid fa-gauge me-1"></i> Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/reports"><i class="fa-solid fa-chart-line me-1"></i> Reportes</a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/alumnos"><i class="fa-solid fa-user-graduate me-1"></i> Alumnos <span class="badge bg-light text-dark ms-1" id="nav-count-alumnos" data-bs-toggle="tooltip" title="Alumnos activos">—</span></a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/subjects"><i class="fa-solid fa-book me-1"></i> Materias <span class="badge bg-light text-dark ms-1" id="nav-count-materias" data-bs-toggle="tooltip" title="Materias registradas">—</span><span class="badge bg-warning text-dark ms-1" id="nav-count-sinoferta" data-bs-toggle="tooltip" title="Materias sin oferta">—</span></a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/professors"><i class="fa-solid fa-chalkboard-user me-1"></i> Profesores <span class="badge bg-light text-dark ms-1" id="nav-count-profesores" data-bs-toggle="tooltip" title="Profesores activos">—</span></a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/groups"><i class="fa-solid fa-users me-1"></i> Grupos <span class="badge bg-light text-dark ms-1" id="nav-count-grupos" data-bs-toggle="tooltip" title="Grupos activos con calificaciones">—</span></a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/admin/settings"><i class="fa-solid fa-gear me-1"></i> Ajustes</a></li>
           <?php elseif ($role === 'profesor'): ?>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/dashboard">Dashboard</a></li>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/reports">Reportes</a></li>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/grades/bulk">Carga masiva</a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/dashboard"><i class="fa-solid fa-gauge me-1"></i> Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/reports"><i class="fa-solid fa-chart-line me-1"></i> Reportes</a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/grades/bulk"><i class="fa-solid fa-upload me-1"></i> Carga masiva</a></li>
           <?php elseif ($role === 'alumno'): ?>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/dashboard">Mi tablero</a></li>
+            <li class="nav-item"><a class="nav-link" href="<?php echo $base; ?>/app.php?r=/dashboard"><i class="fa-solid fa-table-columns me-1"></i> Mi tablero</a></li>
           <?php endif; ?>
         </ul>
         <div class="d-flex align-items-center">
@@ -101,15 +117,16 @@ if ($p !== false) { $base = substr($scriptDir, 0, $p + 7); }
           <button id="theme-toggle" class="btn btn-outline-secondary me-2" type="button" aria-label="Cambiar tema">🌙</button>
           <?php if ($role !== 'guest'): ?>
             <span class="navbar-text me-3"><i class="fa-regular fa-user me-1"></i><?php echo htmlspecialchars($name ?: $role); ?></span>
-            <a href="/public/app.php?r=/logout" class="btn btn-exit">Salir</a>
+            <a href="<?php echo $base; ?>/app.php?r=/logout" class="btn btn-exit">Salir</a>
           <?php else: ?>
-            <a href="/public/app.php?r=/login" class="btn btn-login">Acceder</a>
+            <a href="<?php echo $base; ?>/app.php?r=/login" class="btn btn-login">Acceder</a>
           <?php endif; ?>
         </div>
       </div>
     </div>
   </nav>
-  <main class="container py-4">
+<?php endif; ?>
+  <main class="<?php echo !empty($containerFluid) ? 'container-fluid' : 'container'; ?> py-4">
     <?php echo $content ?? ''; ?>
   </main>
   <?php if (!empty($_SESSION['flash'])): ?>
