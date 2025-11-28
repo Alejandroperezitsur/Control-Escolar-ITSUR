@@ -18,6 +18,7 @@ class StudentsController
         $offset = max(0, ($page - 1) * $limit);
         $search = $_GET['q'] ?? '';
         $status = $_GET['status'] ?? '';
+        $career = (int)($_GET['career'] ?? 0);
         
         $where = '';
         $params = [];
@@ -33,6 +34,10 @@ class StudentsController
             $conditions[] = "activo = 1";
         } elseif ($status === 'inactive') {
             $conditions[] = "activo = 0";
+        }
+        if ($career > 0) {
+            $conditions[] = "carrera_id = :career";
+            $params[':career'] = $career;
         }
         if ($conditions) {
             $where = 'WHERE ' . implode(' AND ', $conditions);
@@ -61,13 +66,22 @@ class StudentsController
         if ($sort === 'apellido') { $orderBy .= ", nombre ASC"; }
         
         // Fetch students
-        $sql = "SELECT id, matricula, nombre, apellido, email, activo FROM alumnos $where ORDER BY $orderBy LIMIT :limit OFFSET :offset";
+        $sql = "SELECT a.id, a.matricula, a.nombre, a.apellido, a.email, a.activo, c.nombre AS carrera_nombre 
+                FROM alumnos a 
+                LEFT JOIN carreras c ON c.id = a.carrera_id 
+                $where 
+                ORDER BY $orderBy 
+                LIMIT :limit OFFSET :offset";
         $stmt = $this->pdo->prepare($sql);
         foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
         $stmt->execute();
         $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Fetch careers for filter
+        $careersStmt = $this->pdo->query("SELECT id, nombre FROM carreras WHERE activo = 1 ORDER BY nombre");
+        $careers = $careersStmt->fetchAll(PDO::FETCH_ASSOC);
         
         include __DIR__ . '/../Views/students/index.php';
     }
@@ -168,8 +182,8 @@ class StudentsController
 
         $password = !empty($data['password']) ? password_hash($data['password'], PASSWORD_DEFAULT) : null;
         
-        $sql = "INSERT INTO alumnos (matricula, nombre, apellido, email, password, activo) 
-                VALUES (:matricula, :nombre, :apellido, :email, :password, :activo)";
+        $sql = "INSERT INTO alumnos (matricula, nombre, apellido, email, password, activo, carrera_id) 
+                VALUES (:matricula, :nombre, :apellido, :email, :password, :activo, :carrera_id)";
         
         $stmt = $this->pdo->prepare($sql);
         $res = $stmt->execute([
@@ -178,7 +192,8 @@ class StudentsController
             ':apellido' => $data['apellido'],
             ':email' => $data['email'] ?? null,
             ':password' => $password,
-            ':activo' => isset($data['activo']) ? 1 : 0
+            ':activo' => isset($data['activo']) ? 1 : 0,
+            ':carrera_id' => !empty($data['carrera_id']) ? (int)$data['carrera_id'] : null
         ]);
 
         if ($res) {
@@ -208,13 +223,14 @@ class StudentsController
             return;
         }
 
-        $fields = "matricula = :matricula, nombre = :nombre, apellido = :apellido, email = :email, activo = :activo";
+        $fields = "matricula = :matricula, nombre = :nombre, apellido = :apellido, email = :email, activo = :activo, carrera_id = :carrera_id";
         $params = [
             ':matricula' => $data['matricula'],
             ':nombre' => $data['nombre'],
             ':apellido' => $data['apellido'],
             ':email' => $data['email'] ?? null,
             ':activo' => isset($data['activo']) ? 1 : 0,
+            ':carrera_id' => !empty($data['carrera_id']) ? (int)$data['carrera_id'] : null,
             ':id' => $id
         ];
 
@@ -262,7 +278,7 @@ class StudentsController
             return;
         }
 
-        $stmt = $this->pdo->prepare("SELECT id, matricula, nombre, apellido, email, activo FROM alumnos WHERE id = :id");
+        $stmt = $this->pdo->prepare("SELECT id, matricula, nombre, apellido, email, activo, carrera_id FROM alumnos WHERE id = :id");
         $stmt->execute([':id' => $id]);
         $student = $stmt->fetch(PDO::FETCH_ASSOC);
 

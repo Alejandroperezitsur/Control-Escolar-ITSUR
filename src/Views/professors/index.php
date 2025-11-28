@@ -15,6 +15,12 @@ $csrf = $_SESSION['csrf_token'] ?? '';
           <option value="active" <?= $status==='active'?'selected':'' ?>>Activos</option>
           <option value="inactive" <?= $status==='inactive'?'selected':'' ?>>Inactivos</option>
         </select>
+        <select name="career" class="form-select ms-2" style="max-width:180px" data-bs-toggle="tooltip" title="Filtrar por carrera">
+            <option value="0">Todas las carreras</option>
+            <?php foreach (($careers ?? []) as $c): ?>
+                <option value="<?= $c['id'] ?>" <?= ((int)($_GET['career'] ?? 0) === $c['id']) ? 'selected' : '' ?>><?= htmlspecialchars($c['nombre']) ?></option>
+            <?php endforeach; ?>
+        </select>
         <button class="btn btn-outline-primary ms-2" type="submit" data-bs-toggle="tooltip" title="Buscar"><i class="fa-solid fa-magnifying-glass"></i></button>
       </form>
       <a href="<?php echo $base; ?>/dashboard" class="btn btn-outline-secondary">Volver</a>
@@ -36,6 +42,14 @@ $csrf = $_SESSION['csrf_token'] ?? '';
           <div class="invalid-feedback">Ingresa un correo válido.</div>
         </div>
         <div class="col-md-4">
+            <select class="form-select" name="carrera_id">
+                <option value="">Carrera (Opcional)</option>
+                <?php foreach (($careers ?? []) as $c): ?>
+                    <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['nombre']) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="col-md-12 text-end">
           <button class="btn btn-primary" type="submit"><i class="fa-solid fa-user-plus me-1"></i> Agregar</button>
         </div>
       </form>
@@ -49,6 +63,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
         <th><a href="<?php echo $base; ?>/professors?page=<?= $pg ?>&sort=id&order=<?= $sort==='id'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $sv!==''?"&status=$sv":'' ?>">ID<?= $sort==='id' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
         <th><a href="<?php echo $base; ?>/professors?page=<?= $pg ?>&sort=nombre&order=<?= $sort==='nombre'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $sv!==''?"&status=$sv":'' ?>">Nombre<?= $sort==='nombre' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
         <th><a href="<?php echo $base; ?>/professors?page=<?= $pg ?>&sort=email&order=<?= $sort==='email'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $sv!==''?"&status=$sv":'' ?>">Email<?= $sort==='email' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
+        <th>Carrera</th>
         <th><a href="<?php echo $base; ?>/professors?page=<?= $pg ?>&sort=activo&order=<?= $sort==='activo'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $sv!==''?"&status=$sv":'' ?>">Activo<?= $sort==='activo' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
         <th class="text-end">Acciones</th>
       </tr></thead>
@@ -58,6 +73,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
           <td><?= htmlspecialchars($p['id']) ?></td>
           <td><a href="<?= $base; ?>/professors/detail?id=<?= (int)$p['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($p['nombre']) ?></a></td>
           <td><a href="<?= $base; ?>/professors/detail?id=<?= (int)$p['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($p['email']) ?></a></td>
+          <td class="small text-muted"><?= htmlspecialchars($p['carrera_nombre'] ?? '—') ?></td>
           <td><?= (int)$p['activo'] === 1 ? 'Sí' : 'No' ?></td>
           <td class="text-end">
             <button class="btn btn-outline-primary btn-sm me-1" data-bs-toggle="modal" data-bs-target="#editProf<?= (int)$p['id'] ?>" title="Editar profesor" data-bs-toggle="tooltip">
@@ -103,6 +119,15 @@ $csrf = $_SESSION['csrf_token'] ?? '';
                         <label class="form-label">Email</label>
                         <input class="form-control" type="email" name="email" value="<?= htmlspecialchars($p['email']) ?>" required>
                         <div class="invalid-feedback">Ingresa un correo válido.</div>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label">Carrera</label>
+                        <select class="form-select" name="carrera_id">
+                            <option value="">Sin asignar</option>
+                            <?php foreach (($careers ?? []) as $c): ?>
+                                <option value="<?= $c['id'] ?>" <?= ((int)($p['carrera_id'] ?? 0) === $c['id']) ? 'selected' : '' ?>><?= htmlspecialchars($c['nombre']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                       </div>
                       <div class="form-check mt-2">
                         <input class="form-check-input" type="checkbox" name="activo" id="chkActivo<?= (int)$p['id'] ?>" <?= ((int)$p['activo'] === 1) ? 'checked' : '' ?>>

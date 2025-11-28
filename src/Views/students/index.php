@@ -22,6 +22,12 @@ ob_start();
                 <option value="active" <?= (isset($_GET['status']) && $_GET['status'] === 'active') ? 'selected' : '' ?>>Activos</option>
                 <option value="inactive" <?= (isset($_GET['status']) && $_GET['status'] === 'inactive') ? 'selected' : '' ?>>Inactivos</option>
             </select>
+            <select name="career" class="form-select form-select-sm me-2" style="max-width: 160px;" data-bs-toggle="tooltip" title="Filtrar por carrera">
+                <option value="0">Todas las carreras</option>
+                <?php foreach (($careers ?? []) as $c): ?>
+                    <option value="<?= $c['id'] ?>" <?= ((int)($_GET['career'] ?? 0) === $c['id']) ? 'selected' : '' ?>><?= htmlspecialchars($c['nombre']) ?></option>
+                <?php endforeach; ?>
+            </select>
             <button class="btn btn-sm btn-outline-secondary" type="submit" data-bs-toggle="tooltip" title="Buscar"><i class="fa-solid fa-magnifying-glass"></i></button>
         </form>
         <button class="btn btn-sm btn-primary" onclick="openCreateModal()" data-bs-toggle="tooltip" title="Registrar un nuevo alumno">
@@ -59,6 +65,7 @@ ob_start();
               <th class="ps-4"><?= sortLink('matricula', 'Matrícula', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th><?= sortLink('nombre', 'Nombre Completo', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th><?= sortLink('email', 'Email', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
+              <th>Carrera</th>
 
               <th><?= sortLink('activo', 'Estado', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th class="text-end pe-4">Acciones</th>
@@ -83,6 +90,7 @@ ob_start();
                     </div>
                 </td>
                 <td class="text-dark small"><a href="/public/app.php?r=/alumnos/detalle&id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['email'] ?? '—') ?></a></td>
+                <td class="small text-muted"><?= htmlspecialchars($s['carrera_nombre'] ?? 'Sin asignar') ?></td>
 
                 <td>
                     <?php
@@ -200,6 +208,16 @@ ob_start();
             <div class="invalid-feedback">Ingresa un correo válido.</div>
           </div>
 
+          <div class="mb-3">
+            <label for="carrera_id" class="form-label">Carrera</label>
+            <select class="form-select" id="carrera_id" name="carrera_id">
+                <option value="">Selecciona una carrera...</option>
+                <?php foreach (($careers ?? []) as $c): ?>
+                    <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['nombre']) ?></option>
+                <?php endforeach; ?>
+            </select>
+          </div>
+
 
 
           <div class="mb-3">
@@ -248,6 +266,9 @@ function openCreateModal() {
         
         const idEl = document.getElementById('studentId');
         if (idEl) idEl.value = '';
+        
+        const carEl = document.getElementById('carrera_id');
+        if (carEl) carEl.value = '';
         
         const title = document.getElementById('modalTitle');
         if (title) title.textContent = 'Nuevo Alumno';
@@ -307,6 +328,7 @@ function openEditModal(id) {
             document.getElementById('nombre').value = data.nombre;
             document.getElementById('apellido').value = data.apellido;
             document.getElementById('email').value = data.email || '';
+            document.getElementById('carrera_id').value = data.carrera_id || '';
 
             const act = document.getElementById('activo');
             if(act) act.checked = data.activo == 1;
