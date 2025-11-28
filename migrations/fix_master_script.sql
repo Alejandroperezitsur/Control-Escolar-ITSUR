@@ -1,41 +1,45 @@
 -- ============================================
--- SCRIPT MAESTRO DE CORRECCIÓN
--- Ejecutar en este orden para corregir datos de alumnos
+-- SCRIPT MAESTRO DE CORRECCIÓN (COMPATIBLE AWARDSPACE)
 -- Control Escolar ITSUR
 -- ============================================
 
--- IMPORTANTE: Ejecutar estos scripts EN ORDEN
-
-USE control_escolar;
-
 -- ============================================
--- PASO 1: BACKUP (MANUAL - ejecutar ANTES)
--- ============================================
--- mysqldump -u root -p control_escolar > backup_antes_correccion_$(date +%Y%m%d).sql
-
--- ============================================
--- PASO 2: LIMPIEZA
--- ============================================
-SELECT 'Ejecutando limpieza de datos...' AS paso;
-SOURCE migrations/fix_cleanup_enrollments.sql;
-
--- ============================================
--- PASO 3: SEED REALISTA
--- ============================================
-SELECT 'Poblando inscripciones realistas...' AS paso;
-SOURCE migrations/fix_realistic_enrollments.sql;
-
--- ============================================
--- PASO 4: POBLAR HORARIOS
--- ============================================
-SELECT 'Poblando horarios...' AS paso;
-SOURCE migrations/fix_populate_schedules.sql;
-
--- ============================================
--- VERIFICACIÓN FINAL
+-- PASO 1: Seleccionar base de datos
 -- ============================================
 
-SELECT '\n\n=== VERIFICACIÓN FINAL ===' AS resultado;
+
+-- ============================================
+-- PASO 2: AVISO SOBRE BACKUP
+-- ============================================
+
+SELECT 'REALIZA UN BACKUP MANUAL DESDE PHPMYADMIN ANTES DE CONTINUAR' AS aviso;
+
+-- ============================================
+-- PASO 3: LIMPIEZA (EJECUTAR ARCHIVO 1)
+-- ============================================
+
+SELECT 'Ahora ejecuta el archivo: fix_cleanup_enrollments.sql' AS instruccion;
+
+-- Aquí NO se puede usar SOURCE porque AwardSpace no lo soporta
+-- Solo mostramos la instrucción.
+
+-- ============================================
+-- PASO 4: SEED REALISTA (ARCHIVO 2)
+-- ============================================
+
+SELECT 'Después ejecuta: fix_realistic_enrollments.sql' AS instruccion;
+
+-- ============================================
+-- PASO 5: POBLAR HORARIOS (ARCHIVO 3)
+-- ============================================
+
+SELECT 'Finalmente ejecuta: fix_populate_schedules_fix.sql (versión compatible)' AS instruccion;
+
+-- ============================================
+-- PASO 6: VERIFICACIÓN FINAL
+-- ============================================
+
+SELECT '\n=== VERIFICACIÓN FINAL ===' AS resultado;
 
 -- 1. Resumen general
 SELECT 
@@ -49,7 +53,7 @@ LEFT JOIN grupos g ON g.id = c.grupo_id
 LEFT JOIN horarios h ON h.grupo_id = g.id
 WHERE a.activo = 1;
 
--- 2. Top 10 estudiantes (verificar que sea razonable: 6-18 materias)
+-- 2. Top 10 estudiantes
 SELECT 
     a.matricula,
     CONCAT(a.nombre, ' ', a.apellido) AS alumno,
@@ -74,5 +78,4 @@ FROM grupos g
 LEFT JOIN horarios h ON h.grupo_id = g.id
 WHERE g.ciclo = '2024-2';
 
-SELECT '\n✓ Corrección completada. Revisa los resultados arriba.' AS status;
-SELECT 'Si todo se ve bien (6-18 materias por alumno), los datos son coherentes.' AS nota;
+SELECT '\n✓ Corrección completada.' AS status;

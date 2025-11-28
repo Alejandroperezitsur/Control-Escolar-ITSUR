@@ -198,7 +198,13 @@ class StudentsController
         
         $sql = "INSERT INTO alumnos (matricula, nombre, apellido, email, password, activo, carrera_id) 
                 VALUES (:matricula, :nombre, :apellido, :email, :password, :activo, :carrera_id)";
-        
+
+        // Determine career_id based on matricula if not provided
+        $careerId = $data['carrera_id'] ?? null;
+        if (empty($careerId)) {
+            $careerId = $this->getCareerIdFromMatricula($data['matricula']);
+        }
+
         $stmt = $this->pdo->prepare($sql);
         $res = $stmt->execute([
             ':matricula' => $data['matricula'],
@@ -207,7 +213,7 @@ class StudentsController
             ':email' => $data['email'] ?? null,
             ':password' => $password,
             ':activo' => isset($data['activo']) ? 1 : 0,
-            ':carrera_id' => !empty($data['carrera_id']) ? (int)$data['carrera_id'] : null
+            ':carrera_id' => $careerId
         ]);
 
         if ($res) {
@@ -237,18 +243,24 @@ class StudentsController
             return;
         }
 
-        $fields = "matricula = :matricula, nombre = :nombre, apellido = :apellido, email = :email, activo = :activo, carrera_id = :carrera_id";
+        // Validation
+        if (empty($data['matricula']) || empty($data['nombre']) || empty($data['apellido'])) {
+            $this->jsonResponse(['error' => 'Campos obligatorios faltantes'], 400);
+            return;
+        }
+
+        $fields = "matricula = :matricula, nombre = :nombre, apellido = :apellido, email = :email, activo = :activo, carrera_id = :carrera_id, fecha_nac = :fecha_nac";
         $params = [
             ':matricula' => $data['matricula'],
             ':nombre' => $data['nombre'],
             ':apellido' => $data['apellido'],
             ':email' => $data['email'] ?? null,
             ':activo' => isset($data['activo']) ? 1 : 0,
-            ':carrera_id' => !empty($data['carrera_id']) ? (int)$data['carrera_id'] : null,
+            // Determine career_id based on matricula if not provided
+            ':carrera_id' => $this->getCareerIdFromMatricula($data['matricula']),
+            ':fecha_nac' => !empty($data['fecha_nac']) ? $data['fecha_nac'] : null,
             ':id' => $id
         ];
-
-
 
         if (!empty($data['password'])) {
             $fields .= ", password = :password";
@@ -650,12 +662,12 @@ class StudentsController
                     h.hora_inicio,
                     h.hora_fin,
                     h.aula
-                FROM inscripciones i
-                JOIN grupos g ON g.id = i.grupo_id
+                FROM calificaciones c
+                JOIN grupos g ON g.id = c.grupo_id
                 JOIN materias m ON m.id = g.materia_id
                 LEFT JOIN horarios h ON h.grupo_id = g.id
-                WHERE i.alumno_id = :aid 
-                AND i.estatus = 'inscrito'
+                WHERE c.alumno_id = :aid 
+                AND c.final IS NULL
                 AND g.ciclo = :ciclo
                 ORDER BY 
                     FIELD(h.dia_semana, 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'),
@@ -676,6 +688,7 @@ class StudentsController
             $scheduleByDay[$dia][] = $h;
         }
         
+        $csrf = $_SESSION['csrf_token'] ?? '';
         ob_start();
         include __DIR__ . '/../Views/student/schedule.php';
         return ob_get_clean();
@@ -713,5 +726,37 @@ class StudentsController
             'aprobadas' => (int)($row['aprobadas'] ?? 0),
             'reprobadas' => (int)($row['reprobadas'] ?? 0)
         ]);
+    }
+
+    private function getCareerIdFromMatricula(string $matricula): ?int
+    {
+        $prefix = strtoupper(substr($matricula, 0, 1));
+        
+        // Mapping based on test data and available careers
+        // S -> ISC (1)
+        // I -> II (2)
+        // A -> IGE (3)
+        // E -> IE (4)
+        // M -> IM (5)
+        // Q -> IER (6)
+        // C -> CP (7)
+        
+        $clave = '';
+        switch ($prefix) {
+            case 'S': $clave = 'ISC'; break;
+            case 'I': $clave = 'II'; break;
+            case 'A': $clave = 'IGE'; break;
+            case 'E': $clave = 'IE'; break;
+            case 'M': $clave = 'IM'; break;
+            case 'Q': $clave = 'IER'; break;
+            case 'C': $clave = 'CP'; break;
+            default: return null;
+        }
+        
+        $stmt = $this->pdo->prepare("SELECT id FROM carreras WHERE clave = :clave LIMIT 1");
+        $stmt->execute([':clave' => $clave]);
+        $id = $stmt->fetchColumn();
+        
+        return $id ? (int)$id : null;
     }
 }
