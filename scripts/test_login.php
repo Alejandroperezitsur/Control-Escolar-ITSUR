@@ -12,8 +12,10 @@ echo "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Diagnóstico Login
 echo "<style>body{font-family:Arial;padding:20px;} h2{color:#333;} h3{color:#666;margin-top:20px;} pre{background:#f4f4f4;padding:10px;border-radius:5px;}</style></head><body>";
 
 try {
-    require_once __DIR__ . '/../config/config.php';
-    require_once __DIR__ . '/../config/db.php';
+    // Ruta absoluta al directorio raíz del proyecto
+    $root = rtrim($_SERVER['DOCUMENT_ROOT'], '/');
+    require_once $root . '/config/config.php';
+    require_once $root . '/config/db.php';
     
     $db = Database::getInstance();
     $pdo = $db->getConnection();

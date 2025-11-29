@@ -60,6 +60,15 @@ INSERT INTO `carreras` (`id`, `nombre`, `clave`, `descripcion`, `duracion_semest
 (7, 'Contador Público', 'CP', 'Profesionista capaz de diseñar, implementar y evaluar sistemas de información financiera.', 9, 240, 1);
 
 -- =====================================================
+-- 2A. INSERTAR USUARIO ADMINISTRADOR
+-- =====================================================
+-- Password: admin123
+-- Hash generado en el servidor: $2y$10$K3C1d0zFxoQ3a8kPR.ie2urlavZLEEvqcq9nAEESkLk0N70iP8GG6
+
+INSERT INTO `usuarios` (`matricula`, `nombre`, `email`, `password`, `rol`, `carrera_id`, `activo`) VALUES
+(NULL, 'Administrador ITSUR', 'admin@itsur.edu.mx', '$2y$10$K3C1d0zFxoQ3a8kPR.ie2urlavZLEEvqcq9nAEESkLk0N70iP8GG6', 'admin', NULL, 1);
+
+-- =====================================================
 -- 3. INSERTAR PROFESORES (10 por carrera = 70 total)
 -- =====================================================
 -- Password hash para todos: $2y$10$JI9hKZGHTfoP4cqt68heEeqLS8Mzcmj8hXVM0wF.NzO3DL25tD7hC (password: profesor123)
