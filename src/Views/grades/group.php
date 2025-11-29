@@ -252,7 +252,7 @@ function loadSchedules(){
     if (!j || !j.success) { tb.innerHTML = '<tr><td colspan="5" class="text-danger">Error al cargar horarios</td></tr>'; return; }
     const rows = j.data || [];
     if (rows.length === 0) { tb.innerHTML = '<tr><td colspan="5" class="text-muted">Sin horarios</td></tr>'; return; }
-    tb.innerHTML = rows.map(r => `<tr><td>${esc(r.dia)}</td><td>${esc(r.hora_inicio)}</td><td>${esc(r.hora_fin)}</td><td>${esc(r.salon||'')}</td><td class="text-end"><?php echo ($_SESSION['role'] ?? '') === 'admin' ? '<button class=\"btn btn-sm btn-outline-danger\" onclick=\"delSchedule('+"${r.id}"+')\" data-bs-toggle=\"tooltip\" title=\"Eliminar horario\">Eliminar</button>' : '' ?></td></tr>`).join('');
+    tb.innerHTML = rows.map(r => `<tr><td>${esc(r.dia)}</td><td>${esc(r.hora_inicio)}</td><td>${esc(r.hora_fin)}</td><td>${esc(r.salon||'')}</td><td class="text-end"><?php echo ($_SESSION['role'] ?? '') === 'admin' ? '<button class="btn btn-sm btn-outline-danger" onclick="delSchedule(${r.id})" data-bs-toggle="tooltip" title="Eliminar horario">Eliminar</button>' : '' ?></td></tr>`).join('');
   }).catch(()=>{
     document.getElementById('sched-body').innerHTML = '<tr><td colspan="5" class="text-danger">Error de red</td></tr>';
   });
