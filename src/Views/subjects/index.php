@@ -47,6 +47,9 @@ ob_start();
   </div>
 
   <div class="d-flex justify-content-end mb-2">
+    <button id="bulkDeleteBtn" class="btn btn-sm btn-danger d-none me-2" onclick="bulkDeleteSubjects()" data-bs-toggle="tooltip" title="Eliminar seleccionados">
+        <i class="fa-solid fa-trash me-1"></i> Eliminar (<span id="selectedCount">0</span>)
+    </button>
     <?php $qv = urlencode((string)($pagination['q'] ?? '')); $carv = urlencode((string)($pagination['carrera'] ?? '')); $cicv = urlencode((string)($pagination['ciclo'] ?? '')); $estv = urlencode((string)($pagination['estado'] ?? '')); $ppv = urlencode((string)($pagination['per_page'] ?? '')); ?>
     <a class="btn btn-sm btn-outline-primary me-2" href="<?php echo $base; ?>/subjects/export/csv<?= ($qv!==''||$carv!==''||$cicv!==''||$estv!=='')?('?'.implode('&', array_filter([
       $qv!==''?('q='.$qv):'', $carv!==''?('carrera='.$carv):'', $cicv!==''?('ciclo='.$cicv):'', $estv!==''?('estado='.$estv):'', $ppv!==''?('per_page='.$ppv):''
@@ -135,6 +138,7 @@ ob_start();
     <?php endif; ?>
     <table class="table table-striped table-hover">
       <thead><tr>
+        <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="selectAll"></th>
         <?php $sort = (string)($pagination['sort'] ?? 'nombre'); $order = (string)($pagination['order'] ?? 'ASC'); $pg = (int)($pagination['page'] ?? 1); $qv = urlencode((string)($pagination['q'] ?? '')); $toggle = $order==='ASC'?'DESC':'ASC'; $ppv = urlencode((string)($pagination['per_page'] ?? '')); ?>
         <th><a href="<?php echo $base; ?>/subjects?page=<?= $pg ?>&sort=id&order=<?= $sort==='id'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $selCar!==''?"&carrera=$selCar":'' ?><?= $selCiclo!==''?"&ciclo=$selCiclo":'' ?><?= $selEstado!==''?"&estado=$selEstado":'' ?><?= $ppv!==''?"&per_page=$ppv":'' ?>">ID<?= $sort==='id' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
         <th><a href="<?php echo $base; ?>/subjects?page=<?= $pg ?>&sort=nombre&order=<?= $sort==='nombre'?$toggle:'ASC' ?><?= $qv!==''?"&q=$qv":'' ?><?= $selCar!==''?"&carrera=$selCar":'' ?><?= $selCiclo!==''?"&ciclo=$selCiclo":'' ?><?= $selEstado!==''?"&estado=$selEstado":'' ?><?= $ppv!==''?"&per_page=$ppv":'' ?>">Nombre<?= $sort==='nombre' ? ($order==='ASC'?' ▲':' ▼') : '' ?></a></th>
@@ -147,6 +151,7 @@ ob_start();
       <tbody>
         <?php foreach (($subjects ?? []) as $s): ?>
         <tr>
+          <td><input type="checkbox" class="form-check-input subject-check" value="<?= $s['id'] ?>"></td>
           <td><?= htmlspecialchars($s['id']) ?></td>
           <td><a href="<?= $base; ?>/subjects/detail?id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['nombre']) ?></a></td>
           <td><?= htmlspecialchars($s['clave'] ?? '') ?></td>
@@ -312,6 +317,76 @@ ob_start();
   <?php if ($flash): ?>
   showToast('<?= htmlspecialchars($flash) ?>', '<?= htmlspecialchars($flashType) ?>');
   <?php endif; ?>
+
+  window.updateBulkDeleteBtn = function() {
+    const checks = document.querySelectorAll('.subject-check:checked');
+    const btn = document.getElementById('bulkDeleteBtn');
+    const countSpan = document.getElementById('selectedCount');
+    
+    if (checks.length > 0) {
+        btn.classList.remove('d-none');
+        countSpan.textContent = checks.length;
+    } else {
+        btn.classList.add('d-none');
+    }
+  };
+
+  document.getElementById('selectAll')?.addEventListener('change', function(e) {
+    const checks = document.querySelectorAll('.subject-check');
+    checks.forEach(c => c.checked = e.target.checked);
+    updateBulkDeleteBtn();
+  });
+
+  document.querySelectorAll('.subject-check').forEach(c => {
+    c.addEventListener('change', updateBulkDeleteBtn);
+  });
+
+  window.bulkDeleteSubjects = function() {
+    const checks = document.querySelectorAll('.subject-check:checked');
+    if (checks.length === 0) return;
+    
+    if (!confirm(`¿Estás seguro de eliminar ${checks.length} materias seleccionadas? Esta acción no se puede deshacer.`)) return;
+    
+    const ids = Array.from(checks).map(c => c.value);
+    const formData = new FormData();
+    formData.append('ids', JSON.stringify(ids));
+    formData.append('csrf_token', '<?= $csrf ?>');
+    
+    const btn = document.getElementById('bulkDeleteBtn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Eliminando...';
+    
+    fetch('<?php echo $base; ?>/subjects/bulk-delete', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin'
+    })
+    .then(response => response.text().then(text => {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Raw response:', text);
+            throw new Error('Respuesta inválida del servidor');
+        }
+    }))
+    .then(data => {
+        if(data.success) {
+            showToast(`${data.deleted} materias eliminadas`, 'warning');
+            setTimeout(() => location.reload(), 600);
+        } else {
+            showToast(data.error || 'Error al eliminar', 'danger');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    })
+    .catch(e => {
+        console.error(e);
+        showToast('Error de red', 'danger');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+  };
 })();
 </script>
 

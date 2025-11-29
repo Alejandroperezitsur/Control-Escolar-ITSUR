@@ -1,430 +1,612 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="es">
+
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Credenciales de prueba</title>
-    <link rel="stylesheet" href="assets/css/styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificación Completa de Datos - Control Escolar ITSUR</title>
     <style>
-        table { width: 100%; border-collapse: collapse }
-        th, td { border: 1px solid #ddd; padding: 8px }
-        th { background: #f5f5f5; text-align: left }
-        .container { padding: 1rem }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f1f3f4;
+            padding: 0 30px;
+            overflow-x: auto;
+        }
+
+        .tab {
+            padding: 15px 25px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 1em;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .tab:hover {
+            color: #667eea;
+        }
+
+        .tab.active {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .content {
+            padding: 30px;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+
+        th {
+            background: #667eea;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        tr:hover {
+            background: #f5f5f5;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 10px;
+            border: 1px solid #f5c6cb;
+        }
+
+        .search-box {
+            margin-bottom: 20px;
+            padding: 12px 20px;
+            width: 100%;
+            max-width: 400px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .export-btn {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-left: 10px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+
+        .export-btn:hover {
+            background: #5568d3;
+        }
     </style>
-    
 </head>
+
 <body>
     <div class="container">
-        <h1>Usuarios de prueba</h1>
-        <p>Contraseñas de 8 dígitos generadas para pruebas. No usar en producción.</p>
+        <header>
+            <h1>🎓 Verificación de Datos Poblados</h1>
+            <p class="subtitle">Control Escolar ITSUR - Base de Datos Completa</p>
+            <p style="margin-top: 10px; opacity: 0.8;" id="timestamp"></p>
+        </header>
 
-        <h2>Alumnos (40)</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Matrícula</th>
-                    <th>Nombre</th>
-                    <th>Apellido</th>
-                    <th>Email</th>
-                    <th>Contraseña</th>
-                </tr>
-            </thead>
-            <tbody>
-            <tr>
-                <td>S64695061</td>
-                <td>Ana</td>
-                <td>Sánchez</td>
-                <td>ana.sánchez0@alumnos.test</td>
-                <td>77870309</td>
-            </tr>
-            <tr>
-                <td>E63337655</td>
-                <td>Miguel</td>
-                <td>Aguilar</td>
-                <td>miguel.aguilar1@alumnos.test</td>
-                <td>44105457</td>
-            </tr>
-            <tr>
-                <td>A74057894</td>
-                <td>Adrián</td>
-                <td>Díaz</td>
-                <td>adrián.díaz2@alumnos.test</td>
-                <td>88606919</td>
-            </tr>
-            <tr>
-                <td>S58323200</td>
-                <td>Lucía</td>
-                <td>González</td>
-                <td>lucía.gonzález3@alumnos.test</td>
-                <td>73979037</td>
-            </tr>
-            <tr>
-                <td>Q00293352</td>
-                <td>Isabel</td>
-                <td>Silva</td>
-                <td>isabel.silva4@alumnos.test</td>
-                <td>79381690</td>
-            </tr>
-            <tr>
-                <td>A82644179</td>
-                <td>Sara</td>
-                <td>García</td>
-                <td>sara.garcía5@alumnos.test</td>
-                <td>17688212</td>
-            </tr>
-            <tr>
-                <td>S69446957</td>
-                <td>Elena</td>
-                <td>Hernández</td>
-                <td>elena.hernández6@alumnos.test</td>
-                <td>37212695</td>
-            </tr>
-            <tr>
-                <td>A90943345</td>
-                <td>Noelia</td>
-                <td>Hernández</td>
-                <td>noelia.hernández7@alumnos.test</td>
-                <td>25455802</td>
-            </tr>
-            <tr>
-                <td>I36534358</td>
-                <td>Valeria</td>
-                <td>Castro</td>
-                <td>valeria.castro8@alumnos.test</td>
-                <td>21605623</td>
-            </tr>
-            <tr>
-                <td>E70378898</td>
-                <td>Ana</td>
-                <td>Martínez</td>
-                <td>ana.martínez9@alumnos.test</td>
-                <td>19932938</td>
-            </tr>
-            <tr>
-                <td>S08820730</td>
-                <td>Ana</td>
-                <td>Rojas</td>
-                <td>ana.rojas10@alumnos.test</td>
-                <td>59511288</td>
-            </tr>
-            <tr>
-                <td>M28308092</td>
-                <td>Valeria</td>
-                <td>Vargas</td>
-                <td>valeria.vargas11@alumnos.test</td>
-                <td>30493896</td>
-            </tr>
-            <tr>
-                <td>C99373479</td>
-                <td>Miguel</td>
-                <td>Delgado</td>
-                <td>miguel.delgado12@alumnos.test</td>
-                <td>94903626</td>
-            </tr>
-            <tr>
-                <td>E19415505</td>
-                <td>Diego</td>
-                <td>Rojas</td>
-                <td>diego.rojas13@alumnos.test</td>
-                <td>88530838</td>
-            </tr>
-            <tr>
-                <td>C47574169</td>
-                <td>Andrés</td>
-                <td>Ramos</td>
-                <td>andrés.ramos14@alumnos.test</td>
-                <td>91490560</td>
-            </tr>
-            <tr>
-                <td>C07163041</td>
-                <td>Raúl</td>
-                <td>Rojas</td>
-                <td>raúl.rojas15@alumnos.test</td>
-                <td>53830246</td>
-            </tr>
-            <tr>
-                <td>A69495447</td>
-                <td>Irene</td>
-                <td>Ramírez</td>
-                <td>irene.ramírez16@alumnos.test</td>
-                <td>78208779</td>
-            </tr>
-            <tr>
-                <td>S52823529</td>
-                <td>Gabriela</td>
-                <td>Flores</td>
-                <td>gabriela.flores17@alumnos.test</td>
-                <td>49939745</td>
-            </tr>
-            <tr>
-                <td>M99322542</td>
-                <td>Irene</td>
-                <td>Delgado</td>
-                <td>irene.delgado18@alumnos.test</td>
-                <td>87689406</td>
-            </tr>
-            <tr>
-                <td>I33481613</td>
-                <td>Luis</td>
-                <td>Ramos</td>
-                <td>luis.ramos19@alumnos.test</td>
-                <td>52158935</td>
-            </tr>
-            <tr>
-                <td>M67483512</td>
-                <td>Alicia</td>
-                <td>López</td>
-                <td>alicia.lópez20@alumnos.test</td>
-                <td>58550314</td>
-            </tr>
-            <tr>
-                <td>C94538422</td>
-                <td>Ángel</td>
-                <td>Ramos</td>
-                <td>Ángel.ramos21@alumnos.test</td>
-                <td>68655918</td>
-            </tr>
-            <tr>
-                <td>A44785430</td>
-                <td>Hugo</td>
-                <td>Jiménez</td>
-                <td>hugo.jiménez22@alumnos.test</td>
-                <td>43854700</td>
-            </tr>
-            <tr>
-                <td>Q59612295</td>
-                <td>Sofía</td>
-                <td>Silva</td>
-                <td>sofía.silva23@alumnos.test</td>
-                <td>14474965</td>
-            </tr>
-            <tr>
-                <td>S38646932</td>
-                <td>Elena</td>
-                <td>Pérez</td>
-                <td>elena.pérez24@alumnos.test</td>
-                <td>12905986</td>
-            </tr>
-            <tr>
-                <td>C42148538</td>
-                <td>Isabel</td>
-                <td>Sánchez</td>
-                <td>isabel.sánchez25@alumnos.test</td>
-                <td>71626163</td>
-            </tr>
-            <tr>
-                <td>E27139987</td>
-                <td>Óscar</td>
-                <td>Domínguez</td>
-                <td>Óscar.domínguez26@alumnos.test</td>
-                <td>47192359</td>
-            </tr>
-            <tr>
-                <td>S40520268</td>
-                <td>Ana</td>
-                <td>Morales</td>
-                <td>ana.morales27@alumnos.test</td>
-                <td>77398713</td>
-            </tr>
-            <tr>
-                <td>A10393980</td>
-                <td>Olga</td>
-                <td>Ortega</td>
-                <td>olga.ortega28@alumnos.test</td>
-                <td>35373802</td>
-            </tr>
-            <tr>
-                <td>Q01858252</td>
-                <td>Camila</td>
-                <td>Díaz</td>
-                <td>camila.díaz29@alumnos.test</td>
-                <td>71028143</td>
-            </tr>
-            <tr>
-                <td>E55063223</td>
-                <td>Alicia</td>
-                <td>Vargas</td>
-                <td>alicia.vargas30@alumnos.test</td>
-                <td>17777571</td>
-            </tr>
-            <tr>
-                <td>C31129486</td>
-                <td>Óscar</td>
-                <td>Ramos</td>
-                <td>Óscar.ramos31@alumnos.test</td>
-                <td>40524433</td>
-            </tr>
-            <tr>
-                <td>C74534925</td>
-                <td>Marta</td>
-                <td>Vázquez</td>
-                <td>marta.vázquez32@alumnos.test</td>
-                <td>26650258</td>
-            </tr>
-            <tr>
-                <td>A24058104</td>
-                <td>Nicolás</td>
-                <td>Pérez</td>
-                <td>nicolás.pérez33@alumnos.test</td>
-                <td>13563532</td>
-            </tr>
-            <tr>
-                <td>Q64308974</td>
-                <td>Elena</td>
-                <td>Ortega</td>
-                <td>elena.ortega34@alumnos.test</td>
-                <td>34570524</td>
-            </tr>
-            <tr>
-                <td>M15051962</td>
-                <td>Sara</td>
-                <td>Vázquez</td>
-                <td>sara.vázquez35@alumnos.test</td>
-                <td>86510658</td>
-            </tr>
-            <tr>
-                <td>Q38726023</td>
-                <td>Raúl</td>
-                <td>Aguilar</td>
-                <td>raúl.aguilar36@alumnos.test</td>
-                <td>25482816</td>
-            </tr>
-            <tr>
-                <td>Q21533576</td>
-                <td>Adrián</td>
-                <td>Rivera</td>
-                <td>adrián.rivera37@alumnos.test</td>
-                <td>97066945</td>
-            </tr>
-            <tr>
-                <td>Q67170521</td>
-                <td>María</td>
-                <td>Navarro</td>
-                <td>maría.navarro38@alumnos.test</td>
-                <td>58101181</td>
-            </tr>
-            <tr>
-                <td>E05074615</td>
-                <td>Elena</td>
-                <td>González</td>
-                <td>elena.gonzález39@alumnos.test</td>
-                <td>98350253</td>
-            </tr>
-            </tbody>
-        </table>
+        <div class="summary" id="summary">
+            <div class="loading">Cargando datos...</div>
+        </div>
 
-        <h2 style="margin-top: 2rem">Profesores (20)</h2>
-        <table>
-            <thead>
-                <tr>
-                    <th>Matrícula</th>
-                    <th>Email</th>
-                    <th>Contraseña</th>
-                </tr>
-            </thead>
-            <tbody>
-            <tr>
-                <td>C20582419</td>
-                <td>diana.carrillo0@profes.test</td>
-                <td>59369531</td>
-            </tr>
-            <tr>
-                <td>A78685183</td>
-                <td>beatriz.quintero1@profes.test</td>
-                <td>40194988</td>
-            </tr>
-            <tr>
-                <td>M00374383</td>
-                <td>yolanda.juárez2@profes.test</td>
-                <td>35626318</td>
-            </tr>
-            <tr>
-                <td>C25332056</td>
-                <td>rafael.uribe3@profes.test</td>
-                <td>48299057</td>
-            </tr>
-            <tr>
-                <td>M32094235</td>
-                <td>eduardo.gómez4@profes.test</td>
-                <td>28231428</td>
-            </tr>
-            <tr>
-                <td>C37626751</td>
-                <td>sofía.salazar5@profes.test</td>
-                <td>14825464</td>
-            </tr>
-            <tr>
-                <td>I41462241</td>
-                <td>mauricio.zepeda6@profes.test</td>
-                <td>73109810</td>
-            </tr>
-            <tr>
-                <td>S08612758</td>
-                <td>ismael.herrera7@profes.test</td>
-                <td>66905214</td>
-            </tr>
-            <tr>
-                <td>Q41445620</td>
-                <td>kevin.salazar8@profes.test</td>
-                <td>76710008</td>
-            </tr>
-            <tr>
-                <td>C56296674</td>
-                <td>lorena.nieves9@profes.test</td>
-                <td>79145267</td>
-            </tr>
-            <tr>
-                <td>A79830367</td>
-                <td>césar.yáñez10@profes.test</td>
-                <td>98431586</td>
-            </tr>
-            <tr>
-                <td>A67417495</td>
-                <td>xavier.escobar11@profes.test</td>
-                <td>88944541</td>
-            </tr>
-            <tr>
-                <td>S85745990</td>
-                <td>julia.zepeda12@profes.test</td>
-                <td>93902719</td>
-            </tr>
-            <tr>
-                <td>Q45452797</td>
-                <td>fátima.téllez13@profes.test</td>
-                <td>42038892</td>
-            </tr>
-            <tr>
-                <td>C47177608</td>
-                <td>helena.durán14@profes.test</td>
-                <td>88681755</td>
-            </tr>
-            <tr>
-                <td>M44292909</td>
-                <td>kevin.velasco15@profes.test</td>
-                <td>35975444</td>
-            </tr>
-            <tr>
-                <td>M54603305</td>
-                <td>yolanda.juárez16@profes.test</td>
-                <td>42728822</td>
-            </tr>
-            <tr>
-                <td>E81280157</td>
-                <td>fátima.yáñez17@profes.test</td>
-                <td>92321211</td>
-            </tr>
-            <tr>
-                <td>C89310739</td>
-                <td>helena.alonso18@profes.test</td>
-                <td>22830690</td>
-            </tr>
-            <tr>
-                <td>A85174546</td>
-                <td>ulises.juárez19@profes.test</td>
-                <td>33256161</td>
-            </tr>
-            </tbody>
-        </table>
+        <div class="tabs" id="tabs">
+            <button class="tab active" onclick="showTab('students')">👨‍🎓 Estudiantes</button>
+            <button class="tab" onclick="showTab('professors')">👨‍🏫 Profesores</button>
+            <button class="tab" onclick="showTab('careers')">📚 Carreras</button>
+            <button class="tab" onclick="showTab('subjects')">📖 Materias</button>
+            <button class="tab" onclick="showTab('groups')">👥 Grupos</button>
+            <button class="tab" onclick="showTab('enrollments')">📝 Inscripciones</button>
+            <button class="tab" onclick="showTab('schedules')">🕐 Horarios</button>
+            <button class="tab" onclick="showTab('grades')">📊 Calificaciones</button>
+        </div>
+
+        <div class="content" id="content">
+            <div class="loading">Cargando información...</div>
+        </div>
     </div>
+
+    <script>
+        let allData = null;
+        let currentTab = 'students';
+
+        // Cargar datos al iniciar
+        async function loadData() {
+            try {
+                const response = await fetch('api_verification.php');
+                if (!response.ok) throw new Error('Error al cargar datos');
+                allData = await response.json();
+
+                if (allData.error) {
+                    document.getElementById('content').innerHTML = `<div class="error">Error: ${allData.error}</div>`;
+                    return;
+                }
+
+                displaySummary();
+                showTab('students');
+                document.getElementById('timestamp').textContent = `Última actualización: ${allData.timestamp}`;
+            } catch (error) {
+                document.getElementById('content').innerHTML = `<div class="error">Error al cargar datos: ${error.message}</div>`;
+            }
+        }
+
+        function displaySummary() {
+            const s = allData.summary;
+            document.getElementById('summary').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${s.total_students}</div>
+                    <div class="stat-label">Estudiantes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${s.total_professors}</div>
+                    <div class="stat-label">Profesores</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${s.total_careers}</div>
+                    <div class="stat-label">Carreras</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${s.total_subjects}</div>
+                    <div class="stat-label">Materias</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${s.total_groups}</div>
+                    <div class="stat-label">Grupos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${s.total_grades_shown}</div>
+                    <div class="stat-label">Calificaciones</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${s.students_without_career}</div>
+                    <div class="stat-label">Sin Carrera</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${s.students_without_enrollments}</div>
+                    <div class="stat-label">Sin Carga</div>
+                </div>
+            `;
+        }
+
+        function showTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+
+            const content = document.getElementById('content');
+
+            switch (tab) {
+                case 'students':
+                    content.innerHTML = renderStudents();
+                    break;
+                case 'professors':
+                    content.innerHTML = renderProfessors();
+                    break;
+                case 'careers':
+                    content.innerHTML = renderCareers();
+                    break;
+                case 'subjects':
+                    content.innerHTML = renderSubjects();
+                    break;
+                case 'groups':
+                    content.innerHTML = renderGroups();
+                    break;
+                case 'enrollments':
+                    content.innerHTML = renderEnrollments();
+                    break;
+                case 'schedules':
+                    content.innerHTML = renderSchedules();
+                    break;
+                case 'grades':
+                    content.innerHTML = renderGrades();
+                    break;
+            }
+        }
+
+        function renderStudents() {
+            let html = `
+                <div style="margin-bottom: 20px;">
+                    <input type="text" class="search-box" placeholder="Buscar estudiante..." onkeyup="filterTable(this, 'students-table')">
+                    <button class="export-btn" onclick="exportToCSV('students')">📥 Exportar CSV</button>
+                </div>
+                <table id="students-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Matrícula</th>
+                            <th>Nombre Completo</th>
+                            <th>Email</th>
+                            <th>Password Hash</th>
+                            <th>Fecha Nac.</th>
+                            <th>Carrera</th>
+                            <th>Grupos</th>
+                            <th>Calificaciones</th>
+                            <th>Pendientes</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            allData.students.forEach(s => {
+                const statusClass = s.activo == 1 ? 'badge-success' : 'badge-danger';
+                const statusText = s.activo == 1 ? 'Activo' : 'Inactivo';
+                html += `
+                    <tr>
+                        <td>${s.id}</td>
+                        <td><strong>${s.matricula}</strong></td>
+                        <td>${s.nombre} ${s.apellido}</td>
+                        <td>${s.email || 'N/A'}</td>
+                        <td style="font-size: 0.75em; max-width: 150px; overflow: hidden; text-overflow: ellipsis;">${s.password.substring(0, 20)}...</td>
+                        <td>${s.fecha_nac || 'N/A'}</td>
+                        <td><span class="badge badge-info">${s.carrera_clave || 'N/A'}</span></td>
+                        <td>${s.total_inscripciones || 0}</td>
+                        <td>${s.total_calificaciones || 0}</td>
+                        <td><span class="badge ${s.materias_pendientes > 0 ? 'badge-warning' : 'badge-success'}">${s.materias_pendientes || 0}</span></td>
+                        <td><span class="badge ${statusClass}">${statusText}</span></td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function renderProfessors() {
+            let html = `
+                <div style="margin-bottom: 20px;">
+                    <input type="text" class="search-box" placeholder="Buscar profesor..." onkeyup="filterTable(this, 'professors-table')">
+                    <button class="export-btn" onclick="exportToCSV('professors')">📥 Exportar CSV</button>
+                </div>
+                <table id="professors-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Email</th>
+                            <th>Password Hash</th>
+                            <th>Carrera</th>
+                            <th>Total Grupos</th>
+                            <th>Materias Distintas</th>
+                            <th>Grupos Asignados</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            allData.professors.forEach(p => {
+                const statusClass = p.activo == 1 ? 'badge-success' : 'badge-danger';
+                html += `
+                    <tr>
+                        <td>${p.id}</td>
+                        <td><strong>${p.nombre}</strong></td>
+                        <td>${p.email}</td>
+                        <td style="font-size: 0.75em; max-width: 150px; overflow: hidden;">${p.password.substring(0, 20)}...</td>
+                        <td>${p.carrera_nombre || 'N/A'}</td>
+                        <td><span class="badge badge-info">${p.total_grupos}</span></td>
+                        <td>${p.materias_distintas}</td>
+                        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">${p.grupos_asignados || 'Sin grupos'}</td>
+                        <td><span class="badge ${statusClass}">${p.activo == 1 ? 'Activo' : 'Inactivo'}</span></td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+            return html;
+        }
+
+        function renderCareers() {
+            let html = '<table><thead><tr><th>ID</th><th>Nombre</th><th>Clave</th><th>Alumnos</th><th>Profesores</th><th>Materias</th><th>Estado</th></tr></thead><tbody>';
+            allData.careers.forEach(c => {
+                html += `<tr>
+                    <td>${c.id}</td>
+                    <td><strong>${c.nombre}</strong></td>
+                    <td><span class="badge badge-info">${c.clave}</span></td>
+                    <td>${c.total_alumnos}</td>
+                    <td>${c.total_profesores}</td>
+                    <td>${c.total_materias}</td>
+                    <td><span class="badge ${c.activo == 1 ? 'badge-success' : 'badge-danger'}">${c.activo == 1 ? 'Activa' : 'Inactiva'}</span></td>
+                </tr>`;
+            });
+            return html + '</tbody></table>';
+        }
+
+        function renderSubjects() {
+            let html = `
+                <input type="text" class="search-box" placeholder="Buscar materia..." onkeyup="filterTable(this, 'subjects-table')" style="margin-bottom: 20px;">
+                <table id="subjects-table"><thead><tr><th>ID</th><th>Nombre</th><th>Clave</th><th>Carreras</th><th>Grupos</th><th>Calificaciones</th></tr></thead><tbody>
+            `;
+            allData.subjects.forEach(s => {
+                html += `<tr>
+                    <td>${s.id}</td>
+                    <td>${s.nombre}</td>
+                    <td><span class="badge badge-info">${s.clave}</span></td>
+                    <td>${s.carreras || 'N/A'}</td>
+                    <td><span class="badge ${s.total_grupos > 0 ? 'badge-success' : 'badge-warning'}">${s.total_grupos}</span></td>
+                    <td>${s.total_calificaciones}</td>
+                </tr>`;
+            });
+            return html + '</tbody></table>';
+        }
+
+        function renderGroups() {
+            let html = `
+                <input type="text" class="search-box" placeholder="Buscar grupo..." onkeyup="filterTable(this, 'groups-table')" style="margin-bottom: 20px;">
+                <table id="groups-table"><thead><tr><th>ID</th><th>Nombre</th><th>Materia</th><th>Profesor</th><th>Ciclo</th><th>Cupo</th><th>Inscritos</th><th>Horarios</th><th>Aula</th></tr></thead><tbody>
+            `;
+            allData.groups.forEach(g => {
+                const ocupacion = g.alumnos_inscritos || 0;
+                const cupo = g.cupo || 30;
+                const porcentaje = Math.round((ocupacion / cupo) * 100);
+                const badgeClass = porcentaje > 90 ? 'badge-danger' : porcentaje > 70 ? 'badge-warning' : 'badge-success';
+
+                html += `<tr>
+                    <td>${g.id}</td>
+                    <td><strong>${g.nombre}</strong></td>
+                    <td>${g.materia_nombre} (${g.materia_clave})</td>
+                    <td>${g.profesor_nombre || 'Sin asignar'}</td>
+                    <td><span class="badge badge-info">${g.ciclo}</span></td>
+                    <td>${cupo}</td>
+                    <td><span class="badge ${badgeClass}">${ocupacion} (${porcentaje}%)</span></td>
+                    <td>${g.horarios_definidos || 0}</td>
+                    <td>${g.aula_default || 'N/A'}</td>
+                </tr>`;
+            });
+            return html + '</tbody></table>';
+        }
+
+        function renderEnrollments() {
+            let html = '<table><thead><tr><th>ID</th><th>Matrícula</th><th>Alumno</th><th>Materia</th><th>Grupo</th><th>Ciclo</th><th>Fecha Inscripción</th></tr></thead><tbody>';
+            allData.enrollments.slice(0, 500).forEach(e => {
+                html += `<tr>
+                    <td>${e.id}</td>
+                    <td>${e.matricula}</td>
+                    <td>${e.alumno_nombre}</td>
+                    <td>${e.materia_nombre}</td>
+                    <td>${e.grupo_nombre}</td>
+                    <td><span class="badge badge-info">${e.ciclo}</span></td>
+                    <td>${e.fecha_inscripcion || 'N/A'}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            if (allData.enrollments.length > 500) {
+                html += `<p style="text-align: center; margin-top: 20px; color: #666;">Mostrando primeras 500 inscripciones de ${allData.enrollments.length} totales</p>`;
+            }
+            return html;
+        }
+
+        function renderSchedules() {
+            let html = '<table><thead><tr><th>ID</th><th>Grupo</th><th>Materia</th><th>Día</th><th>Hora Inicio</th><th>Hora Fin</th><th>Aula</th></tr></thead><tbody>';
+            allData.schedules.slice(0, 500).forEach(h => {
+                html += `<tr>
+                    <td>${h.id}</td>
+                    <td>${h.grupo_nombre}</td>
+                    <td>${h.materia_nombre}</td>
+                    <td><span class="badge badge-info">${h.dia_semana}</span></td>
+                    <td>${h.hora_inicio}</td>
+                    <td>${h.hora_fin}</td>
+                    <td>${h.aula || 'N/A'}</td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            if (allData.schedules.length > 500) {
+                html += `<p style="text-align: center; margin-top: 20px; color: #666;">Mostrando primeros 500 horarios de ${allData.schedules.length} totales</p>`;
+            }
+            return html;
+        }
+
+        function renderGrades() {
+            let html = '<table><thead><tr><th>ID</th><th>Matrícula</th><th>Alumno</th><th>Materia</th><th>Grupo</th><th>Ciclo</th><th>P1</th><th>P2</th><th>Final</th><th>Promedio</th></tr></thead><tbody>';
+            allData.grades.slice(0, 500).forEach(g => {
+                const promedioClass = g.final >= 70 ? 'badge-success' : g.final < 70 ? 'badge-danger' : 'badge-warning';
+                html += `<tr>
+                    <td>${g.id}</td>
+                    <td>${g.matricula}</td>
+                    <td>${g.alumno_nombre}</td>
+                    <td>${g.materia_nombre}</td>
+                    <td>${g.grupo_nombre}</td>
+                    <td>${g.ciclo}</td>
+                    <td>${g.parcial1 || 'N/A'}</td>
+                    <td>${g.parcial2 || 'N/A'}</td>
+                    <td>${g.final || 'Pendiente'}</td>
+                    <td><span class="badge ${promedioClass}">${g.promedio}</span></td>
+                </tr>`;
+            });
+            html += '</tbody></table>';
+            if (allData.grades.length > 500) {
+                html += `<p style="text-align: center; margin-top: 20px; color: #666;">Mostrando primeras 500 calificaciones de ${allData.grades.length} totales</p>`;
+            }
+            return html;
+        }
+
+        function filterTable(input, tableId) {
+            const filter = input.value.toUpperCase();
+            const table = document.getElementById(tableId);
+            const tr = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < tr.length; i++) {
+                let txtValue = tr[i].textContent || tr[i].innerText;
+                tr[i].style.display = txtValue.toUpperCase().indexOf(filter) > -1 ? '' : 'none';
+            }
+        }
+
+        function exportToCSV(type) {
+            let csv = '';
+            let filename = type + '.csv';
+
+            switch (type) {
+                case 'students':
+                    csv = 'ID,Matricula,Nombre,Apellido,Email,Password,Fecha Nac,Carrera,Total Inscripciones,Total Calificaciones,Pendientes,Activo\n';
+                    allData.students.forEach(s => {
+                        csv += `${s.id},"${s.matricula}","${s.nombre}","${s.apellido}","${s.email || ''}","${s.password}","${s.fecha_nac || ''}","${s.carrera_clave || ''}",${s.total_inscripciones},${s.total_calificaciones},${s.materias_pendientes},${s.activo}\n`;
+                    });
+                    break;
+                case 'professors':
+                    csv = 'ID,Nombre,Email,Password,Carrera,Total Grupos,Materias Distintas,Activo\n';
+                    allData.professors.forEach(p => {
+                        csv += `${p.id},"${p.nombre}","${p.email}","${p.password}","${p.carrera_nombre || ''}",${p.total_grupos},${p.materias_distintas},${p.activo}\n`;
+                    });
+                    break;
+            }
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+        }
+
+        // Cargar datos al iniciar
+        loadData();
+    </script>
 </body>
+
 </html>

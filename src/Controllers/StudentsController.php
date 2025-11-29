@@ -277,6 +277,36 @@ class StudentsController
         }
     }
 
+    public function bulkDelete(): void
+    {
+        $this->checkAdmin();
+        $this->assertCsrfPost();
+        
+        $ids = json_decode($_POST['ids'] ?? '[]', true);
+        if (!is_array($ids) || empty($ids)) {
+            $this->jsonResponse(['error' => 'No se seleccionaron alumnos'], 400);
+            return;
+        }
+        
+        // Sanitize IDs
+        $ids = array_map('intval', $ids);
+        $ids = array_filter($ids, fn($id) => $id > 0);
+        
+        if (empty($ids)) {
+            $this->jsonResponse(['error' => 'IDs inválidos'], 400);
+            return;
+        }
+        
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->pdo->prepare("DELETE FROM alumnos WHERE id IN ($placeholders)");
+        
+        if ($stmt->execute($ids)) {
+            $this->jsonResponse(['success' => true, 'deleted' => $stmt->rowCount()]);
+        } else {
+            $this->jsonResponse(['error' => 'Error al eliminar alumnos'], 500);
+        }
+    }
+
     public function delete(): void
     {
         $this->checkAdmin();

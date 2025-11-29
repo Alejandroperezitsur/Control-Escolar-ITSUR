@@ -171,6 +171,7 @@ $router->get('/alumnos', fn() => $students->index(), [AuthMiddleware::requireRol
 $router->post('/alumnos/store', fn() => $students->store(), [AuthMiddleware::requireRole('admin')]);
     $router->post('/alumnos/update', fn() => $students->update(), [AuthMiddleware::requireRole('admin')]);
     $router->post('/alumnos/delete', fn() => $students->delete(), [AuthMiddleware::requireRole('admin')]);
+    $router->post('/alumnos/bulk-delete', fn() => $students->bulkDelete(), [AuthMiddleware::requireRole('admin')]);
     $router->get('/alumnos/get', fn() => $students->get(), [AuthMiddleware::requireRole('admin')]);
     $router->get('/alumnos/detalle', fn() => $students->show(), [AuthMiddleware::requireRole('admin')]);
     $router->post('/alumnos/enroll', fn() => $students->enroll(), [AuthMiddleware::requireRole('admin')]);
@@ -184,6 +185,7 @@ $router->get('/subjects/export/pdf', fn() => (new App\Controllers\SubjectsContro
 $router->get('/subjects/export/xlsx', fn() => (new App\Controllers\SubjectsController($pdo))->exportXlsx(), [AuthMiddleware::requireRole('admin')]);
 $router->post('/subjects/create', fn() => (new App\Controllers\SubjectsController($pdo))->create(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('subjects_create', 30, 600)]);
 $router->post('/subjects/delete', fn() => (new App\Controllers\SubjectsController($pdo))->delete(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('subjects_delete', 30, 600)]);
+$router->post('/subjects/bulk-delete', fn() => (new App\Controllers\SubjectsController($pdo))->bulkDelete(), [AuthMiddleware::requireRole('admin')]);
 // Actualizar materias
 $router->post('/subjects/update', fn() => (new App\Controllers\SubjectsController($pdo))->update(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('subjects_update', 30, 600)]);
 // Asociaciones materia <-> carrera
@@ -194,6 +196,7 @@ $router->get('/groups', fn() => (new App\Controllers\GroupsController($pdo))->in
 $router->post('/groups/create', fn() => (new App\Controllers\GroupsController($pdo))->create(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('groups_create', 30, 600)]);
 $router->post('/groups/update_professor', fn() => (new App\Controllers\GroupsController($pdo))->updateProfessor(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('groups_update_professor', 30, 600)]);
 $router->post('/groups/delete', fn() => (new App\Controllers\GroupsController($pdo))->delete(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('groups_delete', 30, 600)]);
+$router->post('/groups/bulk-delete', fn() => (new App\Controllers\GroupsController($pdo))->bulkDelete(), [AuthMiddleware::requireRole('admin')]);
 $router->get('/api/groups/schedules', fn() => (new App\Controllers\GroupsController($pdo))->schedules(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 $router->post('/groups/schedules/add', fn() => (new App\Controllers\GroupsController($pdo))->addSchedule(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('groups_schedule_add', 50, 600)]);
 $router->post('/groups/schedules/delete', fn() => (new App\Controllers\GroupsController($pdo))->deleteSchedule(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('groups_schedule_delete', 50, 600)]);

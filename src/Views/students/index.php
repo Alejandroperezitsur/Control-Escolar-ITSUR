@@ -32,19 +32,6 @@ ob_start();
                 <option value="0">Todos los grupos</option>
                 <?php foreach (($groups ?? []) as $g): ?>
                     <option value="<?= $g['id'] ?>" <?= ((int)($_GET['group'] ?? 0) === $g['id']) ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($g['nombre']) ?> - <?= htmlspecialchars($g['materia_nombre']) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-            <button class="btn btn-sm btn-outline-secondary" type="submit" data-bs-toggle="tooltip" title="Buscar"><i class="fa-solid fa-magnifying-glass"></i></button>
-        </form>
-        <button class="btn btn-sm btn-primary" onclick="openCreateModal()" data-bs-toggle="tooltip" title="Registrar un nuevo alumno">
-            <i class="fa-solid fa-plus me-1"></i> Nuevo Alumno
-        </button>
-        <a href="/public/app.php?r=/dashboard" class="btn btn-sm btn-outline-secondary">Volver</a>
-    </div>
-  </div>
-
   <div class="card shadow-sm border-0">
     <div class="card-body p-0">
       <div class="table-responsive">
@@ -70,7 +57,8 @@ ob_start();
             }
             ?>
             <tr>
-              <th class="ps-4"><?= sortLink('matricula', 'Matrícula', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
+              <th class="ps-4" style="width: 40px;"><input type="checkbox" class="form-check-input" id="selectAll"></th>
+              <th class="ps-2"><?= sortLink('matricula', 'Matrícula', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th><?= sortLink('nombre', 'Nombre Completo', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th><?= sortLink('email', 'Email', $currentSort, $currentOrder, $baseParams, $currentPath) ?></th>
               <th>Carrera</th>
@@ -84,7 +72,8 @@ ob_start();
                 <tr><td colspan="5" class="text-center py-5 text-muted">No se encontraron alumnos.</td></tr>
             <?php else: foreach ($students as $s): ?>
               <tr>
-                <td class="ps-4 fw-medium"><a href="/public/app.php?r=/alumnos/detalle&id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['matricula']) ?></a></td>
+                <td class="ps-4"><input type="checkbox" class="form-check-input student-check" value="<?= $s['id'] ?>"></td>
+                <td class="ps-2 fw-medium"><a href="/public/app.php?r=/alumnos/detalle&id=<?= (int)$s['id'] ?>" class="text-decoration-none"><?= htmlspecialchars($s['matricula']) ?></a></td>
                 <td>
                     <div class="d-flex align-items-center">
                         <div class="avatar-initials bg-primary-subtle text-primary rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.85rem;">
@@ -458,6 +447,77 @@ function deleteStudent(id) {
         showToast('Error de red', 'danger');
     });
 }
+
+function updateBulkDeleteBtn() {
+    const checks = document.querySelectorAll('.student-check:checked');
+    const btn = document.getElementById('bulkDeleteBtn');
+    const countSpan = document.getElementById('selectedCount');
+    
+    if (checks.length > 0) {
+        btn.classList.remove('d-none');
+        countSpan.textContent = checks.length;
+    } else {
+        btn.classList.add('d-none');
+    }
+}
+
+document.getElementById('selectAll')?.addEventListener('change', function(e) {
+    const checks = document.querySelectorAll('.student-check');
+    checks.forEach(c => c.checked = e.target.checked);
+    updateBulkDeleteBtn();
+});
+
+document.querySelectorAll('.student-check').forEach(c => {
+    c.addEventListener('change', updateBulkDeleteBtn);
+});
+
+function bulkDeleteStudents() {
+    const checks = document.querySelectorAll('.student-check:checked');
+    if (checks.length === 0) return;
+    
+    if (!confirm(`¿Estás seguro de eliminar ${checks.length} alumnos seleccionados? Esta acción no se puede deshacer.`)) return;
+    
+    const ids = Array.from(checks).map(c => c.value);
+    const formData = new FormData();
+    formData.append('ids', JSON.stringify(ids));
+    formData.append('csrf_token', '<?= $_SESSION['csrf_token'] ?? '' ?>');
+    
+    const btn = document.getElementById('bulkDeleteBtn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Eliminando...';
+    
+    fetch(`${API_BASE_URL}/app.php?r=/alumnos/bulk-delete`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin'
+    })
+    .then(response => response.text().then(text => {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Raw response:', text);
+            throw new Error('Respuesta inválida del servidor');
+        }
+    }))
+    .then(data => {
+        if(data.success) {
+            showToast(`${data.deleted} alumnos eliminados`, 'warning');
+            setTimeout(() => location.reload(), 600);
+        } else {
+            showToast(data.error || 'Error al eliminar', 'danger');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    })
+    .catch(e => {
+        console.error(e);
+        showToast('Error de red', 'danger');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
 
 function showToast(message, type = 'success') {
     try {

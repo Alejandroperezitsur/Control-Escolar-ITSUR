@@ -46,6 +46,7 @@ ob_start();
     <table class="table table-striped">
       <thead>
         <tr>
+          <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="selectAll"></th>
           <th data-sort="id" role="button">ID <span class="ms-1" id="sort-id"></span></th>
           <th data-sort="materia" role="button">Materia <span class="ms-1" id="sort-materia"></span></th>
           <th data-sort="profesor" role="button">Profesor <span class="ms-1" id="sort-profesor"></span></th>
@@ -58,6 +59,7 @@ ob_start();
       <tbody>
         <?php foreach (($groups ?? []) as $g): ?>
         <tr>
+          <td><input type="checkbox" class="form-check-input group-check" value="<?= $g['id'] ?>"></td>
           <td><?= htmlspecialchars($g['id']) ?></td>
           <td><a href="<?= $base; ?>/subjects/detail?id=<?= (int)($g['materia_id'] ?? 0) ?>" class="text-decoration-none"><?= htmlspecialchars($g['materia'] ?? '') ?></a></td>
           <td><a href="<?= $base; ?>/professors/detail?id=<?= (int)($g['profesor_id'] ?? 0) ?>" class="text-decoration-none"><?= htmlspecialchars($g['profesor'] ?? '') ?></a></td>
@@ -104,6 +106,9 @@ ob_start();
     </select>
     <button type="button" id="btn-export" class="btn btn-sm btn-outline-secondary ms-2"><i class="fa-solid fa-file-csv me-1"></i> Exportar CSV</button>
     <button type="button" id="btn-export-pdf" class="btn btn-sm btn-outline-secondary ms-2"><i class="fa-solid fa-file-pdf me-1"></i> Exportar PDF</button>
+    <button id="bulkDeleteBtn" class="btn btn-sm btn-danger d-none ms-2" onclick="bulkDeleteGroups()" data-bs-toggle="tooltip" title="Eliminar seleccionados">
+        <i class="fa-solid fa-trash me-1"></i> Eliminar (<span id="selectedCount">0</span>)
+    </button>
   </div>
   <div class="d-flex justify-content-between align-items-center mt-2">
     <div>
@@ -381,6 +386,86 @@ function updateUrlParams(){
   const url = location.pathname + (qs ? ('?' + qs) : '');
   history.replaceState(null, '', url);
 }
+  if (SORT_DIR) params.set('dir', SORT_DIR);
+  const qs = params.toString();
+  const url = location.pathname + (qs ? ('?' + qs) : '');
+  history.replaceState(null, '', url);
+}
+
+window.updateBulkDeleteBtn = function() {
+    const checks = document.querySelectorAll('.group-check:checked');
+    const btn = document.getElementById('bulkDeleteBtn');
+    const countSpan = document.getElementById('selectedCount');
+    
+    if (checks.length > 0) {
+        btn.classList.remove('d-none');
+        countSpan.textContent = checks.length;
+    } else {
+        btn.classList.add('d-none');
+    }
+};
+
+document.getElementById('selectAll')?.addEventListener('change', function(e) {
+    const checks = document.querySelectorAll('.group-check');
+    // Only select visible rows
+    const visibleChecks = Array.from(checks).filter(c => c.closest('tr').style.display !== 'none');
+    visibleChecks.forEach(c => c.checked = e.target.checked);
+    updateBulkDeleteBtn();
+});
+
+// Use delegation for dynamic rows
+document.querySelector('table tbody').addEventListener('change', function(e) {
+    if (e.target.classList.contains('group-check')) {
+        updateBulkDeleteBtn();
+    }
+});
+
+window.bulkDeleteGroups = function() {
+    const checks = document.querySelectorAll('.group-check:checked');
+    if (checks.length === 0) return;
+    
+    if (!confirm(`¿Estás seguro de eliminar ${checks.length} grupos seleccionados? Esta acción no se puede deshacer.`)) return;
+    
+    const ids = Array.from(checks).map(c => c.value);
+    const formData = new FormData();
+    formData.append('ids', JSON.stringify(ids));
+    formData.append('csrf_token', '<?= $csrf ?>');
+    
+    const btn = document.getElementById('bulkDeleteBtn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Eliminando...';
+    
+    fetch('<?php echo $base; ?>/groups/bulk-delete', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin'
+    })
+    .then(response => response.text().then(text => {
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('Raw response:', text);
+            throw new Error('Respuesta inválida del servidor');
+        }
+    }))
+    .then(data => {
+        if(data.success) {
+            alert(`${data.deleted} grupos eliminados`);
+            location.reload();
+        } else {
+            alert(data.error || 'Error al eliminar');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    })
+    .catch(e => {
+        console.error(e);
+        alert('Error de red');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+};
 </script>
 
 <?php

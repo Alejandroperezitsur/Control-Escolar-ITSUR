@@ -485,6 +485,55 @@ class SubjectsController
         $_SESSION['flash'] = 'Materia creada'; $_SESSION['flash_type'] = 'success'; header('Location: /subjects');
     }
 
+    public function bulkDelete(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['error' => 'Método no permitido']); return; }
+        if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo json_encode(['error' => 'No autorizado']); return; }
+        
+        $token = $_POST['csrf_token'] ?? '';
+        if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { 
+            http_response_code(403); 
+            echo json_encode(['error' => 'CSRF inválido']); 
+            return; 
+        }
+        
+        $ids = json_decode($_POST['ids'] ?? '[]', true);
+        if (!is_array($ids) || empty($ids)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'No se seleccionaron materias']);
+            return;
+        }
+        
+        // Sanitize IDs
+        $ids = array_map('intval', $ids);
+        $ids = array_filter($ids, fn($id) => $id > 0);
+        
+        if (empty($ids)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'IDs inválidos']);
+            return;
+        }
+        
+        // Check for dependencies (groups)
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $chk = $this->pdo->prepare("SELECT COUNT(*) FROM grupos WHERE materia_id IN ($placeholders)");
+        $chk->execute($ids);
+        if ($chk->fetchColumn() > 0) {
+            http_response_code(409);
+            echo json_encode(['error' => 'No se pueden eliminar materias que tienen grupos asignados.']);
+            return;
+        }
+        
+        $stmt = $this->pdo->prepare("DELETE FROM materias WHERE id IN ($placeholders)");
+        
+        if ($stmt->execute($ids)) {
+            echo json_encode(['success' => true, 'deleted' => $stmt->rowCount()]);
+        } else {
+            http_response_code(500);
+            echo json_encode(['error' => 'Error al eliminar materias']);
+        }
+    }
+
     public function delete(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }

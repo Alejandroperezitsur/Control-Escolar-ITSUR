@@ -138,6 +138,54 @@ class GroupsController
             \App\Utils\Logger::info('group_delete', ['id' => $id]);
             $_SESSION['flash'] = $ok ? 'Grupo eliminado' : 'Error al eliminar grupo';
             $_SESSION['flash_type'] = $ok ? 'warning' : 'danger';
+            header('Location: /groups');
+            exit;
+        }
+    }
+
+    public function bulkDelete(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['error' => 'Método no permitido']); return; }
+        if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo json_encode(['error' => 'No autorizado']); return; }
+        
+        $this->assertCsrf();
+        
+        $ids = json_decode($_POST['ids'] ?? '[]', true);
+        if (!is_array($ids) || empty($ids)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'No se seleccionaron grupos']);
+            return;
+        }
+        
+        // Sanitize IDs
+        $ids = array_map('intval', $ids);
+        $ids = array_filter($ids, fn($id) => $id > 0);
+        
+        if (empty($ids)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'IDs inválidos']);
+            return;
+        }
+        
+        $deletedCount = 0;
+        foreach ($ids as $id) {
+            if ($this->service->delete($id)) {
+                $deletedCount++;
+            }
+        }
+        
+        if ($deletedCount > 0) {
+            echo json_encode(['success' => true, 'deleted' => $deletedCount]);
+        } else {
+            http_response_code(500);
+            echo json_encode(['error' => 'Error al eliminar grupos']);
+        }
+    }
+
+    private function assertCsrf(): void
+    {
+        $token = $_POST['csrf_token'] ?? '';
+        if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
             http_response_code(403);
             exit('CSRF inválido');
         }
