@@ -136,6 +136,9 @@ class StudentsController
 
         $allGroups = $this->pdo->query('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia FROM grupos g JOIN materias m ON m.id = g.materia_id ORDER BY g.ciclo DESC, m.nombre, g.nombre')->fetchAll(PDO::FETCH_ASSOC);
 
+        $careersStmt = $this->pdo->query("SELECT id, nombre, clave FROM carreras WHERE activo = 1 ORDER BY nombre");
+        $careers = $careersStmt->fetchAll(PDO::FETCH_ASSOC);
+
         ob_start();
         include __DIR__ . '/../Views/students/show.php';
         return ob_get_clean();
@@ -256,8 +259,8 @@ class StudentsController
             ':apellido' => $data['apellido'],
             ':email' => $data['email'] ?? null,
             ':activo' => isset($data['activo']) ? 1 : 0,
-            // Determine career_id based on matricula if not provided
-            ':carrera_id' => $this->getCareerIdFromMatricula($data['matricula']),
+            // Use provided career_id or derive from matricula
+            ':carrera_id' => !empty($data['carrera_id']) ? $data['carrera_id'] : $this->getCareerIdFromMatricula($data['matricula']),
             ':fecha_nac' => !empty($data['fecha_nac']) ? $data['fecha_nac'] : null,
             ':id' => $id
         ];

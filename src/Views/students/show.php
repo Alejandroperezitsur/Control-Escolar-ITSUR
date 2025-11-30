@@ -41,6 +41,15 @@ ob_start();
                 <div class="invalid-feedback">Ingresa un correo válido.</div>
               </div>
               <div class="mb-3">
+                <label for="carrera_id" class="form-label">Carrera</label>
+                <select class="form-select" id="carrera_id" name="carrera_id">
+                    <option value="">Selecciona una carrera...</option>
+                    <?php foreach (($careers ?? []) as $c): ?>
+                        <option value="<?= $c['id'] ?>"><?= htmlspecialchars($c['nombre']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+              </div>
+              <div class="mb-3">
                 <label for="password" class="form-label">Contraseña</label>
                 <input type="password" class="form-control" id="password" name="password" placeholder="Dejar en blanco para mantener actual">
                 <div class="form-text small text-muted" id="passwordHelp">Dejar en blanco para mantener la contraseña actual.</div>
@@ -272,6 +281,7 @@ function openEditModal(id) {
       document.getElementById('nombre').value = data.nombre;
       document.getElementById('apellido').value = data.apellido;
       document.getElementById('email').value = data.email || '';
+      document.getElementById('carrera_id').value = data.carrera_id || '';
       const act = document.getElementById('activo'); if(act) act.checked = data.activo == 1;
       document.getElementById('modalTitle').textContent = 'Editar Alumno';
       const pwd = document.getElementById('password'); if(pwd) { pwd.placeholder = 'Dejar en blanco para mantener actual'; pwd.required = false; }
