@@ -62,7 +62,10 @@ $charts = new ChartsController($pdo);
 $catalogs = new CatalogsController($pdo);
 $professorsCtl = new ProfessorsController($pdo);
 $adminSettings = new AdminSettingsController();
+$adminSettings = new AdminSettingsController();
 $careers = new CareersController($pdo);
+$planes = new \App\Controllers\PlanesController($pdo);
+$aulas = new \App\Controllers\AulasController($pdo);
 
 // Rutas públicas
 $router->get('/login', fn() => $auth->showLogin());
@@ -116,6 +119,20 @@ $router->get('/api/careers/curriculum/available-subjects', fn() => $careers->get
 $router->post('/api/careers/curriculum/add', fn() => $careers->addSubjectToCurriculum(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('curriculum_add', 20, 600)]);
 $router->post('/api/careers/curriculum/update', fn() => $careers->updateSubjectInCurriculum(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('curriculum_update', 20, 600)]);
 $router->post('/api/careers/curriculum/remove', fn() => $careers->removeSubjectFromCurriculum(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('curriculum_remove', 20, 600)]);
+
+// Planes de Estudio
+$router->get('/planes', fn() => $planes->index(), [AuthMiddleware::requireRole('admin')]);
+$router->post('/planes/store', fn() => $planes->store(), [AuthMiddleware::requireRole('admin')]);
+$router->post('/planes/update', fn() => $planes->update(), [AuthMiddleware::requireRole('admin')]);
+$router->post('/planes/delete', fn() => $planes->delete(), [AuthMiddleware::requireRole('admin')]);
+$router->get('/planes/get', fn() => $planes->get(), [AuthMiddleware::requireRole('admin')]);
+
+// Aulas
+$router->get('/aulas', fn() => $aulas->index(), [AuthMiddleware::requireRole('admin')]);
+$router->post('/aulas/store', fn() => $aulas->store(), [AuthMiddleware::requireRole('admin')]);
+$router->post('/aulas/update', fn() => $aulas->update(), [AuthMiddleware::requireRole('admin')]);
+$router->post('/aulas/delete', fn() => $aulas->delete(), [AuthMiddleware::requireRole('admin')]);
+$router->get('/aulas/get', fn() => $aulas->get(), [AuthMiddleware::requireRole('admin')]);
 
 // Catálogos (para selects dinámicos)
 $router->get('/api/catalogs/subjects', fn() => $catalogs->subjects(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
@@ -182,6 +199,9 @@ $router->post('/alumnos/store', fn() => $students->store(), [AuthMiddleware::req
     $router->get('/alumnos/detalle', fn() => $students->show(), [AuthMiddleware::requireRole('admin')]);
     $router->post('/alumnos/enroll', fn() => $students->enroll(), [AuthMiddleware::requireRole('admin')]);
     $router->post('/alumnos/unenroll', fn() => $students->unenroll(), [AuthMiddleware::requireRole('admin')]);
+
+// Student Kardex
+$router->get('/alumnos/kardex', fn() => $students->kardex(), [AuthMiddleware::requireRole('admin')]);
 
 // CRUD Subjects/Groups
 $router->get('/subjects', fn() => (new App\Controllers\SubjectsController($pdo))->index(), [AuthMiddleware::requireRole('admin')]);

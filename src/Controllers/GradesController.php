@@ -151,6 +151,12 @@ class GradesController
                 ':p2' => $p2,
                 ':fin' => $fin,
             ]);
+            
+            // Sync to Kardex if final grade is present
+            if ($fin !== null) {
+                $this->syncToKardex($alumnoId, $grupoId, (float)$fin);
+            }
+
             $count += $stmt->rowCount();
             $processed++;
         }
@@ -302,6 +308,11 @@ class GradesController
             }
             $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, parcial3, parcial4, parcial5, final, promedio) VALUES (:a, :g, :p1, :p2, :p3, :p4, :p5, :fin, :prom)');
             $ins->execute([':a' => $alumnoId, ':g' => $grupoId, ':p1' => $p1, ':p2' => $p2, ':p3' => $p3, ':p4' => $p4, ':p5' => $p5, ':fin' => $fin, ':prom' => $prom]);
+        }
+
+        // Sync to Kardex if final grade is present
+        if ($fin !== null) {
+            $this->syncToKardex($alumnoId, $grupoId, (float)$fin);
         }
 
         try {
@@ -569,5 +580,58 @@ class GradesController
         foreach ($rows as $row) { $xml .= $makeRow($row); }
         $xml .= '</sheetData></worksheet>';
         return $xml;
+    }
+    private function syncToKardex(int $alumnoId, int $grupoId, float $finalGrade): void
+    {
+        try {
+            // Get group info (materia, ciclo)
+            $stmt = $this->pdo->prepare("SELECT materia_id, ciclo FROM grupos WHERE id = :gid");
+            $stmt->execute([':gid' => $grupoId]);
+            $group = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$group) return;
+            
+            $materiaId = (int)$group['materia_id'];
+            $periodo = $group['ciclo'];
+            
+            // Get credits
+            $stmtM = $this->pdo->prepare("SELECT creditos FROM materias WHERE id = :mid");
+            $stmtM->execute([':mid' => $materiaId]);
+            $creditos = (int)$stmtM->fetchColumn();
+            
+            $estatus = ($finalGrade >= 70) ? 'Aprobada' : 'Reprobada';
+            $creditosObtenidos = ($estatus === 'Aprobada') ? $creditos : 0;
+            
+            // Upsert into kardex
+            $upsert = $this->pdo->prepare("
+                INSERT INTO kardex (alumno_id, materia_id, periodo, calificacion, estatus, creditos_obtenidos)
+                VALUES (:aid, :mid, :per, :cal, :st, :cred)
+                ON DUPLICATE KEY UPDATE 
+                    calificacion = VALUES(calificacion),
+                    estatus = VALUES(estatus),
+                    creditos_obtenidos = VALUES(creditos_obtenidos)
+            ");
+            // Note: kardex table doesn't have a unique key on (alumno, materia, periodo) in the migration script I wrote?
+            // Let's check the migration script. 
+            // I defined: PRIMARY KEY (`id`), INDEX `idx_kardex_alumno`, INDEX `idx_kardex_materia`.
+            // I did NOT define a UNIQUE KEY on (alumno_id, materia_id, periodo).
+            // So INSERT ON DUPLICATE KEY UPDATE won't work as expected unless I add that unique key.
+            // I should check if record exists first.
+            
+            $check = $this->pdo->prepare("SELECT id FROM kardex WHERE alumno_id = :aid AND materia_id = :mid AND periodo = :per");
+            $check->execute([':aid' => $alumnoId, ':mid' => $materiaId, ':per' => $periodo]);
+            $kId = $check->fetchColumn();
+            
+            if ($kId) {
+                $upd = $this->pdo->prepare("UPDATE kardex SET calificacion = :cal, estatus = :st, creditos_obtenidos = :cred WHERE id = :id");
+                $upd->execute([':cal' => $finalGrade, ':st' => $estatus, ':cred' => $creditosObtenidos, ':id' => $kId]);
+            } else {
+                $ins = $this->pdo->prepare("INSERT INTO kardex (alumno_id, materia_id, periodo, calificacion, estatus, creditos_obtenidos) VALUES (:aid, :mid, :per, :cal, :st, :cred)");
+                $ins->execute([':aid' => $alumnoId, ':mid' => $materiaId, ':per' => $periodo, ':cal' => $finalGrade, ':st' => $estatus, ':cred' => $creditosObtenidos]);
+            }
+        } catch (\Throwable $e) {
+            // Log error but don't stop execution
+            \App\Utils\Logger::error('kardex_sync_error', ['error' => $e->getMessage()]);
+        }
     }
 }

@@ -763,6 +763,54 @@ class StudentsController
         ]);
     }
 
+    public function kardex(): string
+    {
+        $this->checkAdmin();
+        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        if (!$id) { http_response_code(400); return 'ID inválido'; }
+
+        // Get student info
+        $stmt = $this->pdo->prepare("SELECT a.*, c.nombre as carrera_nombre, c.clave as carrera_clave FROM alumnos a LEFT JOIN carreras c ON a.carrera_id = c.id WHERE a.id = :id");
+        $stmt->execute([':id' => $id]);
+        $alumno = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$alumno) { http_response_code(404); return 'Alumno no encontrado'; }
+
+        // Get Kardex entries (consolidated history)
+        // If kardex table is empty, we might want to generate it on the fly from calificaciones for now?
+        // The migration created 'kardex' table. Ideally we populate it when grades are finalized.
+        // For now, let's query the 'kardex' table.
+        $kStmt = $this->pdo->prepare("
+            SELECT k.*, m.nombre as materia_nombre, m.clave as materia_clave, m.creditos
+            FROM kardex k
+            JOIN materias m ON k.materia_id = m.id
+            WHERE k.alumno_id = :id
+            ORDER BY k.periodo, m.nombre
+        ");
+        $kStmt->execute([':id' => $id]);
+        $entries = $kStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Calculate statistics
+        $creditosAcumulados = 0;
+        $promedioAcumulado = 0;
+        $totalMaterias = 0;
+        $sumaCalificaciones = 0;
+
+        foreach ($entries as $e) {
+            if ($e['estatus'] === 'Aprobada') {
+                $creditosAcumulados += $e['creditos_obtenidos'];
+                $sumaCalificaciones += $e['calificacion'];
+                $totalMaterias++;
+            }
+        }
+        if ($totalMaterias > 0) {
+            $promedioAcumulado = round($sumaCalificaciones / $totalMaterias, 2);
+        }
+
+        ob_start();
+        include __DIR__ . '/../Views/students/kardex.php';
+        return ob_get_clean();
+    }
+
     private function getCareerIdFromMatricula(string $matricula): ?int
     {
         $prefix = strtoupper(substr($matricula, 0, 1));

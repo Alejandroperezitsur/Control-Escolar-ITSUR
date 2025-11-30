@@ -8,6 +8,7 @@ class GroupsService
 {
     private PDO $pdo;
     private ?string $lastError = null;
+    
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
@@ -42,7 +43,7 @@ class GroupsService
     public function studentsInGroup(int $grupoId): array
     {
         $sql = "SELECT a.id, a.matricula, a.nombre, a.apellido,
-                       c.parcial1, c.parcial2, c.final, c.promedio
+                       c.parcial1, c.parcial2, c.parcial3, c.parcial4, c.parcial5, c.final, c.promedio
                 FROM calificaciones c
                 JOIN alumnos a ON a.id = c.alumno_id
                 WHERE c.grupo_id = :grupoId
@@ -98,6 +99,7 @@ class GroupsService
         $nombre = trim((string)($data['nombre'] ?? ''));
         $ciclo = trim((string)($data['ciclo'] ?? ''));
         $cupo = (int)($data['cupo'] ?? 30);
+        $aulaId = (int)($data['aula_id'] ?? 0);
 
         // cupo 1-100
         if ($cupo < 1 || $cupo > 100) {
@@ -122,6 +124,12 @@ class GroupsService
             Logger::info('group_validation_failed', ['reason' => 'profesor_missing_or_inactive', 'profesor_id' => $profesorId]);
             return false;
         }
+        // aula existe (si se proporciona)
+        if ($aulaId > 0 && !$this->exists('aulas', $aulaId)) {
+            $this->lastError = 'Aula no existe';
+            Logger::info('group_validation_failed', ['reason' => 'aula_missing', 'aula_id' => $aulaId]);
+            return false;
+        }
         // unicidad
         if ($this->existsGroupCombo($data, $excludeId)) {
             $this->lastError = 'Ya existe un grupo con la misma materia, profesor, nombre y ciclo';
@@ -141,21 +149,26 @@ class GroupsService
     public function create(array $data): bool
     {
         if (!$this->validate($data, null)) { return false; }
-        $stmt = $this->pdo->prepare('INSERT INTO grupos (materia_id, profesor_id, nombre, ciclo, cupo) VALUES (:materia_id, :profesor_id, :nombre, :ciclo, :cupo)');
+        $stmt = $this->pdo->prepare('INSERT INTO grupos (materia_id, profesor_id, nombre, ciclo, cupo, aula_id) VALUES (:materia_id, :profesor_id, :nombre, :ciclo, :cupo, :aula_id)');
         return $stmt->execute([
             ':materia_id' => (int)($data['materia_id'] ?? 0),
             ':profesor_id' => (int)($data['profesor_id'] ?? 0),
             ':nombre' => trim((string)($data['nombre'] ?? '')),
             ':ciclo' => trim((string)($data['ciclo'] ?? '')),
             ':cupo' => (int)($data['cupo'] ?? 30),
+            ':aula_id' => ($data['aula_id'] ?? 0) > 0 ? (int)$data['aula_id'] : null,
         ]);
     }
 
     public function update(int $id, array $data): bool
     {
-        if ($id <= 0) { $this->lastError = 'ID de grupo inválido'; Logger::info('group_validation_failed', ['reason' => 'invalid_id', 'id' => $id]); return false; }
+        if ($id <= 0) { 
+            $this->lastError = 'ID de grupo inválido'; 
+            Logger::info('group_validation_failed', ['reason' => 'invalid_id', 'id' => $id]); 
+            return false; 
+        }
         if (!$this->validate($data, $id)) { return false; }
-        $stmt = $this->pdo->prepare('UPDATE grupos SET materia_id = :materia_id, profesor_id = :profesor_id, nombre = :nombre, ciclo = :ciclo, cupo = :cupo WHERE id = :id');
+        $stmt = $this->pdo->prepare('UPDATE grupos SET materia_id = :materia_id, profesor_id = :profesor_id, nombre = :nombre, ciclo = :ciclo, cupo = :cupo, aula_id = :aula_id WHERE id = :id');
         return $stmt->execute([
             ':id' => $id,
             ':materia_id' => (int)($data['materia_id'] ?? 0),
@@ -163,6 +176,7 @@ class GroupsService
             ':nombre' => trim((string)($data['nombre'] ?? '')),
             ':ciclo' => trim((string)($data['ciclo'] ?? '')),
             ':cupo' => (int)($data['cupo'] ?? 30),
+            ':aula_id' => ($data['aula_id'] ?? 0) > 0 ? (int)$data['aula_id'] : null,
         ]);
     }
 
