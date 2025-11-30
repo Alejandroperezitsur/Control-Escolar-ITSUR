@@ -323,7 +323,7 @@ class CatalogsController
         $key = 'groups_' . $profesorId;
         $cached = $this->getCache($key);
         if ($cached !== null) { echo json_encode($cached); return; }
-        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia FROM grupos g JOIN materias m ON m.id = g.materia_id WHERE g.profesor_id = :p ORDER BY g.ciclo DESC, m.nombre, g.nombre');
+        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, m.num_parciales FROM grupos g JOIN materias m ON m.id = g.materia_id WHERE g.profesor_id = :p ORDER BY g.ciclo DESC, m.nombre, g.nombre');
         $stmt->execute([':p' => $profesorId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $this->setCache($key, $rows);
@@ -336,7 +336,7 @@ class CatalogsController
         $this->ensureCompleteData();
         $cached = $this->getCache('groups_all');
         if ($cached !== null) { echo json_encode($cached); return; }
-        $stmt = $this->pdo->query('SELECT g.id, g.nombre, g.ciclo, g.profesor_id, m.nombre AS materia FROM grupos g JOIN materias m ON m.id = g.materia_id ORDER BY g.ciclo DESC, m.nombre, g.nombre');
+        $stmt = $this->pdo->query('SELECT g.id, g.nombre, g.ciclo, g.profesor_id, m.nombre AS materia, m.num_parciales FROM grupos g JOIN materias m ON m.id = g.materia_id ORDER BY g.ciclo DESC, m.nombre, g.nombre');
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $this->setCache('groups_all', $rows);
         echo json_encode($rows);

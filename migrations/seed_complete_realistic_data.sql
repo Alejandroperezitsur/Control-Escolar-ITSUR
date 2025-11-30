@@ -1,16 +1,17 @@
 -- SCRIPT GENERADO AUTOMATICAMENTE
 SET FOREIGN_KEY_CHECKS = 0;
-TRUNCATE TABLE `calificaciones`;
-TRUNCATE TABLE `inscripciones`;
-TRUNCATE TABLE `horarios`;
-TRUNCATE TABLE `grupos`;
-TRUNCATE TABLE `materias`;
-TRUNCATE TABLE `alumnos`;
+DELETE FROM `calificaciones`;
+DELETE FROM `inscripciones`;
+DELETE FROM `horarios`;
+DELETE FROM `grupos`;
+DELETE FROM `materias`;
+DELETE FROM `alumnos`;
 DELETE FROM `usuarios` WHERE rol != 'admin';
 ALTER TABLE `alumnos` AUTO_INCREMENT = 1;
 ALTER TABLE `grupos` AUTO_INCREMENT = 1;
 ALTER TABLE `materias` AUTO_INCREMENT = 1;
 ALTER TABLE `usuarios` AUTO_INCREMENT = 2;
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- Insertar 100 alumnos por carrera (700 total)
 INSERT INTO `alumnos` (`matricula`, `nombre`, `apellido`, `email`, `password`, `fecha_nac`, `carrera_id`, `activo`) VALUES
@@ -19366,3 +19367,74 @@ INSERT INTO `calificaciones` (`alumno_id`, `grupo_id`, `parcial1`, `parcial2`, `
 
 SET FOREIGN_KEY_CHECKS = 1;
 COMMIT;
+ 
+ - -   S c h e m a   u p d a t e s   f o r   F l e x i b l e   G r a d i n g   a n d   S u b j e c t   C R U D  
+ - -   A d d e d   b y   A n t i g r a v i t y  
+  
+ S E T   @ d b n a m e   =   D A T A B A S E ( ) ;  
+ S E T   @ t a b l e n a m e   =   " c a l i f i c a c i o n e s " ;  
+ S E T   @ c o l u m n n a m e   =   " p a r c i a l 3 " ;  
+ S E T   @ p r e p a r e d S t a t e m e n t   =   ( S E L E C T   I F (  
+     (  
+         S E L E C T   C O U N T ( * )   F R O M   I N F O R M A T I O N _ S C H E M A . C O L U M N S  
+         W H E R E  
+             ( t a b l e _ n a m e   =   @ t a b l e n a m e )  
+             A N D   ( t a b l e _ s c h e m a   =   @ d b n a m e )  
+             A N D   ( c o l u m n _ n a m e   =   @ c o l u m n n a m e )  
+     )   >   0 ,  
+     " S E L E C T   1 " ,  
+     " A L T E R   T A B L E   c a l i f i c a c i o n e s   A D D   C O L U M N   p a r c i a l 3   I N T   N U L L   A F T E R   p a r c i a l 2 "  
+ ) ) ;  
+ P R E P A R E   a l t e r I f N o t E x i s t s   F R O M   @ p r e p a r e d S t a t e m e n t ;  
+ E X E C U T E   a l t e r I f N o t E x i s t s ;  
+ D E A L L O C A T E   P R E P A R E   a l t e r I f N o t E x i s t s ;  
+  
+ S E T   @ c o l u m n n a m e   =   " p a r c i a l 4 " ;  
+ S E T   @ p r e p a r e d S t a t e m e n t   =   ( S E L E C T   I F (  
+     (  
+         S E L E C T   C O U N T ( * )   F R O M   I N F O R M A T I O N _ S C H E M A . C O L U M N S  
+         W H E R E  
+             ( t a b l e _ n a m e   =   @ t a b l e n a m e )  
+             A N D   ( t a b l e _ s c h e m a   =   @ d b n a m e )  
+             A N D   ( c o l u m n _ n a m e   =   @ c o l u m n n a m e )  
+     )   >   0 ,  
+     " S E L E C T   1 " ,  
+     " A L T E R   T A B L E   c a l i f i c a c i o n e s   A D D   C O L U M N   p a r c i a l 4   I N T   N U L L   A F T E R   p a r c i a l 3 "  
+ ) ) ;  
+ P R E P A R E   a l t e r I f N o t E x i s t s   F R O M   @ p r e p a r e d S t a t e m e n t ;  
+ E X E C U T E   a l t e r I f N o t E x i s t s ;  
+ D E A L L O C A T E   P R E P A R E   a l t e r I f N o t E x i s t s ;  
+  
+ S E T   @ c o l u m n n a m e   =   " p a r c i a l 5 " ;  
+ S E T   @ p r e p a r e d S t a t e m e n t   =   ( S E L E C T   I F (  
+     (  
+         S E L E C T   C O U N T ( * )   F R O M   I N F O R M A T I O N _ S C H E M A . C O L U M N S  
+         W H E R E  
+             ( t a b l e _ n a m e   =   @ t a b l e n a m e )  
+             A N D   ( t a b l e _ s c h e m a   =   @ d b n a m e )  
+             A N D   ( c o l u m n _ n a m e   =   @ c o l u m n n a m e )  
+     )   >   0 ,  
+     " S E L E C T   1 " ,  
+     " A L T E R   T A B L E   c a l i f i c a c i o n e s   A D D   C O L U M N   p a r c i a l 5   I N T   N U L L   A F T E R   p a r c i a l 4 "  
+ ) ) ;  
+ P R E P A R E   a l t e r I f N o t E x i s t s   F R O M   @ p r e p a r e d S t a t e m e n t ;  
+ E X E C U T E   a l t e r I f N o t E x i s t s ;  
+ D E A L L O C A T E   P R E P A R E   a l t e r I f N o t E x i s t s ;  
+  
+ S E T   @ t a b l e n a m e   =   " m a t e r i a s " ;  
+ S E T   @ c o l u m n n a m e   =   " n u m _ p a r c i a l e s " ;  
+ S E T   @ p r e p a r e d S t a t e m e n t   =   ( S E L E C T   I F (  
+     (  
+         S E L E C T   C O U N T ( * )   F R O M   I N F O R M A T I O N _ S C H E M A . C O L U M N S  
+         W H E R E  
+             ( t a b l e _ n a m e   =   @ t a b l e n a m e )  
+             A N D   ( t a b l e _ s c h e m a   =   @ d b n a m e )  
+             A N D   ( c o l u m n _ n a m e   =   @ c o l u m n n a m e )  
+     )   >   0 ,  
+     " S E L E C T   1 " ,  
+     " A L T E R   T A B L E   m a t e r i a s   A D D   C O L U M N   n u m _ p a r c i a l e s   I N T   N O T   N U L L   D E F A U L T   3 "  
+ ) ) ;  
+ P R E P A R E   a l t e r I f N o t E x i s t s   F R O M   @ p r e p a r e d S t a t e m e n t ;  
+ E X E C U T E   a l t e r I f N o t E x i s t s ;  
+ D E A L L O C A T E   P R E P A R E   a l t e r I f N o t E x i s t s ;  
+ 

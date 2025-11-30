@@ -22,9 +22,16 @@ ob_start();
       <i class="fa-solid fa-graduation-cap me-2"></i>
       Carreras y Planes de Estudio
     </h2>
-    <a href="<?php echo $base; ?>/dashboard" class="btn btn-outline-secondary">
-      <i class="fa-solid fa-arrow-left me-1"></i> Volver al Dashboard
-    </a>
+    <div>
+      <?php if (isset($_SESSION['user']) && $_SESSION['user']['rol'] === 'admin'): ?>
+        <button class="btn btn-primary me-2" id="toggleEditMode">
+          <i class="fa-solid fa-edit me-1"></i> Editar Plan
+        </button>
+      <?php endif; ?>
+      <a href="<?php echo $base; ?>/dashboard" class="btn btn-outline-secondary">
+        <i class="fa-solid fa-arrow-left me-1"></i> Volver al Dashboard
+      </a>
+    </div>
   </div>
 
   <?php if (empty($carreras)): ?>
@@ -104,6 +111,117 @@ ob_start();
       <?php endforeach; ?>
     </div>
   <?php endif; ?>
+</div>
+
+<!-- Modal: Agregar Materia -->
+<div class="modal fade" id="addSubjectModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title"><i class="fa-solid fa-plus me-2"></i>Agregar Materia al Plan</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addSubjectForm">
+          <input type="hidden" id="add_carrera_id" name="carrera_id">
+          <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token'] ?? ''; ?>">
+          
+          <div class="mb-3">
+            <label class="form-label">Materia</label>
+            <select class="form-select" id="add_materia_id" name="materia_id" required>
+              <option value="">Cargando...</option>
+            </select>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Semestre</label>
+            <select class="form-select" name="semestre" required>
+              <?php for($i=1; $i<=8; $i++): ?>
+                <option value="<?php echo $i; ?>">Semestre <?php echo $i; ?></option>
+              <?php endfor; ?>
+            </select>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Créditos</label>
+              <input type="number" class="form-control" name="creditos" min="1" max="10" value="5" required>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Tipo</label>
+              <select class="form-select" name="tipo" required>
+                <option value="Básica">Básica</option>
+                <option value="Especialidad">Especialidad</option>
+              </select>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="saveAddSubject()">
+          <i class="fa-solid fa-save me-1"></i>Agregar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Editar Materia -->
+<div class="modal fade" id="editSubjectModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title"><i class="fa-solid fa-edit me-2"></i>Editar Materia</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editSubjectForm">
+          <input type="hidden" id="edit_mc_id" name="mc_id">
+          <input type="hidden" id="edit_materia_id" name="materia_id">
+          <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token'] ?? ''; ?>">
+          
+          <div class="mb-3">
+            <label class="form-label">Materia</label>
+            <input type="text" class="form-control" id="edit_materia_nombre" readonly>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Semestre</label>
+            <select class="form-select" id="edit_semestre" name="semestre" required>
+              <?php for($i=1; $i<=8; $i++): ?>
+                <option value="<?php echo $i; ?>">Semestre <?php echo $i; ?></option>
+              <?php endfor; ?>
+            </select>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Créditos</label>
+              <input type="number" class="form-control" id="edit_creditos" name="creditos" min="1" max="10" required>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Tipo</label>
+              <select class="form-select" id="edit_tipo" name="tipo" required>
+                <option value="Básica">Básica</option>
+                <option value="Especialidad">Especialidad</option>
+              </select>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">Parciales</label>
+              <input type="number" class="form-control" id="edit_parciales" name="num_parciales" min="2" max="5" required>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-warning" onclick="saveEditSubject()">
+          <i class="fa-solid fa-save me-1"></i>Guardar Cambios
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -225,65 +343,22 @@ ob_start();
 </style>
 
 <script>
-// Lazy load curriculum data
+let isEditMode = false;
+const basePath = '<?php echo $base; ?>';
+
 document.addEventListener('DOMContentLoaded', function() {
-  const basePath = '<?php echo $base; ?>';
   
-  // Function to load curriculum for a specific container
-  const loadCurriculum = (container) => {
-    // Check if already loaded or loading
-    if (container.dataset.loaded === 'true' || container.dataset.loading === 'true') return;
-    
-    const careerClave = container.dataset.careerClave;
-    if (!careerClave) {
-        container.innerHTML = `
-            <div class="col-12">
-                <div class="alert alert-warning">
-                    <i class="fa-solid fa-exclamation-triangle me-2"></i>
-                    No se encontró la clave de la carrera.
-                </div>
-            </div>
-        `;
-        return;
-    }
-    
-    // Mark as loading
-    container.dataset.loading = 'true';
-    
-    fetch(`${basePath}/api/careers/curriculum?career=${encodeURIComponent(careerClave)}`)
-      .then(response => response.json())
-      .then(data => {
-        if (data.error) {
-          container.innerHTML = `
-            <div class="col-12">
-              <div class="alert alert-warning">
-                <i class="fa-solid fa-exclamation-triangle me-2"></i>
-                ${data.error}
-              </div>
-            </div>
-          `;
-        } else {
-          container.innerHTML = renderCurriculum(data, basePath);
-        }
-        // Mark as loaded
-        container.dataset.loaded = 'true';
-      })
-      .catch(error => {
-        console.error('Error loading curriculum:', error);
-        container.innerHTML = `
-          <div class="col-12">
-            <div class="alert alert-danger">
-              <i class="fa-solid fa-exclamation-circle me-2"></i>
-              Error al cargar el plan de estudios.
-              <button class="btn btn-sm btn-outline-danger ms-3" onclick="location.reload()">Reintentar</button>
-            </div>
-          </div>
-        `;
-      })
-      .finally(() => {
-        container.dataset.loading = 'false';
-      });
-  };
+  // Toggle Edit Mode
+  const toggleBtn = document.getElementById('toggleEditMode');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function() {
+      isEditMode = !isEditMode;
+      this.innerHTML = isEditMode ? '<i class="fa-solid fa-check me-1"></i> Terminar Edición' : '<i class="fa-solid fa-edit me-1"></i> Editar Plan';
+      this.classList.toggle('btn-primary');
+      this.classList.toggle('btn-success');
+      reloadCurrentTab();
+    });
+  }
 
   // 1. Load the initially active tab
   const activeTabPane = document.querySelector('.tab-pane.active');
@@ -296,7 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const tabEls = document.querySelectorAll('button[data-bs-toggle="tab"]');
   tabEls.forEach(tabEl => {
     tabEl.addEventListener('shown.bs.tab', event => {
-      const targetId = event.target.getAttribute('data-bs-target'); // e.g. #career-1
+      const targetId = event.target.getAttribute('data-bs-target');
       const targetPane = document.querySelector(targetId);
       if (targetPane) {
         const container = targetPane.querySelector('[id^="curriculum-"]');
@@ -306,63 +381,160 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+function loadCurriculum(container) {
+    // Check if already loaded or loading (unless force reload)
+    if (container.dataset.loading === 'true') return;
+    if (container.dataset.loaded === 'true' && !container.dataset.forceReload) return;
+    
+    const careerClave = container.dataset.careerClave;
+    if (!careerClave) return;
+    
+    container.dataset.loading = 'true';
+    container.innerHTML = `
+        <div class="col-12">
+          <div class="d-flex justify-content-center align-items-center py-5">
+            <div class="spinner-border text-primary me-3" role="status"></div>
+            <span class="text-muted">Cargando plan de estudios...</span>
+          </div>
+        </div>
+    `;
+    
+    fetch(`${basePath}/api/careers/curriculum?career=${encodeURIComponent(careerClave)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.error) {
+          container.innerHTML = `<div class="col-12"><div class="alert alert-warning">${data.error}</div></div>`;
+        } else {
+          container.innerHTML = renderCurriculum(data, basePath);
+        }
+        container.dataset.loaded = 'true';
+        delete container.dataset.forceReload;
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        container.innerHTML = `<div class="col-12"><div class="alert alert-danger">Error al cargar el plan.</div></div>`;
+      })
+      .finally(() => {
+        container.dataset.loading = 'false';
+      });
+}
+
+function reloadCurrentTab() {
+    const activeTabPane = document.querySelector('.tab-pane.active');
+    if (activeTabPane) {
+        const container = activeTabPane.querySelector('[id^="curriculum-"]');
+        if (container) {
+            container.dataset.forceReload = 'true';
+            loadCurriculum(container);
+        }
+    }
+}
+
 function renderCurriculum(semesters, basePath) {
   if (!semesters || semesters.length === 0) {
-    return `
+    let emptyHtml = `
       <div class="col-12">
         <div class="alert alert-info">
           <i class="fa-solid fa-info-circle me-2"></i>
-          <strong>Próximamente:</strong> El plan de estudios para esta carrera estará disponible pronto.
-          Por ahora, puedes gestionar las materias desde el módulo de <a href="${basePath}/subjects" class="alert-link">Materias</a>.
+          <strong>Próximamente:</strong> El plan de estudios estará disponible pronto.
         </div>
       </div>
     `;
+    // If edit mode, show button to add first semester
+    if (isEditMode) {
+        emptyHtml += `
+            <div class="col-12 text-center">
+                <button class="btn btn-primary" onclick="openAddModal(1, event)">
+                    <i class="fa-solid fa-plus me-2"></i> Agregar Primera Materia
+                </button>
+            </div>
+        `;
+    }
+    return emptyHtml;
   }
   
   let html = '';
   
-  semesters.forEach(semester => {
+  // Find max semester to ensure we show all columns up to max or 8
+  let maxSem = 0;
+  semesters.forEach(s => maxSem = Math.max(maxSem, s.semester));
+  if (isEditMode) maxSem = Math.max(maxSem, 8); // Show up to 8 semesters in edit mode
+
+  // Create map for easy access
+  const semMap = {};
+  semesters.forEach(s => semMap[s.semester] = s);
+
+  for (let i = 1; i <= maxSem; i++) {
+    const semester = semMap[i] || { semester: i, subjects: [] };
     const semesterNum = semester.semester;
     const subjects = semester.subjects || [];
     const isResidencias = semesterNum === 9;
     const headerClass = isResidencias ? 'bg-success text-white' : ('sem-' + (semesterNum % 9));
     
+    let addBtn = '';
+    if (isEditMode) {
+        addBtn = `
+            <div class="text-center mt-3 pt-2 border-top">
+                <button class="btn btn-sm btn-outline-primary w-100" onclick="openAddModal(${semesterNum}, event)">
+                    <i class="fa-solid fa-plus"></i> Agregar
+                </button>
+            </div>
+        `;
+    }
+
     html += `
-      <div class="col-md-6 col-lg-4 col-xl-3 semester-column">
+      <div class="col-md-6 col-lg-4 col-xl-3 semester-column mb-4">
         <div class="semester-header ${headerClass}">
           <h5 class="mb-1">Semestre ${semesterNum}</h5>
           <small>${subjects.length} materia${subjects.length !== 1 ? 's' : ''}</small>
-          ${isResidencias ? '<div class="mt-2"><i class="fa-solid fa-star me-1"></i><strong>Requisitos:</strong> 10 niveles de Inglés + Servicio Social</div>' : ''}
         </div>
         <div class="subjects-list">
-          ${subjects.map(subject => renderSubjectCard(subject, isResidencias)).join('')}
+          ${subjects.map(subject => renderSubjectCard(subject)).join('')}
         </div>
+        ${addBtn}
       </div>
     `;
-  });
+  }
   
   return html;
 }
 
-function renderSubjectCard(subject, isResidencias) {
-  const typeClass = subject.type === 'especialidad' ? 'specialty' : 
-                   subject.type === 'residencia' ? 'residencia' : 'general';
-  const typeLabel = subject.type === 'especialidad' ? 'Especialidad' : 
-                   subject.type === 'residencia' ? 'Residencia' : 'Básica';
-  const typeColor = subject.type === 'especialidad' ? 'primary' : 
-                   subject.type === 'residencia' ? 'success' : 'secondary';
+function renderSubjectCard(subject) {
+  const typeClass = subject.type === 'Especialidad' ? 'specialty' : 'general';
+  const typeLabel = subject.type;
+  const typeColor = subject.type === 'Especialidad' ? 'primary' : 'secondary';
+  
+  let actions = '';
+  if (isEditMode) {
+    // Escape quotes for onclick
+    const safeName = subject.name.replace(/'/g, "\\'");
+    actions = `
+        <div class="mt-2 d-flex justify-content-end gap-2 border-top pt-2" onclick="event.stopPropagation()">
+            <button class="btn btn-sm btn-outline-warning" 
+                onclick="openEditModal(${subject.mc_id}, ${subject.materia_id}, '${safeName}', ${subject.credits}, '${subject.type}', ${subject.parciales}, ${subject.semester || 0}, event)">
+                <i class="fa-solid fa-edit"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" 
+                onclick="deleteSubject(${subject.mc_id}, '${safeName}', event)">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>
+    `;
+  }
   
   return `
-    <div class="card subject-card ${typeClass} mb-3" onclick="showSubjectDetails('${subject.code}', '${subject.name.replace(/'/g, "\\'")}')" data-bs-toggle="tooltip" title="Ver detalles de ${subject.name}">
+    <div class="card subject-card ${typeClass} mb-3" onclick="if(!isEditMode) showSubjectDetails('${subject.code}', '${subject.name.replace(/'/g, "\\'")}')">
       <div class="card-body p-3">
         <h6 class="card-title mb-2" style="color: #000000 !important;">${subject.name}</h6>
         <div class="d-flex justify-content-between align-items-center flex-wrap">
           <span class="subject-code text-uppercase">${subject.code}</span>
           <span class="badge subject-credits bg-${typeColor}">${subject.credits} créditos</span>
         </div>
-        <div class="mt-2">
+        <div class="mt-2 d-flex justify-content-between align-items-center">
           <span class="badge bg-light text-dark border">${typeLabel}</span>
+          ${subject.parciales ? `<span class="badge bg-info text-dark" title="Parciales">${subject.parciales} P</span>` : ''}
         </div>
+        ${actions}
       </div>
     </div>
   `;
@@ -370,6 +542,125 @@ function renderSubjectCard(subject, isResidencias) {
 
 function showSubjectDetails(code, name) {
   alert(`Materia: ${name}\nClave: ${code}\n\nFuncionalidad de detalles en desarrollo.`);
+}
+
+// --- CRUD Operations ---
+
+function openAddModal(semestre, event) {
+    if(event) event.stopPropagation();
+    
+    // Get current career ID
+    const activeTabPane = document.querySelector('.tab-pane.active');
+    const container = activeTabPane.querySelector('[id^="curriculum-"]');
+    const careerClave = container.dataset.careerClave;
+    
+    // Find career ID from tab ID (career-X)
+    const careerId = activeTabPane.id.replace('career-', '');
+    document.getElementById('add_carrera_id').value = careerId;
+    
+    // Set semester
+    const semSelect = document.querySelector('#addSubjectForm select[name="semestre"]');
+    semSelect.value = semestre;
+    
+    // Load available subjects
+    const select = document.getElementById('add_materia_id');
+    select.innerHTML = '<option value="">Cargando...</option>';
+    
+    fetch(`${basePath}/api/careers/curriculum/available-subjects?career=${encodeURIComponent(careerClave)}`)
+        .then(res => res.json())
+        .then(data => {
+            select.innerHTML = '<option value="">Seleccione una materia...</option>';
+            data.forEach(m => {
+                select.innerHTML += `<option value="${m.id}">${m.nombre} (${m.clave}) - ${m.creditos} cr</option>`;
+            });
+        })
+        .catch(err => {
+            console.error(err);
+            select.innerHTML = '<option value="">Error al cargar materias</option>';
+        });
+        
+    const modal = new bootstrap.Modal(document.getElementById('addSubjectModal'));
+    modal.show();
+}
+
+function saveAddSubject() {
+    const form = document.getElementById('addSubjectForm');
+    const data = Object.fromEntries(new FormData(form).entries());
+    
+    fetch(`${basePath}/api/careers/curriculum/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            bootstrap.Modal.getInstance(document.getElementById('addSubjectModal')).hide();
+            reloadCurrentTab();
+        }
+    })
+    .catch(err => alert('Error de red'));
+}
+
+function openEditModal(mcId, materiaId, nombre, creditos, tipo, parciales, semestre, event) {
+    if(event) event.stopPropagation();
+    
+    document.getElementById('edit_mc_id').value = mcId;
+    document.getElementById('edit_materia_id').value = materiaId;
+    document.getElementById('edit_materia_nombre').value = nombre;
+    document.getElementById('edit_creditos').value = creditos;
+    document.getElementById('edit_tipo').value = tipo;
+    document.getElementById('edit_parciales').value = parciales;
+    document.getElementById('edit_semestre').value = semestre || 1;
+    
+    const modal = new bootstrap.Modal(document.getElementById('editSubjectModal'));
+    modal.show();
+}
+
+function saveEditSubject() {
+    const form = document.getElementById('editSubjectForm');
+    const data = Object.fromEntries(new FormData(form).entries());
+    
+    fetch(`${basePath}/api/careers/curriculum/update`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            bootstrap.Modal.getInstance(document.getElementById('editSubjectModal')).hide();
+            reloadCurrentTab();
+        }
+    })
+    .catch(err => alert('Error de red'));
+}
+
+function deleteSubject(mcId, nombre, event) {
+    if(event) event.stopPropagation();
+    
+    if(!confirm(`¿Estás seguro de eliminar "${nombre}" del plan de estudios?`)) return;
+    
+    const csrf = document.querySelector('input[name="csrf_token"]').value;
+    
+    fetch(`${basePath}/api/careers/curriculum/remove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mc_id: mcId, csrf_token: csrf })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if(data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            reloadCurrentTab();
+        }
+    })
+    .catch(err => alert('Error de red'));
 }
 </script>
 

@@ -139,8 +139,10 @@ ob_start();
             <tr>
               <th>Matrícula</th>
               <th>Alumno</th>
-              <th class="text-end">Parcial 1</th>
-              <th class="text-end">Parcial 2</th>
+              <?php $numParciales = (int)($grp['num_parciales'] ?? 2); ?>
+              <?php for($i=1; $i<=$numParciales; $i++): ?>
+                <th class="text-end">Parcial <?= $i ?></th>
+              <?php endfor; ?>
               <th class="text-end">Final</th>
               <th class="text-end">Promedio</th>
             </tr>
@@ -148,8 +150,6 @@ ob_start();
           <tbody id="grpTableBody">
             <?php if (!empty($rows)): foreach ($rows as $r): ?>
             <?php
-              $p1 = isset($r['parcial1']) && $r['parcial1'] !== '' ? (float)$r['parcial1'] : null;
-              $p2 = isset($r['parcial2']) && $r['parcial2'] !== '' ? (float)$r['parcial2'] : null;
               $fin = isset($r['final']) && $r['final'] !== '' ? (float)$r['final'] : null;
               $prom = isset($r['promedio']) && $r['promedio'] !== '' ? (float)$r['promedio'] : null;
               $cls = function($v){ if ($v === null) return 'text-muted'; return $v >= 70 ? 'text-success' : 'text-danger'; };
@@ -158,13 +158,15 @@ ob_start();
             <tr data-state="<?= $state ?>">
               <td><?= htmlspecialchars($r['matricula'] ?? '') ?></td>
               <td><?= htmlspecialchars(($r['nombre'] ?? '') . ' ' . ($r['apellido'] ?? '')) ?></td>
-              <td class="text-end"><span class="<?= $cls($p1) ?>"><?= htmlspecialchars($r['parcial1'] ?? '') ?></span></td>
-              <td class="text-end"><span class="<?= $cls($p2) ?>"><?= htmlspecialchars($r['parcial2'] ?? '') ?></span></td>
+              <?php for($i=1; $i<=$numParciales; $i++): ?>
+                <?php $p = isset($r['parcial'.$i]) && $r['parcial'.$i] !== '' ? (float)$r['parcial'.$i] : null; ?>
+                <td class="text-end"><span class="<?= $cls($p) ?>"><?= htmlspecialchars($r['parcial'.$i] ?? '') ?></span></td>
+              <?php endfor; ?>
               <td class="text-end"><span class="<?= $cls($fin) ?>"><?= htmlspecialchars($r['final'] ?? '') ?></span></td>
               <td class="text-end"><span class="<?= $cls($prom) ?>"><?= htmlspecialchars($r['promedio'] ?? '') ?></span></td>
             </tr>
             <?php endforeach; else: ?>
-            <tr><td colspan="6" class="text-muted">No hay calificaciones registradas en este grupo.</td></tr>
+            <tr><td colspan="<?= $numParciales + 4 ?>" class="text-muted">No hay calificaciones registradas en este grupo.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
@@ -173,19 +175,30 @@ ob_start();
   </div>
 
   <?php 
-    $sumP1 = 0; $cntP1 = 0; $sumP2 = 0; $cntP2 = 0; $sumFin = 0; $cntFin = 0;
+    $sums = array_fill(1, 5, 0); $cnts = array_fill(1, 5, 0);
+    $sumFin = 0; $cntFin = 0;
     $distLabels = ['0-59','60-69','70-79','80-89','90-100'];
-    $distP1 = [0,0,0,0,0];
-    $distP2 = [0,0,0,0,0];
+    $dists = [];
+    for($i=1; $i<=5; $i++) $dists[$i] = [0,0,0,0,0];
     $distFin = [0,0,0,0,0];
     $bucket = function (float $v): int { if ($v < 60) return 0; if ($v < 70) return 1; if ($v < 80) return 2; if ($v < 90) return 3; return 4; };
+    
     foreach (($rows ?? []) as $r) {
-      if (($r['parcial1'] ?? '') !== '') { $v=(float)$r['parcial1']; $sumP1 += $v; $cntP1++; $distP1[$bucket($v)]++; }
-      if (($r['parcial2'] ?? '') !== '') { $v=(float)$r['parcial2']; $sumP2 += $v; $cntP2++; $distP2[$bucket($v)]++; }
+      for($i=1; $i<=$numParciales; $i++) {
+        if (($r['parcial'.$i] ?? '') !== '') { 
+            $v=(float)$r['parcial'.$i]; 
+            $sums[$i] += $v; 
+            $cnts[$i]++; 
+            $dists[$i][$bucket($v)]++; 
+        }
+      }
       if (($r['final'] ?? '') !== '') { $v=(float)$r['final']; $sumFin += $v; $cntFin++; $distFin[$bucket($v)]++; }
     }
-    $avgP1 = $cntP1 > 0 ? round($sumP1 / $cntP1, 2) : 0;
-    $avgP2 = $cntP2 > 0 ? round($sumP2 / $cntP2, 2) : 0;
+    
+    $avgs = [];
+    for($i=1; $i<=$numParciales; $i++) {
+        $avgs[$i] = $cnts[$i] > 0 ? round($sums[$i] / $cnts[$i], 2) : 0;
+    }
     $avgFin = $cntFin > 0 ? round($sumFin / $cntFin, 2) : 0;
   ?>
   <div class="card mb-3">
@@ -246,6 +259,8 @@ ob_start();
 <script>
 const BASE = '<?php echo $base; ?>';
 const GID = <?php echo (int)($grp['id'] ?? 0); ?>;
+const NUM_PARCIALES = <?php echo $numParciales; ?>;
+
 function loadSchedules(){
   fetch(`${BASE}/api/groups/schedules?grupo_id=${GID}`).then(r=>r.json()).then(j=>{
     const tb = document.getElementById('sched-body');
@@ -282,35 +297,66 @@ document.addEventListener('DOMContentLoaded', loadSchedules);
       var perfEl = document.getElementById('grpPerf');
       var distEl = document.getElementById('grpDist');
       if (perfEl) {
+        var labels = [];
+        var data = [];
+        var bgColors = [];
+        var borderColors = [];
+        
+        <?php for($i=1; $i<=$numParciales; $i++): ?>
+            labels.push('Parcial <?= $i ?>');
+            data.push(<?= json_encode($avgs[$i]) ?>);
+            bgColors.push('rgba(13,110,253,.35)');
+            borderColors.push('#0d6efd');
+        <?php endfor; ?>
+        
+        labels.push('Final');
+        data.push(<?= json_encode($avgFin) ?>);
+        bgColors.push('rgba(25,135,84,.35)');
+        borderColors.push('#198754');
+        
         var perfData = {
-          labels: ['Parcial 1','Parcial 2','Final'],
+          labels: labels,
           datasets: [{
             label: 'Promedio',
-            data: [<?= json_encode($avgP1) ?>, <?= json_encode($avgP2) ?>, <?= json_encode($avgFin) ?>],
-            backgroundColor: ['rgba(13,110,253,.35)','rgba(255,193,7,.35)','rgba(25,135,84,.35)'],
-            borderColor: ['#0d6efd','#ffc107','#198754'],
+            data: data,
+            backgroundColor: bgColors,
+            borderColor: borderColors,
             borderWidth: 1,
           }]
         };
         new Chart(perfEl, { type: 'bar', data: perfData, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, suggestedMax: 100 } }, plugins: { legend: { display: false } } } });
         try {
           var initSel = document.getElementById('avgSel');
-          var initIdx = (initSel && initSel.value === 'promedio') ? 5 : 4;
+          var initIdx = (initSel && initSel.value === 'promedio') ? (NUM_PARCIALES + 3) : (NUM_PARCIALES + 2);
           updateChart(initIdx);
         } catch(e) {}
       }
       if (distEl) {
         var distLabels = <?= json_encode($distLabels) ?>;
-        var distDataP1 = <?= json_encode(array_map('intval', $distP1)) ?>;
-        var distDataP2 = <?= json_encode(array_map('intval', $distP2)) ?>;
-        var distDataFin = <?= json_encode(array_map('intval', $distFin)) ?>;
+        var datasets = [];
+        var colors = ['#0d6efd', '#ffc107', '#0dcaf0', '#d63384', '#6610f2'];
+        
+        <?php for($i=1; $i<=$numParciales; $i++): ?>
+            datasets.push({
+                label: 'Parcial <?= $i ?>',
+                data: <?= json_encode(array_map('intval', $dists[$i])) ?>,
+                backgroundColor: 'rgba(13,110,253,.35)',
+                borderColor: colors[<?= $i-1 ?> % 5],
+                borderWidth: 1
+            });
+        <?php endfor; ?>
+        
+        datasets.push({
+            label: 'Final',
+            data: <?= json_encode(array_map('intval', $distFin)) ?>,
+            backgroundColor: 'rgba(25,135,84,.35)',
+            borderColor: '#198754',
+            borderWidth: 1
+        });
+        
         var distData = {
           labels: distLabels,
-          datasets: [
-            { label: 'Parcial 1', data: distDataP1, backgroundColor: 'rgba(13,110,253,.35)', borderColor: '#0d6efd', borderWidth: 1 },
-            { label: 'Parcial 2', data: distDataP2, backgroundColor: 'rgba(255,193,7,.35)', borderColor: '#ffc107', borderWidth: 1 },
-            { label: 'Final', data: distDataFin, backgroundColor: 'rgba(25,135,84,.35)', borderColor: '#198754', borderWidth: 1 }
-          ]
+          datasets: datasets
         };
         new Chart(distEl, { type: 'bar', data: distData, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } } });
       }
@@ -326,25 +372,44 @@ document.addEventListener('DOMContentLoaded', loadSchedules);
     var tb = document.getElementById('grpTableBody');
     if (!tb) { return; }
     var rows = tb.querySelectorAll('tr');
-    var sumP1 = 0, cntP1 = 0;
-    var sumP2 = 0, cntP2 = 0;
-    var sumSel = 0, cntSel = 0;
+    
+    var sums = new Array(NUM_PARCIALES + 2).fill(0); // P1..Pn, Final, Promedio
+    var cnts = new Array(NUM_PARCIALES + 2).fill(0);
+    
     rows.forEach(function (r) {
       if (r.style.display === 'none') { return; }
       var cells = r.querySelectorAll('td');
-      if (cells.length < 6) { return; }
-      var p1 = cells[2] ? String(cells[2].textContent || '').trim() : '';
-      var p2 = cells[3] ? String(cells[3].textContent || '').trim() : '';
-      var sel = cells[colIdx] ? String(cells[colIdx].textContent || '').trim() : '';
-      if (p1 !== '') { var v1 = Number(p1.replace(',', '.')); if (!isNaN(v1)) { sumP1 += v1; cntP1++; } }
-      if (p2 !== '') { var v2 = Number(p2.replace(',', '.')); if (!isNaN(v2)) { sumP2 += v2; cntP2++; } }
-      if (sel !== '') { var vs = Number(sel.replace(',', '.')); if (!isNaN(vs)) { sumSel += vs; cntSel++; } }
+      if (cells.length < NUM_PARCIALES + 4) { return; }
+      
+      // Cells: 0=Mat, 1=Nom, 2=P1, ..., 2+N-1=Pn, 2+N=Final, 2+N+1=Prom
+      for(let i=0; i<NUM_PARCIALES; i++) {
+          let txt = cells[2+i] ? String(cells[2+i].textContent || '').trim() : '';
+          if(txt !== '') {
+              let v = Number(txt.replace(',', '.'));
+              if(!isNaN(v)) { sums[i] += v; cnts[i]++; }
+          }
+      }
+      
+      // Selected column for last bar (Final or Promedio)
+      let selTxt = cells[colIdx] ? String(cells[colIdx].textContent || '').trim() : '';
+      if(selTxt !== '') {
+          let vs = Number(selTxt.replace(',', '.'));
+          if(!isNaN(vs)) { sums[NUM_PARCIALES] += vs; cnts[NUM_PARCIALES]++; }
+      }
     });
-    var avgP1 = cntP1 > 0 ? Math.round((sumP1 / cntP1) * 100) / 100 : 0;
-    var avgP2 = cntP2 > 0 ? Math.round((sumP2 / cntP2) * 100) / 100 : 0;
-    var avgSel = cntSel > 0 ? Math.round((sumSel / cntSel) * 100) / 100 : 0;
-    chart.data.labels = ['Parcial 1','Parcial 2', (colIdx === 5 ? 'Promedio' : 'Final')];
-    chart.data.datasets[0].data = [avgP1, avgP2, avgSel];
+    
+    var avgs = [];
+    for(let i=0; i<NUM_PARCIALES; i++) {
+        avgs.push(cnts[i] > 0 ? Math.round((sums[i] / cnts[i]) * 100) / 100 : 0);
+    }
+    avgs.push(cnts[NUM_PARCIALES] > 0 ? Math.round((sums[NUM_PARCIALES] / cnts[NUM_PARCIALES]) * 100) / 100 : 0);
+    
+    let labels = [];
+    for(let i=1; i<=NUM_PARCIALES; i++) labels.push('Parcial ' + i);
+    labels.push(colIdx === (NUM_PARCIALES + 3) ? 'Promedio' : 'Final');
+    
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = avgs;
     chart.update();
   }
   (function(){
@@ -358,7 +423,8 @@ document.addEventListener('DOMContentLoaded', loadSchedules);
       if (initial) { sel.value = initial; }
       var apply = function(){
         var v = sel.value;
-        var colIdx = (avgSel && avgSel.value === 'promedio') ? 5 : 4;
+        // Col index for stats: 2 + NUM_PARCIALES = Final, +1 = Promedio
+        var colIdx = (avgSel && avgSel.value === 'promedio') ? (NUM_PARCIALES + 3) : (NUM_PARCIALES + 2);
         var rows = tb.querySelectorAll('tr');
         var count = 0;
         var sum = 0;

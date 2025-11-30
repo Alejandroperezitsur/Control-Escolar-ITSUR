@@ -181,8 +181,21 @@ class GradesController
 
         $alumnoId = isset($_POST['alumno_id']) ? filter_var($_POST['alumno_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : null;
         $grupoId = isset($_POST['grupo_id']) ? filter_var($_POST['grupo_id'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : null;
+        // Obtener configuración de parciales de la materia
+        $stmtMateria = $this->pdo->prepare("
+            SELECT m.num_parciales 
+            FROM grupos g 
+            JOIN materias m ON m.id = g.materia_id 
+            WHERE g.id = :gid
+        ");
+        $stmtMateria->execute([':gid' => $grupoId]);
+        $numParciales = (int)$stmtMateria->fetchColumn() ?: 2;
+
         $p1 = ($_POST['parcial1'] ?? '') !== '' ? filter_var($_POST['parcial1'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
         $p2 = ($_POST['parcial2'] ?? '') !== '' ? filter_var($_POST['parcial2'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+        $p3 = ($numParciales >= 3 && ($_POST['parcial3'] ?? '') !== '') ? filter_var($_POST['parcial3'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+        $p4 = ($numParciales >= 4 && ($_POST['parcial4'] ?? '') !== '') ? filter_var($_POST['parcial4'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+        $p5 = ($numParciales >= 5 && ($_POST['parcial5'] ?? '') !== '') ? filter_var($_POST['parcial5'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
         $fin = ($_POST['final'] ?? '') !== '' ? filter_var($_POST['final'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
 
         if (!$alumnoId || !$grupoId) {
@@ -232,22 +245,52 @@ class GradesController
         $stmt->execute([':a' => $alumnoId, ':g' => $grupoId]);
         $existingId = $stmt->fetchColumn();
 
-        $prom = ($fin !== null) ? (float)$fin : (($p1 !== null && $p2 !== null) ? round(($p1 + $p2) / 2, 2) : null);
+        // Get num_parciales
+        $npStmt = $this->pdo->prepare('SELECT m.num_parciales FROM grupos g JOIN materias m ON m.id = g.materia_id WHERE g.id = :gid');
+        $npStmt->execute([':gid' => $grupoId]);
+        $numParciales = (int)($npStmt->fetchColumn() ?: 3);
+        
+        $p3 = ($_POST['parcial3'] ?? '') !== '' ? filter_var($_POST['parcial3'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+        $p4 = ($_POST['parcial4'] ?? '') !== '' ? filter_var($_POST['parcial4'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+        $p5 = ($_POST['parcial5'] ?? '') !== '' ? filter_var($_POST['parcial5'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+
+        $prom = null;
+        if ($fin !== null) {
+            $prom = (float)$fin;
+        } else {
+            $sum = 0;
+            $cnt = 0;
+            $vals = [$p1, $p2, $p3, $p4, $p5];
+            $allPresent = true;
+            for ($i=0; $i<$numParciales; $i++) {
+                if ($vals[$i] === null) { $allPresent = false; break; }
+                $sum += $vals[$i];
+            }
+            if ($allPresent) {
+                $prom = round($sum / $numParciales, 2);
+            }
+        }
+
         $message = 'Calificación registrada correctamente';
         if ($existingId) {
-            $prevStmt = $this->pdo->prepare('SELECT parcial1, parcial2, final, promedio FROM calificaciones WHERE id = :id');
+            $prevStmt = $this->pdo->prepare('SELECT parcial1, parcial2, parcial3, parcial4, parcial5, final, promedio FROM calificaciones WHERE id = :id');
             $prevStmt->execute([':id' => (int)$existingId]);
             $prev = $prevStmt->fetch(PDO::FETCH_ASSOC);
             $prevP1 = ($prev['parcial1'] !== null ? (int)$prev['parcial1'] : null);
             $prevP2 = ($prev['parcial2'] !== null ? (int)$prev['parcial2'] : null);
+            $prevP3 = ($prev['parcial3'] !== null ? (int)$prev['parcial3'] : null);
+            $prevP4 = ($prev['parcial4'] !== null ? (int)$prev['parcial4'] : null);
+            $prevP5 = ($prev['parcial5'] !== null ? (int)$prev['parcial5'] : null);
             $prevFin = ($prev['final'] !== null ? (int)$prev['final'] : null);
             $prevProm = ($prev['promedio'] !== null ? (float)$prev['promedio'] : null);
-            $noChange = ($prevP1 === $p1) && ($prevP2 === $p2) && ($prevFin === $fin) && ($prevProm === $prom);
+            
+            $noChange = ($prevP1 === $p1) && ($prevP2 === $p2) && ($prevP3 === $p3) && ($prevP4 === $p4) && ($prevP5 === $p5) && ($prevFin === $fin) && ($prevProm === $prom);
+            
             if ($noChange) {
                 $message = 'Sin cambios';
             } else {
-                $upd = $this->pdo->prepare('UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin WHERE id = :id');
-                $upd->execute([':p1' => $p1, ':p2' => $p2, ':fin' => $fin, ':id' => (int)$existingId]);
+                $upd = $this->pdo->prepare('UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, parcial3 = :p3, parcial4 = :p4, parcial5 = :p5, final = :fin, promedio = :prom WHERE id = :id');
+                $upd->execute([':p1' => $p1, ':p2' => $p2, ':p3' => $p3, ':p4' => $p4, ':p5' => $p5, ':fin' => $fin, ':prom' => $prom, ':id' => (int)$existingId]);
             }
         } else {
             if ($role !== 'admin') {
@@ -257,8 +300,8 @@ class GradesController
                 header('Location: /grades');
                 return '';
             }
-            $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final) VALUES (:a, :g, :p1, :p2, :fin)');
-            $ins->execute([':a' => $alumnoId, ':g' => $grupoId, ':p1' => $p1, ':p2' => $p2, ':fin' => $fin]);
+            $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, parcial3, parcial4, parcial5, final, promedio) VALUES (:a, :g, :p1, :p2, :p3, :p4, :p5, :fin, :prom)');
+            $ins->execute([':a' => $alumnoId, ':g' => $grupoId, ':p1' => $p1, ':p2' => $p2, ':p3' => $p3, ':p4' => $p4, ':p5' => $p5, ':fin' => $fin, ':prom' => $prom]);
         }
 
         try {
@@ -294,7 +337,7 @@ class GradesController
         if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
         $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
-        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
+        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, m.num_parciales, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
         $stmt->execute([':id' => $grupoId]);
         $grp = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
@@ -323,7 +366,7 @@ class GradesController
         $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
         $estado = strtolower(trim((string)($_GET['estado'] ?? '')));
-        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
+        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, m.num_parciales, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
         $stmt->execute([':id' => $grupoId]);
         $grp = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
@@ -340,10 +383,19 @@ class GradesController
         $fname = 'grupo_' . (int)$grupoId . '_calificaciones.csv';
         header('Content-Disposition: attachment; filename="' . $fname . '"');
         $fp = fopen('php://temp', 'w+');
-        fputcsv($fp, ['Matrícula','Alumno','Parcial 1','Parcial 2','Final','Promedio']);
+        $np = (int)($grp['num_parciales'] ?? 3);
+        $header = ['Matrícula','Alumno'];
+        for ($i=1; $i<=$np; $i++) { $header[] = "Parcial $i"; }
+        $header[] = 'Final';
+        $header[] = 'Promedio';
+        fputcsv($fp, $header);
         foreach ($rows as $r) {
             $al = trim((string)($r['nombre'] ?? '')); $ap = trim((string)($r['apellido'] ?? ''));
-            fputcsv($fp, [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap), (string)($r['parcial1'] ?? ''), (string)($r['parcial2'] ?? ''), (string)($r['final'] ?? ''), (string)($r['promedio'] ?? '') ]);
+            $row = [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap) ];
+            for ($i=1; $i<=$np; $i++) { $row[] = (string)($r["parcial$i"] ?? ''); }
+            $row[] = (string)($r['final'] ?? '');
+            $row[] = (string)($r['promedio'] ?? '');
+            fputcsv($fp, $row);
         }
         rewind($fp);
         $csv = stream_get_contents($fp);
@@ -387,7 +439,7 @@ class GradesController
         $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
         $estado = strtolower(trim((string)($_GET['estado'] ?? '')));
-        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
+        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, m.num_parciales, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
         $stmt->execute([':id' => $grupoId]);
         $grp = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
@@ -400,9 +452,35 @@ class GradesController
         } elseif ($estado === 'reprobado') {
             $rowsDb = array_values(array_filter($rowsDb, fn($r) => ($r['final'] ?? null) !== null && (float)$r['final'] < 70));
         }
-        $headers = ['Matrícula','Alumno','Parcial 1','Parcial 2','Final','Promedio'];
+        $np = (int)($grp['num_parciales'] ?? 3);
+        $headers = ['Matrícula','Alumno'];
+        for ($i=1; $i<=$np; $i++) { $headers[] = "Parcial $i"; }
+        $headers[] = 'Final';
+        $headers[] = 'Promedio';
+        
         $rows = [];
-        foreach ($rowsDb as $r) { $al = trim((string)($r['nombre'] ?? '')); $ap = trim((string)($r['apellido'] ?? '')); $rows[] = [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap), (string)($r['parcial1'] ?? ''), (string)($r['parcial2'] ?? ''), (string)($r['final'] ?? ''), (string)($r['promedio'] ?? '') ]; }
+        foreach ($rowsDb as $r) { 
+            $al = trim((string)($r['nombre'] ?? '')); $ap = trim((string)($r['apellido'] ?? '')); 
+            $row = [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap) ];
+            for ($i=1; $i<=$np; $i++) { $row[] = (string)($r["parcial$i"] ?? ''); }
+            $row[] = (string)($r['final'] ?? '');
+            $row[] = (string)($r['promedio'] ?? '');
+            $rows[] = $row;
+        }
+        $headers = ['Matrícula','Alumno'];
+        for ($i=1; $i<=$np; $i++) { $headers[] = "Parcial $i"; }
+        $headers[] = 'Final';
+        $headers[] = 'Promedio';
+        
+        $rows = [];
+        foreach ($rowsDb as $r) { 
+            $al = trim((string)($r['nombre'] ?? '')); $ap = trim((string)($r['apellido'] ?? '')); 
+            $row = [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap) ];
+            for ($i=1; $i<=$np; $i++) { $row[] = (string)($r["parcial$i"] ?? ''); }
+            $row[] = (string)($r['final'] ?? '');
+            $row[] = (string)($r['promedio'] ?? '');
+            $rows[] = $row;
+        }
         if (!class_exists('ZipArchive')) { http_response_code(500); return 'ZipArchive no disponible'; }
         $tmp = tempnam(sys_get_temp_dir(), 'xlsx');
         $zip = new \ZipArchive();
@@ -461,7 +539,7 @@ class GradesController
                 return json_encode(['ok' => false, 'message' => 'No autorizado para este grupo']);
             }
         }
-        $q = $this->pdo->prepare('SELECT parcial1, parcial2, final, promedio FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g');
+        $q = $this->pdo->prepare('SELECT parcial1, parcial2, parcial3, parcial4, parcial5, final, promedio FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g');
         $q->execute([':a' => $alumnoId, ':g' => $grupoId]);
         $row = $q->fetch(PDO::FETCH_ASSOC);
         header('Content-Type: application/json');
@@ -469,6 +547,9 @@ class GradesController
         return json_encode(['ok' => true, 'data' => [
             'parcial1' => isset($row['parcial1']) ? (int)$row['parcial1'] : null,
             'parcial2' => isset($row['parcial2']) ? (int)$row['parcial2'] : null,
+            'parcial3' => isset($row['parcial3']) ? (int)$row['parcial3'] : null,
+            'parcial4' => isset($row['parcial4']) ? (int)$row['parcial4'] : null,
+            'parcial5' => isset($row['parcial5']) ? (int)$row['parcial5'] : null,
             'final' => isset($row['final']) ? (int)$row['final'] : null,
             'promedio' => isset($row['promedio']) ? (float)$row['promedio'] : null,
         ]]);

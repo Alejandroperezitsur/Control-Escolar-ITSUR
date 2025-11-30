@@ -111,6 +111,12 @@ $router->get('/careers', fn() => $careers->index(), [AuthMiddleware::requireRole
 $router->get('/api/careers/count', fn() => $careers->getCareersCount(), [AuthMiddleware::requireRole('admin')]);
 $router->get('/api/careers/curriculum', fn() => $careers->getCurriculum(), [AuthMiddleware::requireRole('admin')]);
 
+// Curriculum CRUD (admin only)
+$router->get('/api/careers/curriculum/available-subjects', fn() => $careers->getAvailableSubjects(), [AuthMiddleware::requireRole('admin')]);
+$router->post('/api/careers/curriculum/add', fn() => $careers->addSubjectToCurriculum(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('curriculum_add', 20, 600)]);
+$router->post('/api/careers/curriculum/update', fn() => $careers->updateSubjectInCurriculum(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('curriculum_update', 20, 600)]);
+$router->post('/api/careers/curriculum/remove', fn() => $careers->removeSubjectFromCurriculum(), [AuthMiddleware::requireRole('admin'), RateLimitMiddleware::limit('curriculum_remove', 20, 600)]);
+
 // Catálogos (para selects dinámicos)
 $router->get('/api/catalogs/subjects', fn() => $catalogs->subjects(), [AuthMiddleware::requireAnyRole(['admin','profesor'])]);
 $router->get('/api/catalogs/professors', fn() => $catalogs->professors(), [AuthMiddleware::requireRole('admin')]);

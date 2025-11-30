@@ -89,7 +89,7 @@ $isLogin = (isset($_GET['r']) && $_GET['r'] === '/login') || (strpos($_SERVER['R
             <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/subjects">Materias <span class="badge bg-light text-dark ms-1" id="nav-count-materias" data-bs-toggle="tooltip" title="Materias registradas">—</span><span class="badge bg-warning text-dark ms-1" id="nav-count-sinoferta" data-bs-toggle="tooltip" title="Materias sin oferta">—</span></a></li>
             <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/professors">Profesores <span class="badge bg-light text-dark ms-1" id="nav-count-profesores" data-bs-toggle="tooltip" title="Profesores activos">—</span></a></li>
             <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/groups">Grupos <span class="badge bg-light text-dark ms-1" id="nav-count-grupos" data-bs-toggle="tooltip" title="Grupos activos con calificaciones">—</span></a></li>
-            <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/admin/settings">Ajustes</a></li>
+
           <?php elseif ($role === 'profesor'): ?>
             <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/dashboard">Dashboard</a></li>
             <li class="nav-item"><a class="nav-link" href="/public/app.php?r=/reports">Reportes</a></li>
@@ -259,7 +259,7 @@ $isLogin = (isset($_GET['r']) && $_GET['r'] === '/login') || (strpos($_SERVER['R
               <li><strong>Alumnos, Profesores y Materias:</strong> Altas, bajas y cambios.</li>
               <li><strong>Grupos:</strong> Crear oferta académica y asignar profesores.</li>
               <li><strong>Reportes:</strong> Consultar estadísticas y exportar datos.</li>
-              <li><strong>Ajustes:</strong> Configurar parámetros del sistema.</li>
+
             </ul>
           <?php elseif ($role === 'profesor'): ?>
             <p><strong>Bienvenido Profesor.</strong></p>

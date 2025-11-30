@@ -424,25 +424,87 @@ class SubjectsController
         return ob_get_clean();
     }
 
+    private function isAjax(): bool {
+        return !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
+    }
+
     public function addToCareer(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
         $token = $_POST['csrf_token'] ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
+        
         $materia_id = filter_input(INPUT_POST, 'materia_id', FILTER_VALIDATE_INT);
         $carrera_id = filter_input(INPUT_POST, 'carrera_id', FILTER_VALIDATE_INT);
         $semestre = filter_input(INPUT_POST, 'semestre', FILTER_VALIDATE_INT);
         $creditos = filter_input(INPUT_POST, 'creditos', FILTER_VALIDATE_INT);
         $tipo = in_array($_POST['tipo'] ?? 'basica', ['basica','especialidad','residencia'], true) ? $_POST['tipo'] : 'basica';
-        if (!$materia_id || !$carrera_id || !$semestre) { $_SESSION['flash'] = 'Datos inválidos'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; }
+        $num_parciales = filter_input(INPUT_POST, 'num_parciales', FILTER_VALIDATE_INT);
+        if (!$num_parciales || $num_parciales < 2 || $num_parciales > 5) { $num_parciales = 3; }
+
+        if (!$materia_id || !$carrera_id || !$semestre) { 
+            if ($this->isAjax()) { echo json_encode(['success'=>false, 'message'=>'Datos inválidos']); return; }
+            $_SESSION['flash'] = 'Datos inválidos'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; 
+        }
+
         try { $this->pdo->exec("CREATE TABLE IF NOT EXISTS materias_carrera (id INT AUTO_INCREMENT PRIMARY KEY, materia_id INT NOT NULL, carrera_id INT NOT NULL, semestre TINYINT NOT NULL, tipo ENUM('basica','especialidad','residencia') DEFAULT 'basica', creditos INT DEFAULT 5, UNIQUE KEY uk_materia_carrera_semestre (materia_id, carrera_id, semestre)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"); } catch (\Throwable $e) {}
-        // Insert or update
+        
+        // Update subject partials
+        try {
+            $updM = $this->pdo->prepare('UPDATE materias SET num_parciales = :np WHERE id = :id');
+            $updM->execute([':np' => $num_parciales, ':id' => $materia_id]);
+        } catch (\Throwable $e) {}
+
+        // Insert or update association
         $ins = $this->pdo->prepare('INSERT INTO materias_carrera (materia_id, carrera_id, semestre, creditos, tipo) VALUES (:mid,:cid,:sem,:cred,:tipo) ON DUPLICATE KEY UPDATE creditos = VALUES(creditos), tipo = VALUES(tipo)');
         $ok = $ins->execute([':mid'=>$materia_id, ':cid'=>$carrera_id, ':sem'=>$semestre, ':cred'=>($creditos?:5), ':tipo'=>$tipo]);
+        
+        if ($this->isAjax()) {
+            echo json_encode(['success'=>$ok, 'message'=>$ok?'Asignación guardada':'Error al guardar']);
+            return;
+        }
+
         $_SESSION['flash'] = $ok ? 'Asignación guardada' : 'Error al guardar asignación';
         $_SESSION['flash_type'] = $ok ? 'success' : 'danger';
         header('Location: /subjects/detail?id=' . (int)$materia_id);
+    }
+
+    public function updatePlanSubject(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success'=>false, 'message'=>'Método no permitido']); return; }
+        $token = $_POST['csrf_token'] ?? '';
+        if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo json_encode(['success'=>false, 'message'=>'CSRF inválido']); return; }
+        if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo json_encode(['success'=>false, 'message'=>'No autorizado']); return; }
+
+        $mc_id = filter_input(INPUT_POST, 'mc_id', FILTER_VALIDATE_INT);
+        $materia_id = filter_input(INPUT_POST, 'materia_id', FILTER_VALIDATE_INT);
+        $semestre = filter_input(INPUT_POST, 'semestre', FILTER_VALIDATE_INT);
+        $creditos = filter_input(INPUT_POST, 'creditos', FILTER_VALIDATE_INT);
+        $tipo = in_array($_POST['tipo'] ?? '', ['basica','especialidad','residencia'], true) ? $_POST['tipo'] : 'basica';
+        $num_parciales = filter_input(INPUT_POST, 'num_parciales', FILTER_VALIDATE_INT);
+
+        if (!$mc_id || !$materia_id || !$semestre || !$creditos || !$num_parciales) {
+            echo json_encode(['success'=>false, 'message'=>'Datos incompletos']); return;
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            
+            // Update materias_carrera
+            $stmt1 = $this->pdo->prepare('UPDATE materias_carrera SET semestre = :sem, creditos = :cred, tipo = :tipo WHERE id = :id');
+            $stmt1->execute([':sem'=>$semestre, ':cred'=>$creditos, ':tipo'=>$tipo, ':id'=>$mc_id]);
+            
+            // Update materias
+            $stmt2 = $this->pdo->prepare('UPDATE materias SET num_parciales = :np WHERE id = :id');
+            $stmt2->execute([':np'=>$num_parciales, ':id'=>$materia_id]);
+            
+            $this->pdo->commit();
+            echo json_encode(['success'=>true, 'message'=>'Materia actualizada']);
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) { $this->pdo->rollBack(); }
+            echo json_encode(['success'=>false, 'message'=>'Error al actualizar: ' . $e->getMessage()]);
+        }
     }
 
     public function removeFromCareer(): void
@@ -453,17 +515,29 @@ class SubjectsController
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
         $materia_id = filter_input(INPUT_POST, 'materia_id', FILTER_VALIDATE_INT);
+        $ok = false;
         if ($id) {
             $stmt = $this->pdo->prepare('DELETE FROM materias_carrera WHERE id = :id');
             $ok = $stmt->execute([':id'=>$id]);
         } elseif ($materia_id) {
             $carrera_id = filter_input(INPUT_POST, 'carrera_id', FILTER_VALIDATE_INT);
             $semestre = filter_input(INPUT_POST, 'semestre', FILTER_VALIDATE_INT);
-            if (!$carrera_id || !$semestre) { $_SESSION['flash'] = 'Datos inválidos'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; }
+            if (!$carrera_id || !$semestre) { 
+                if ($this->isAjax()) { echo json_encode(['success'=>false, 'message'=>'Datos inválidos']); return; }
+                $_SESSION['flash'] = 'Datos inválidos'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; 
+            }
             $stmt = $this->pdo->prepare('DELETE FROM materias_carrera WHERE materia_id = :mid AND carrera_id = :cid AND semestre = :sem');
             $ok = $stmt->execute([':mid'=>$materia_id, ':cid'=>$carrera_id, ':sem'=>$semestre]);
         } else {
-            $_SESSION['flash'] = 'ID inválido'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; }
+            if ($this->isAjax()) { echo json_encode(['success'=>false, 'message'=>'ID inválido']); return; }
+            $_SESSION['flash'] = 'ID inválido'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; 
+        }
+        
+        if ($this->isAjax()) {
+            echo json_encode(['success'=>$ok, 'message'=>$ok?'Asignación eliminada':'Error al eliminar']);
+            return;
+        }
+        
         $_SESSION['flash'] = $ok ? 'Asignación eliminada' : 'Error al eliminar'; $_SESSION['flash_type'] = $ok ? 'success' : 'danger';
         header('Location: /subjects/detail?id=' . (int)($materia_id ?? 0));
     }

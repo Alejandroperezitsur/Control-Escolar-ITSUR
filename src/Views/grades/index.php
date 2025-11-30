@@ -35,16 +35,9 @@ ob_start();
             </div>
             <span class="badge bg-warning text-dark ms-2" id="pendingBadge">Pendientes: —</span>
           </div>
-          <div class="col-md-4">
-            <label class="form-label">Parcial 1</label>
-            <input type="number" min="0" max="100" step="1" name="parcial1" class="form-control" placeholder="0-100" data-bs-toggle="tooltip" title="Calificación del primer parcial">
-            <div class="invalid-feedback">Ingresa un número entre 0 y 100.</div>
+          <div id="partials-container" class="contents" style="display:contents;">
+            <!-- Dynamic partials will be inserted here -->
           </div>
-        <div class="col-md-4">
-          <label class="form-label">Parcial 2</label>
-          <input type="number" min="0" max="100" step="1" name="parcial2" class="form-control" placeholder="0-100" data-bs-toggle="tooltip" title="Calificación del segundo parcial">
-          <div class="invalid-feedback">Ingresa un número entre 0 y 100.</div>
-        </div>
         <div class="col-md-4">
           <label class="form-label">Final</label>
           <div class="input-group">
@@ -135,9 +128,13 @@ var IS_DIRTY = false;
         const buckets = {};
         for (const g of grupos) { const k = String(g.ciclo || ''); (buckets[k] = buckets[k] || []).push(g); }
         const cycles = Object.keys(buckets).sort().reverse();
+        const groupMap = {};
+        for (const g of grupos) { groupMap[g.id] = g; }
+        window.groupMap = groupMap;
+        
         for (const c of cycles) {
           const og = document.createElement('optgroup'); og.label = c;
-          og.innerHTML = buckets[c].map(g => `<option value="${g.id}">${g.materia} · ${g.nombre}</option>`).join('');
+          og.innerHTML = buckets[c].map(g => `<option value="${g.id}" data-np="${g.num_parciales||3}">${g.materia} · ${g.nombre}</option>`).join('');
           grupoSel.appendChild(og);
         }
         const savedG = (()=>{ try { return localStorage.getItem(LS_G) || ''; } catch(e){ return ''; } })();
@@ -218,7 +215,10 @@ var IS_DIRTY = false;
         const json = await res.json();
         const d = json && json.data ? json.data : null;
         const setVal = (name, val) => { const el = document.querySelector(`[name="${name}"]`); if (!el) return; el.value = (val === null || typeof val === 'undefined') ? '' : String(val); };
-        if (d) { setVal('parcial1', d.parcial1); setVal('parcial2', d.parcial2); setVal('final', d.final); }
+        if (d) { 
+            for(let i=1; i<=5; i++) { setVal(`parcial${i}`, d[`parcial${i}`]); }
+            setVal('final', d.final); 
+        }
         const p1El = document.querySelector('[name="parcial1"]');
         const p2El = document.querySelector('[name="parcial2"]');
         const finEl = document.querySelector('[name="final"]');
@@ -258,9 +258,40 @@ var IS_DIRTY = false;
 
     grupoSel.addEventListener('change', (e) => {
       try { localStorage.setItem(LS_G, String(e.target.value||'')); } catch(e){}
+      renderPartials();
       loadStudentsByGroup(e.target.value);
       setTimeout(prefillGrades, 100);
     });
+    
+    function renderPartials() {
+        const gid = grupoSel.value;
+        const container = document.getElementById('partials-container');
+        if (!gid) { container.innerHTML = ''; return; }
+        
+        const opt = grupoSel.options[grupoSel.selectedIndex];
+        const np = parseInt(opt.getAttribute('data-np') || 3);
+        window.currentNp = np;
+        
+        let html = '';
+        for(let i=1; i<=np; i++) {
+            html += `
+              <div class="col-md-4">
+                <label class="form-label">Parcial ${i}</label>
+                <input type="number" min="0" max="100" step="1" name="parcial${i}" class="form-control partial-input" placeholder="0-100" data-bs-toggle="tooltip" title="Calificación del parcial ${i}">
+                <div class="invalid-feedback">Ingresa un número entre 0 y 100.</div>
+              </div>
+            `;
+        }
+        container.innerHTML = html;
+        
+        // Re-attach listeners
+        const inputs = container.querySelectorAll('input');
+        inputs.forEach(el => {
+            el.addEventListener('input', () => { paint(el); IS_DIRTY = true; updatePromedioBadge(); saveDraft(); updateSubmitState(); });
+            el.addEventListener('blur', () => clampInt(el));
+            el.addEventListener('change', updateSubmitState);
+        });
+    }
     var pend = document.getElementById('onlyPending'); if (pend) { pend.addEventListener('change', function(){ try { localStorage.setItem(LS_P, pend.checked ? '1' : '0'); } catch(e) {} var gid = grupoSel.value; loadStudentsByGroup(gid); setTimeout(prefillGrades, 100); }); }
     grupoSel.addEventListener('focus', async () => {
       try {
@@ -291,12 +322,38 @@ var IS_DIRTY = false;
     setTimeout(prefillGrades, 200);
     var btnOpen = document.getElementById('openConfirm'); if (btnOpen) { btnOpen.addEventListener('click', function(){ GO_NEXT = false; }); }
     var btnNext = document.getElementById('openConfirmNext'); if (btnNext) { btnNext.addEventListener('click', function(){ GO_NEXT = true; }); }
-    var btnReset = document.getElementById('btnReset'); if (btnReset) { btnReset.addEventListener('click', function(){ var f1=document.querySelector('[name="parcial1"]'); var f2=document.querySelector('[name="parcial2"]'); var ff=document.querySelector('[name="final"]'); if (f1) f1.value=''; if (f2) f2.value=''; if (ff) ff.value=''; try { var gid = document.getElementById('grupo_id').value || ''; var aid = document.getElementById('alumno_id').value || ''; if (gid && aid) { localStorage.removeItem('grades_draft_' + String(gid) + '_' + String(aid)); } } catch(e){} updatePromedioBadge(); focusNext(); }); }
+    var btnReset = document.getElementById('btnReset'); if (btnReset) { btnReset.addEventListener('click', function(){ 
+        const np = window.currentNp || 3;
+        for(let i=1; i<=np; i++) {
+            const el = document.querySelector(`[name="parcial${i}"]`);
+            if(el) el.value = '';
+        }
+        var ff=document.querySelector('[name="final"]'); if (ff) ff.value=''; try { var gid = document.getElementById('grupo_id').value || ''; var aid = document.getElementById('alumno_id').value || ''; if (gid && aid) { localStorage.removeItem('grades_draft_' + String(gid) + '_' + String(aid)); } } catch(e){} updatePromedioBadge(); focusNext(); 
+    }); }
     document.addEventListener('keydown', function(e){ var k = e.key || e.keyCode; if (e.ctrlKey && (k === 'Enter' || k === 13)) { GO_NEXT = true; var m = document.getElementById('confirmModal'); try { var inst = window.bootstrap && window.bootstrap.Modal ? (window.bootstrap.Modal.getInstance(m) || new window.bootstrap.Modal(m)) : null; if (inst) inst.show(); else { m.classList.add('show'); } } catch(x){ m.classList.add('show'); } e.preventDefault(); } });
     document.addEventListener('keydown', function(e){ var k = e.key || e.keyCode; if (!e.ctrlKey && (k === 'Enter' || k === 13)) { GO_NEXT = false; var m = document.getElementById('confirmModal'); try { var inst = window.bootstrap && window.bootstrap.Modal ? (window.bootstrap.Modal.getInstance(m) || new window.bootstrap.Modal(m)) : null; if (inst) inst.show(); else { m.classList.add('show'); } } catch(x){ m.classList.add('show'); } e.preventDefault(); } });
     document.addEventListener('keydown', function(e){ var k = e.key || e.keyCode; if (e.altKey && (k === 'ArrowDown' || k === 40)) { var opts = Array.from(alumnoSel.options).filter(function(o){ return !!o.value; }); var idx = opts.findIndex(function(o){ return o.value === String(alumnoSel.value || ''); }); var next = (idx >= 0 && (idx + 1) < opts.length) ? opts[idx + 1].value : ''; if (next) { alumnoSel.value = String(next); alumnoSel.dispatchEvent(new Event('change')); } e.preventDefault(); } });
     document.addEventListener('keydown', function(e){ var k = e.key || e.keyCode; if (e.altKey && (k === 'ArrowUp' || k === 38)) { var opts = Array.from(alumnoSel.options).filter(function(o){ return !!o.value; }); var idx = opts.findIndex(function(o){ return o.value === String(alumnoSel.value || ''); }); var prev = (idx > 0) ? opts[idx - 1].value : ''; if (prev) { alumnoSel.value = String(prev); alumnoSel.dispatchEvent(new Event('change')); } e.preventDefault(); } });
-    var btnCalc = document.getElementById('btnCalcFinal'); if (btnCalc) { btnCalc.addEventListener('click', function(){ var p1=document.querySelector('[name="parcial1"]').value; var p2=document.querySelector('[name="parcial2"]').value; var fin=document.querySelector('[name="final"]'); var n1=Number(p1), n2=Number(p2); if (!isNaN(n1) && !isNaN(n2)) { var avg=Math.round(((n1+n2)/2)); avg=Math.max(0, Math.min(100, avg)); fin.value=String(avg); updatePromedioBadge(); fin.focus(); } }); }
+    var btnCalc = document.getElementById('btnCalcFinal'); if (btnCalc) { btnCalc.addEventListener('click', function(){ 
+        const np = window.currentNp || 3;
+        let sum = 0;
+        let count = 0;
+        for(let i=1; i<=np; i++) {
+            const el = document.querySelector(`[name="parcial${i}"]`);
+            if(el && el.value !== '') {
+                sum += Number(el.value);
+                count++;
+            }
+        }
+        var fin=document.querySelector('[name="final"]'); 
+        if (count === np) { 
+            var avg=Math.round(sum/np); 
+            avg=Math.max(0, Math.min(100, avg)); 
+            fin.value=String(avg); 
+            updatePromedioBadge(); 
+            fin.focus(); 
+        } 
+    }); }
   } catch (error) {
     console.error('Error en init():', error);
     console.error('Error stack:', error.stack);
@@ -320,7 +377,9 @@ document.getElementById('confirmSubmit').addEventListener('click', function() {
     if (!el.value) { el.classList.add('is-invalid'); return; }
     else { el.classList.remove('is-invalid'); }
   }
-  const numeric = ['parcial1','parcial2','final'];
+  const numeric = ['final'];
+  const np = window.currentNp || 3;
+  for(let i=1; i<=np; i++) numeric.push(`parcial${i}`);
   for (const name of numeric) {
     const el = form.querySelector(`[name="${name}"]`);
     if (el.value !== '') {
@@ -350,7 +409,6 @@ document.getElementById('confirmSubmit').addEventListener('click', function() {
 
 // Umbral visual (>=70 verde, <70 rojo)
 (() => {
-  const inputs = ['parcial1','parcial2','final'].map(n => document.querySelector(`[name="${n}"]`));
   const paint = (el) => {
     const v = el.value === '' ? null : Number(el.value);
     el.classList.remove('is-valid','is-invalid','text-success','text-danger');
@@ -358,16 +416,43 @@ document.getElementById('confirmSubmit').addEventListener('click', function() {
     if (v >= 70) { el.classList.add('is-valid','text-success'); }
     else { el.classList.add('is-invalid','text-danger'); }
   };
-  inputs.forEach(el => el && el.addEventListener('input', () => { paint(el); IS_DIRTY = true; }));
+    if (v >= 70) { el.classList.add('is-valid','text-success'); }
+    else { el.classList.add('is-invalid','text-danger'); }
+  };
+  // inputs listeners attached in renderPartials and below for static inputs
   function clampInt(el){ var v = el.value; if (v === '') return; var n = Math.round(Number(v)); if (Number.isNaN(n)) { el.value = ''; } else { if (n < 0) n = 0; if (n > 100) n = 100; el.value = String(n); } updatePromedioBadge(); paint(el); }
-  inputs.forEach(el => el && el.addEventListener('blur', () => clampInt(el)));
+  window.paint = paint; window.clampInt = clampInt; // Expose for renderPartials
+  
+  const finEl = document.querySelector('[name="final"]');
+  if(finEl) {
+      finEl.addEventListener('input', () => { paint(finEl); IS_DIRTY = true; updatePromedioBadge(); saveDraft(); updateSubmitState(); });
+      finEl.addEventListener('blur', () => clampInt(finEl));
+  }
+
   function updatePromedioBadge() {
-    const p1 = document.querySelector('[name="parcial1"]').value;
-    const p2 = document.querySelector('[name="parcial2"]').value;
+    const np = window.currentNp || 3;
     const fin = document.querySelector('[name="final"]').value;
     let prom = null;
-    if (fin !== '') { prom = Number(fin); }
-    else if (p1 !== '' && p2 !== '') { prom = Math.round(((Number(p1) + Number(p2)) / 2) * 100) / 100; }
+    
+    if (fin !== '') { 
+        prom = Number(fin); 
+    } else {
+        let sum = 0;
+        let count = 0;
+        let allPresent = true;
+        for(let i=1; i<=np; i++) {
+            const el = document.querySelector(`[name="parcial${i}"]`);
+            if(el && el.value !== '') {
+                sum += Number(el.value);
+                count++;
+            } else {
+                allPresent = false;
+            }
+        }
+        if (allPresent && count === np) {
+            prom = Math.round((sum / np) * 100) / 100;
+        }
+    }
     promBadge.textContent = 'Promedio actual: ' + (prom === null || isNaN(prom) ? '—' : String(prom));
     promBadge.classList.remove('bg-secondary','bg-success','bg-danger');
     if (prom === null || isNaN(prom)) { promBadge.classList.add('bg-secondary'); }
@@ -375,28 +460,50 @@ document.getElementById('confirmSubmit').addEventListener('click', function() {
     else { promBadge.classList.add('bg-danger'); }
   }
   function focusNext(){
-    const p1El = document.querySelector('[name="parcial1"]');
-    const p2El = document.querySelector('[name="parcial2"]');
+    const np = window.currentNp || 3;
+    for(let i=1; i<=np; i++) {
+        const el = document.querySelector(`[name="parcial${i}"]`);
+        if(el && el.value === '') { el.focus(); return; }
+    }
     const finEl = document.querySelector('[name="final"]');
     if (finEl && finEl.value === '') { finEl.focus(); return; }
-    if (p1El && p1El.value === '') { p1El.focus(); return; }
-    if (p2El && p2El.value === '') { p2El.focus(); return; }
     const btn = document.getElementById('confirmSubmit'); if (btn) { btn.focus(); }
   }
-  inputs.forEach(el => el && el.addEventListener('input', updatePromedioBadge));
-  function saveDraft(){ var gid = document.getElementById('grupo_id').value; var aid = document.getElementById('alumno_id').value; if (!gid || !aid) return; var p1 = document.querySelector('[name="parcial1"]').value; var p2 = document.querySelector('[name="parcial2"]').value; var fin = document.querySelector('[name="final"]').value; try { localStorage.setItem(getDraftKey(gid, aid), JSON.stringify({ p1, p2, fin })); } catch(e){} }
-  inputs.forEach(el => el && el.addEventListener('input', saveDraft));
+  function saveDraft(){ 
+      var gid = document.getElementById('grupo_id').value; 
+      var aid = document.getElementById('alumno_id').value; 
+      if (!gid || !aid) return; 
+      
+      const np = window.currentNp || 3;
+      const data = {};
+      for(let i=1; i<=np; i++) {
+          const el = document.querySelector(`[name="parcial${i}"]`);
+          if(el) data[`p${i}`] = el.value;
+      }
+      const fin = document.querySelector('[name="final"]').value; 
+      data.fin = fin;
+      
+      try { localStorage.setItem(getDraftKey(gid, aid), JSON.stringify(data)); } catch(e){} 
+  }
+  // inputs listeners attached in renderPartials
   updatePromedioBadge();
   focusNext();
   function updateSubmitState(){
     var ok = true;
     var req = ['grupo_id','alumno_id'];
     for (var i=0;i<req.length;i++){ var el = document.querySelector('[name="'+req[i]+'"]'); if (!el || !el.value) { ok = false; break; } }
-    if (ok){ var names = ['parcial1','parcial2','final']; for (var j=0;j<names.length;j++){ var eln = document.querySelector('[name="'+names[j]+'"]'); if (!eln) continue; var v = eln.value; if (v !== '') { var n = Number(v); if (Number.isNaN(n) || n < 0 || n > 100) { ok = false; break; } } } }
+    if (ok){ 
+        const np = window.currentNp || 3;
+        var names = ['final'];
+        for(let i=1; i<=np; i++) names.push(`parcial${i}`);
+        
+        for (var j=0;j<names.length;j++){ var eln = document.querySelector('[name="'+names[j]+'"]'); if (!eln) continue; var v = eln.value; if (v !== '') { var n = Number(v); if (Number.isNaN(n) || n < 0 || n > 100) { ok = false; break; } } } 
+    }
     var b1 = document.getElementById('openConfirm'); var b2 = document.getElementById('openConfirmNext'); var bc = document.getElementById('confirmSubmit');
     if (b1) b1.disabled = !ok; if (b2) b2.disabled = !ok; if (bc) bc.disabled = !ok;
   }
-  ['parcial1','parcial2','final','grupo_id','alumno_id'].forEach(function(n){ var el = document.querySelector('[name="'+n+'"]'); if (el) { el.addEventListener('input', updateSubmitState); el.addEventListener('change', updateSubmitState); el.addEventListener('blur', updateSubmitState); } });
+  ['grupo_id','alumno_id'].forEach(function(n){ var el = document.querySelector('[name="'+n+'"]'); if (el) { el.addEventListener('input', updateSubmitState); el.addEventListener('change', updateSubmitState); el.addEventListener('blur', updateSubmitState); } });
+  const finEl = document.querySelector('[name="final"]'); if(finEl) { finEl.addEventListener('input', updateSubmitState); finEl.addEventListener('change', updateSubmitState); finEl.addEventListener('blur', updateSubmitState); }
   updateSubmitState();
   window.addEventListener('beforeunload', function(e){ if (IS_DIRTY) { e.preventDefault(); e.returnValue = ''; } });
 })();
