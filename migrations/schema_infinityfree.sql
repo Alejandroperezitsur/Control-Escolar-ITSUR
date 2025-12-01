@@ -1,12 +1,6 @@
 -- ============================================================================
--- SISTEMA DE CONTROL ESCOLAR UNIVERSITARIO - SCHEMA COMPLETO
--- Sistema Realista Inspirado en SICEnet
--- ============================================================================
--- Este schema incluye:
--- - Sistema de calificaciones por unidades (1-10)
--- - Kardex completo (historial académico)
--- - Carga académica con horarios
--- - Sistema de créditos
+-- SCHEMA PARA INFINITYFREE (SIN VISTAS)
+-- Sistema de Control Escolar - Versión Compatible con Hosting Gratuito
 -- ============================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -14,7 +8,7 @@ SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
 
 -- ============================================================================
--- LIMPIEZA COMPLETA (EMPEZAR DE CERO)
+-- LIMPIEZA
 -- ============================================================================
 
 DROP TABLE IF EXISTS `calificaciones_unidades`;
@@ -28,10 +22,6 @@ DROP TABLE IF EXISTS `alumnos`;
 DROP TABLE IF EXISTS `usuarios`;
 DROP TABLE IF EXISTS `materias`;
 DROP TABLE IF EXISTS `carreras`;
-
-DROP VIEW IF EXISTS `view_kardex`;
-DROP VIEW IF EXISTS `view_carga_academica`;
-DROP VIEW IF EXISTS `view_estadisticas_alumno`;
 
 -- ============================================================================
 -- TABLA: CARRERAS
@@ -54,14 +44,14 @@ CREATE TABLE `carreras` (
 INSERT INTO `carreras` (`nombre`, `clave`, `descripcion`, `duracion_semestres`, `creditos_totales`) VALUES
 ('Ingeniería en Sistemas Computacionales', 'ISC', 'Profesionista capaz de diseñar, desarrollar e implementar sistemas computacionales aplicando las metodologías y tecnologías más recientes.', 9, 240),
 ('Ingeniería Industrial', 'II', 'Profesionista capaz de diseñar, implementar y mejorar sistemas de producción de bienes y servicios.', 9, 240),
-('Ingeniería en Gestión Empresarial', 'IGE' , 'Profesionista capaz de diseñar, crear y dirigir organizaciones competitivas con visión estratégica.', 9, 240),
+('Ingeniería en Gestión Empresarial', 'IGE', 'Profesionista capaz de diseñar, crear y dirigir organizaciones competitivas con visión estratégica.', 9, 240),
 ('Ingeniería Electrónica', 'IE', 'Profesionista capaz de diseñar, desarrollar e innovar sistemas electrónicos para la solución de problemas en el sector productivo.', 9, 240),
 ('Ingeniería Mecatrónica', 'IM', 'Profesionista capaz de diseñar, construir y mantener sistemas mecatrónicos innovadores.', 9, 240),
 ('Ingeniería en Energías Renovables', 'IER', 'Profesionista capaz de diseñar, implementar y evaluar proyectos de energía sustentable.', 9, 240),
 ('Contador Público', 'CP', 'Profesionista capaz de diseñar, implementar y evaluar sistemas de información financiera.', 9, 240);
 
 -- ============================================================================
--- TABLA: USUARIOS (Admins y Profesores)
+-- TABLA: USUARIOS
 -- ============================================================================
 
 CREATE TABLE `usuarios` (
@@ -82,12 +72,11 @@ CREATE TABLE `usuarios` (
     CONSTRAINT `fk_usuarios_carrera` FOREIGN KEY (`carrera_id`) REFERENCES `carreras`(`id`) ON DELETE SET NULL ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Usuario admin por defecto (contraseña: admin123)
 INSERT INTO `usuarios` (`email`, `password`, `rol`, `activo`, `nombre`) VALUES
 ('admin@itsur.edu.mx', '$2y$10$iy.ePorFR/2j6ZvmJEFy1uMniVFux3/bIOlFsw.IrggPjURr8eCOG', 'admin', 1, 'Administrador ITSUR');
 
 -- ============================================================================
--- TABLA: MATERIAS (con créditos, tipos, unidades)
+-- TABLA: MATERIAS
 -- ============================================================================
 
 CREATE TABLE `materias` (
@@ -106,7 +95,7 @@ CREATE TABLE `materias` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
--- TABLA: MATERIAS_CARRERA (Retícula)
+-- TABLA: MATERIAS_CARRERA
 -- ============================================================================
 
 CREATE TABLE `materias_carrera` (
@@ -165,7 +154,7 @@ CREATE TABLE `alumnos` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
--- TABLA: INSCRIPCIONES (con semestre cursado)
+-- TABLA: INSCRIPCIONES
 -- ============================================================================
 
 CREATE TABLE `inscripciones` (
@@ -187,7 +176,7 @@ CREATE TABLE `inscripciones` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
--- TABLA: HORARIOS (con aulas específicas)
+-- TABLA: HORARIOS
 -- ============================================================================
 
 CREATE TABLE `horarios` (
@@ -204,8 +193,7 @@ CREATE TABLE `horarios` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
--- NUEVA TABLA: CALIFICACIONES_UNIDADES
--- Almacena calificaciones por unidad (1-10)
+-- TABLA: CALIFICACIONES_UNIDADES
 -- ============================================================================
 
 CREATE TABLE `calificaciones_unidades` (
@@ -219,12 +207,10 @@ CREATE TABLE `calificaciones_unidades` (
     UNIQUE KEY `uk_inscripcion_unidad` (`inscripcion_id`, `unidad_num`),
     INDEX `idx_inscripcion` (`inscripcion_id`),
     INDEX `idx_unidad` (`unidad_num`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Calificaciones por unidad para cada inscripción';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
--- NUEVA TABLA: CALIFICACIONES_FINALES
--- Resumen de calificaciones y estatus por inscripción
+-- TABLA: CALIFICACIONES_FINALES
 -- ============================================================================
 
 CREATE TABLE `calificaciones_finales` (
@@ -242,142 +228,9 @@ CREATE TABLE `calificaciones_finales` (
     UNIQUE KEY `uk_inscripcion` (`inscripcion_id`),
     INDEX `idx_estatus` (`estatus`),
     INDEX `idx_tipo_acreditacion` (`tipo_acreditacion`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Resumen de calificaciones finales y estatus por inscripción';
-
--- ============================================================================
--- VISTA: VIEW_KARDEX
--- Historial académico completo del alumno  
--- ============================================================================
-
-CREATE OR REPLACE VIEW `view_kardex` AS
-SELECT 
-    a.`id` as `alumno_id`,
-    a.`matricula`,
-    a.`nombre`,
-    a.`apellido`,
-    a.`carrera_id`,
-    c.`nombre` as `carrera_nombre`,
-    i.`id` as `inscripcion_id`,
-    m.`id` as `materia_id`,
-    m.`nombre` as `materia_nombre`,
-    m.`clave` as `materia_clave`,
-    m.`creditos`,
-    g.`nombre` as `grupo`,
-    g.`ciclo`,
-    COALESCE(mc.`semestre`, i.`semestre_cursado`, 1) as `semestre`,
-    cf.`promedio_unidades`,
-    cf.`calificacion_final`,
-    cf.`promedio_general`,
-    cf.`estatus`,
-    cf.`tipo_acreditacion`,
-    cf.`periodo_acreditacion`,
-    CASE 
-        WHEN cf.`promedio_general` IS NULL THEN 'Sin Calificar'
-        WHEN cf.`promedio_general` >= 90 THEN 'Excelente'
-        WHEN cf.`promedio_general` >= 80 THEN 'Notable'
-        WHEN cf.`promedio_general` >= 70 THEN 'Bueno'
-        WHEN cf.`promedio_general` >= 60 THEN 'Suficiente'
-        ELSE 'No Acreditado'
-    END as `nivel_desempeno`,
-    i.`fecha_inscripcion`,
-    i.`estatus` as `estatus_inscripcion`
-FROM `alumnos` a
-JOIN `inscripciones` i ON i.`alumno_id` = a.`id`
-JOIN `grupos` g ON g.`id` = i.`grupo_id`
-JOIN `materias` m ON m.`id` = g.`materia_id`
-LEFT JOIN `carreras` c ON c.`id` = a.`carrera_id`
-LEFT JOIN `materias_carrera` mc ON mc.`materia_id` = m.`id` AND mc.`carrera_id` = a.`carrera_id`
-LEFT JOIN `calificaciones_finales` cf ON cf.`inscripcion_id` = i.`id`
-ORDER BY a.`id`, `semestre`, i.`fecha_inscripcion`;
-
--- ============================================================================
--- VISTA: VIEW_CARGA_ACADEMICA
--- Carga académica actual con horarios completos
--- ============================================================================
-
-CREATE OR REPLACE VIEW `view_carga_academica` AS
-SELECT 
-    a.`id` as `alumno_id`,
-    a.`matricula`,
-    a.`nombre` as `alumno_nombre`,
-    a.`apellido` as `alumno_apellido`,
-    m.`id` as `materia_id`,
-    m.`nombre` as `materia_nombre`,
-    m.`clave` as `materia_clave`,
-    m.`creditos`,
-    g.`id` as `grupo_id`,
-    g.`nombre` as `grupo_nombre`,
-    g.`ciclo`,
-    u.`id` as `profesor_id`,
-    u.`nombre` as `profesor_nombre`,
-    GROUP_CONCAT(
-        DISTINCT CONCAT(
-            UPPER(SUBSTRING(h.`dia_semana`, 1, 1)),
-            LOWER(SUBSTRING(h.`dia_semana`, 2)),
-            ' ',
-            TIME_FORMAT(h.`hora_inicio`, '%H:%i'),
-            '-',
-            TIME_FORMAT(h.`hora_fin`, '%H:%i'),
-            ' ',
-            COALESCE(h.`aula`, 'Sin asignar')
-        )
-        ORDER BY FIELD(h.`dia_semana`, 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado')
-        SEPARATOR '; '
-    ) as `horarios`,
-    i.`semestre_cursado`
-FROM `alumnos` a
-JOIN `inscripciones` i ON i.`alumno_id` = a.`id` AND i.`estatus` = 'inscrito'
-JOIN `grupos` g ON g.`id` = i.`grupo_id`
-JOIN `materias` m ON m.`id` = g.`materia_id`
-JOIN `usuarios` u ON u.`id` = g.`profesor_id`
-LEFT JOIN `horarios` h ON h.`grupo_id` = g.`id`
-GROUP BY a.`id`, m.`id`, g.`id`, u.`id`, i.`semestre_cursado`;
-
--- ============================================================================
--- VISTA: VIEW_ESTADISTICAS_ALUMNO
--- Estadísticas académicas para resumen del Kardex
--- ============================================================================
-
-CREATE OR REPLACE VIEW `view_estadisticas_alumno` AS
-SELECT 
-    a.`id` as `alumno_id`,
-    a.`matricula`,
-    a.`nombre`,
-    a.`apellido`,
-    a.`carrera_id`,
-    c.`nombre` as `carrera_nombre`,
-    c.`creditos_totales` as `creditos_requeridos`,
-    COUNT(DISTINCT i.`id`) as `total_materias_cursadas`,
-    SUM(CASE WHEN cf.`estatus` = 'aprobado' THEN 1 ELSE 0 END) as `materias_aprobadas`,
-    SUM(CASE WHEN cf.`estatus` = 'reprobado' THEN 1 ELSE 0 END) as `materias_reprobadas`,
-    SUM(CASE WHEN cf.`estatus` IN ('aprobado') THEN m.`creditos` ELSE 0 END) as `creditos_completados`,
-    ROUND(
-        (SUM(CASE WHEN cf.`estatus` = 'aprobado' THEN m.`creditos` ELSE 0 END) / c.`creditos_totales`) * 100,
-        2
-    ) as `porcentaje_avance`,
-    ROUND(
-        AVG(CASE WHEN cf.`promedio_general` IS NOT NULL AND cf.`estatus` IN ('aprobado', 'reprobado') 
-            THEN cf.`promedio_general` 
-            ELSE NULL 
-        END),
-        2
-    ) as `promedio_general`,
-    MAX(COALESCE(i.`semestre_cursado`, mc.`semestre`, 1)) as `semestre_actual`
-FROM `alumnos` a
-LEFT JOIN `carreras` c ON c.`id` = a.`carrera_id`
-LEFT JOIN `inscripciones` i ON i.`alumno_id` = a.`id`
-LEFT JOIN `grupos` g ON g.`id` = i.`grupo_id`
-LEFT JOIN `materias` m ON m.`id` = g.`materia_id`
-LEFT JOIN `materias_carrera` mc ON mc.`materia_id` = m.`id` AND mc.`carrera_id` = a.`carrera_id`
-LEFT JOIN `calificaciones_finales` cf ON cf.`inscripcion_id` = i.`id`
-GROUP BY a.`id`, c.`id`;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
 
--- ============================================================================
--- SCHEMA COMPLETO
--- ============================================================================
-
-SELECT 'Schema created successfully!' as status;
-SELECT 'Ready for realistic data generation' as next_step;
+SELECT 'Schema creado exitosamente (sin vistas)' as mensaje;
+SELECT 'Ahora ejecuta el script de datos: scripts/generate_realistic_student_data.php' as siguiente_paso;

@@ -43,11 +43,46 @@ class AcademicLoadController
             die('Alumno no encontrado');
         }
         
-        // Get current academic load using the view
+        // Get current academic load (sin vista para InfinityFree)
         $stmt = $this->pdo->prepare("
-            SELECT * FROM view_carga_academica
-            WHERE alumno_id = ?
-            ORDER BY materia_nombre
+            SELECT 
+                a.id as alumno_id,
+                a.matricula,
+                a.nombre as alumno_nombre,
+                a.apellido as alumno_apellido,
+                m.id as materia_id,
+                m.nombre as materia_nombre,
+                m.clave as materia_clave,
+                m.creditos,
+                g.id as grupo_id,
+                g.nombre as grupo_nombre,
+                g.ciclo,
+                u.id as profesor_id,
+                u.nombre as profesor_nombre,
+                GROUP_CONCAT(
+                    DISTINCT CONCAT(
+                        UPPER(SUBSTRING(h.dia_semana, 1, 1)),
+                        LOWER(SUBSTRING(h.dia_semana, 2)),
+                        ' ',
+                        TIME_FORMAT(h.hora_inicio, '%H:%i'),
+                        '-',
+                        TIME_FORMAT(h.hora_fin, '%H:%i'),
+                        ' ',
+                        COALESCE(h.aula, 'Sin asignar')
+                    )
+                    ORDER BY FIELD(h.dia_semana, 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado')
+                    SEPARATOR '; '
+                ) as horarios,
+                i.semestre_cursado
+            FROM alumnos a
+            JOIN inscripciones i ON i.alumno_id = a.id AND i.estatus = 'inscrito'
+            JOIN grupos g ON g.id = i.grupo_id
+            JOIN materias m ON m.id = g.materia_id
+            JOIN usuarios u ON u.id = g.profesor_id
+            LEFT JOIN horarios h ON h.grupo_id = g.id
+            WHERE a.id = ?
+            GROUP BY a.id, m.id, g.id, u.id, i.semestre_cursado
+            ORDER BY m.nombre
         ");
         $stmt->execute([$alumnoId]);
         $cargaAcademica = $stmt->fetchAll(PDO::FETCH_ASSOC);

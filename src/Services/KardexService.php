@@ -24,10 +24,48 @@ class KardexService
      */
     public function getCompleteHistory(int $alumnoId): array
     {
+        // Query directa (sin vista) para compatibilidad con InfinityFree
         $stmt = $this->pdo->prepare("
-            SELECT * FROM view_kardex
-            WHERE alumno_id = ?
-            ORDER BY semestre, fecha_inscripcion
+            SELECT 
+                a.id as alumno_id,
+                a.matricula,
+                a.nombre,
+                a.apellido,
+                a.carrera_id,
+                c.nombre as carrera_nombre,
+                i.id as inscripcion_id,
+                m.id as materia_id,
+                m.nombre as materia_nombre,
+                m.clave as materia_clave,
+                m.creditos,
+                g.nombre as grupo,
+                g.ciclo,
+                COALESCE(mc.semestre, i.semestre_cursado, 1) as semestre,
+                cf.promedio_unidades,
+                cf.calificacion_final,
+                cf.promedio_general,
+                cf.estatus,
+                cf.tipo_acreditacion,
+                cf.periodo_acreditacion,
+                CASE 
+                    WHEN cf.promedio_general IS NULL THEN 'Sin Calificar'
+                    WHEN cf.promedio_general >= 90 THEN 'Excelente'
+                    WHEN cf.promedio_general >= 80 THEN 'Notable'
+                    WHEN cf.promedio_general >= 70 THEN 'Bueno'
+                    WHEN cf.promedio_general >= 60 THEN 'Suficiente'
+                    ELSE 'No Acreditado'
+                END as nivel_desempeno,
+                i.fecha_inscripcion,
+                i.estatus as estatus_inscripcion
+            FROM alumnos a
+            JOIN inscripciones i ON i.alumno_id = a.id
+            JOIN grupos g ON g.id = i.grupo_id
+            JOIN materias m ON m.id = g.materia_id
+            LEFT JOIN carreras c ON c.id = a.carrera_id
+            LEFT JOIN materias_carrera mc ON mc.materia_id = m.id AND mc.carrera_id = a.carrera_id
+            LEFT JOIN calificaciones_finales cf ON cf.inscripcion_id = i.id
+            WHERE a.id = ?
+            ORDER BY semestre, i.fecha_inscripcion
         ");
         $stmt->execute([$alumnoId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -41,9 +79,41 @@ class KardexService
      */
     public function getStatistics(int $alumnoId): array
     {
+        // Query directa (sin vista) para compatibilidad con InfinityFree
         $stmt = $this->pdo->prepare("
-            SELECT * FROM view_estadisticas_alumno
-            WHERE alumno_id = ?
+            SELECT 
+                a.id as alumno_id,
+                a.matricula,
+                a.nombre,
+                a.apellido,
+                a.carrera_id,
+                c.nombre as carrera_nombre,
+                c.creditos_totales as creditos_requeridos,
+                COUNT(DISTINCT i.id) as total_materias_cursadas,
+                SUM(CASE WHEN cf.estatus = 'aprobado' THEN 1 ELSE 0 END) as materias_aprobadas,
+                SUM(CASE WHEN cf.estatus = 'reprobado' THEN 1 ELSE 0 END) as materias_reprobadas,
+                SUM(CASE WHEN cf.estatus IN ('aprobado') THEN m.creditos ELSE 0 END) as creditos_completados,
+                ROUND(
+                    (SUM(CASE WHEN cf.estatus = 'aprobado' THEN m.creditos ELSE 0 END) / c.creditos_totales) * 100,
+                    2
+                ) as porcentaje_avance,
+                ROUND(
+                    AVG(CASE WHEN cf.promedio_general IS NOT NULL AND cf.estatus IN ('aprobado', 'reprobado') 
+                        THEN cf.promedio_general 
+                        ELSE NULL 
+                    END),
+                    2
+                ) as promedio_general,
+                MAX(COALESCE(i.semestre_cursado, mc.semestre, 1)) as semestre_actual
+            FROM alumnos a
+            LEFT JOIN carreras c ON c.id = a.carrera_id
+            LEFT JOIN inscripciones i ON i.alumno_id = a.id
+            LEFT JOIN grupos g ON g.id = i.grupo_id
+            LEFT JOIN materias m ON m.id = g.materia_id
+            LEFT JOIN materias_carrera mc ON mc.materia_id = m.id AND mc.carrera_id = a.carrera_id
+            LEFT JOIN calificaciones_finales cf ON cf.inscripcion_id = i.id
+            WHERE a.id = ?
+            GROUP BY a.id, c.id
         ");
         $stmt->execute([$alumnoId]);
         $stats = $stmt->fetch(PDO::FETCH_ASSOC);
