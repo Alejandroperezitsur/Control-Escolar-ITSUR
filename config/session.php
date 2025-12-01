@@ -30,7 +30,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
     // Control de expiración de sesión por inactividad
     try {
-        $config = @include __DIR__ . '/../config/config.php';
+        $config = @include __DIR__ . '/config.php';
         $timeout = 3600; // 1 hora por defecto
         if (is_array($config) && isset($config['security']['session_timeout'])) {
             $timeout = (int)$config['security']['session_timeout'] ?: $timeout;
@@ -58,4 +58,3 @@ if (session_status() === PHP_SESSION_NONE) {
         $_SESSION['last_activity'] = time();
     }
 }
-?>
