@@ -1,4 +1,5 @@
 <?php
+$csrf = $_SESSION['csrf_token'] ?? '';
 $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
 $base = $scriptDir;
 $p = strpos($scriptDir, '/public');
@@ -225,6 +226,7 @@ ob_start();
       <?php $role = $_SESSION['role'] ?? ''; if ($role === 'admin'): ?>
       <form id="sched-form" class="row g-2 mt-2" onsubmit="addSchedule(event)">
         <input type="hidden" name="grupo_id" value="<?= (int)($grp['id'] ?? 0) ?>">
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
         <div class="col-md-3">
           <select class="form-select form-select-sm" name="dia" required>
             <option value="">Día...</option>
@@ -265,7 +267,9 @@ function addSchedule(e){
 }
 function delSchedule(id){
   if (!confirm('¿Eliminar horario?')) return;
-  const fd = new FormData(); fd.append('id', String(id));
+  const fd = new FormData();
+  fd.append('id', String(id));
+  fd.append('csrf_token', '<?= $_SESSION['csrf_token'] ?? '' ?>');
   fetch(`${BASE}/groups/schedules/delete`, { method:'POST', body: fd }).then(r=>r.json()).then(j=>{ if (j && j.success) { loadSchedules(); } else { alert('No se pudo eliminar'); } });
 }
 document.addEventListener('DOMContentLoaded', loadSchedules);

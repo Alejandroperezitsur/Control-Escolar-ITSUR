@@ -1,14 +1,18 @@
 <?php
 namespace App\Controllers;
 
+use App\Repositories\GradesRepository;
 use PDO;
 
 class GradesController
 {
     private PDO $pdo;
+    private GradesRepository $gradesRepository;
+
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
+        $this->gradesRepository = new GradesRepository($pdo);
     }
 
     public function index(): string
@@ -23,27 +27,9 @@ class GradesController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin') { http_response_code(403); return 'No autorizado'; }
-        
-        // Fetch cycles for the filter dropdown
-        $cycles = $this->pdo->query("SELECT DISTINCT ciclo FROM grupos ORDER BY ciclo DESC")->fetchAll(PDO::FETCH_COLUMN);
-        
+        $cycles = $this->gradesRepository->getCycles();
         $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
-        $params = [];
-        $where = 'WHERE c.final IS NULL';
-        if ($ciclo) { $where .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
-        
-        $sql = "SELECT c.id, c.alumno_id, c.grupo_id, a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, u.nombre AS profesor
-                FROM calificaciones c
-                JOIN alumnos a ON a.id = c.alumno_id
-                JOIN grupos g ON g.id = c.grupo_id
-                JOIN materias m ON m.id = g.materia_id
-                JOIN usuarios u ON u.id = g.profesor_id
-                $where
-                ORDER BY g.ciclo DESC, m.nombre, g.nombre, a.apellido";
-        $stmt = $this->pdo->prepare($sql);
-        foreach ($params as $k=>$v) { $stmt->bindValue($k, $v); }
-        $stmt->execute();
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $this->gradesRepository->getPendingForAdmin($ciclo);
 
         ob_start();
         include __DIR__ . '/../Views/admin/pending.php';
@@ -54,39 +40,7 @@ class GradesController
     {
         $pid = (int)($_SESSION['user_id'] ?? 0);
         $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
-        $params = [':p' => $pid];
-        $where = 'WHERE c.final IS NULL AND g.profesor_id = :p';
-        if ($ciclo) { $where .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
-        $sql = "SELECT c.id, a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo
-                FROM calificaciones c
-                JOIN alumnos a ON a.id = c.alumno_id
-                JOIN grupos g ON g.id = c.grupo_id
-                JOIN materias m ON m.id = g.materia_id
-                $where
-                ORDER BY g.ciclo DESC, m.nombre, g.nombre, a.apellido";
-        $stmt = $this->pdo->prepare($sql);
-        foreach ($params as $k=>$v) { $stmt->bindValue($k, $v); }
-        $stmt->execute();
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if (!$rows) {
-            $gs = $this->pdo->prepare('SELECT id FROM grupos WHERE profesor_id = :p ORDER BY ciclo DESC LIMIT 3');
-            $gs->execute([':p' => $pid]);
-            $gids = array_map(fn($x) => (int)$x['id'], $gs->fetchAll(PDO::FETCH_ASSOC));
-            if ($gids) {
-                $als = $this->pdo->query('SELECT id FROM alumnos WHERE activo = 1 ORDER BY RAND() LIMIT 5')->fetchAll(PDO::FETCH_ASSOC);
-                $alIds = array_map(fn($x) => (int)$x['id'], $als);
-                $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final) VALUES (:a,:g,NULL,NULL,NULL)');
-                $chk = $this->pdo->prepare('SELECT 1 FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g LIMIT 1');
-                foreach ($gids as $g) {
-                    foreach (array_slice($alIds, 0, 2) as $a) {
-                        $chk->execute([':a' => $a, ':g' => $g]);
-                        if (!$chk->fetchColumn()) { $ins->execute([':a' => $a, ':g' => $g]); }
-                    }
-                }
-                $stmt->execute();
-                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            }
-        }
+        $rows = $this->gradesRepository->getPendingForProfessor($pid, $ciclo);
         ob_start();
         include __DIR__ . '/../Views/professor/pending.php';
         return ob_get_clean();
@@ -112,10 +66,9 @@ class GradesController
             http_response_code(400);
             return 'Archivo CSV inválido';
         }
-        try { $this->pdo->exec("ALTER TABLE calificaciones ADD COLUMN promedio DECIMAL(5,2) NULL AFTER final"); } catch (\Throwable $e) {}
+        $this->gradesRepository->ensurePromedioColumn();
         $fp = fopen($_FILES['csv']['tmp_name'], 'r');
         $headers = fgetcsv($fp);
-        $stmt = $this->pdo->prepare("UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin, promedio = :prom WHERE alumno_id = :alumno AND grupo_id = :grupo");
         $count = 0;
         $skipped = 0;
         $processed = 0;
@@ -131,28 +84,13 @@ class GradesController
 
             if (!$alumnoId || !$grupoId) { $skipped++; $processed++; continue; }
 
-            // Validar alumno activo
-            $chkAlumno = $this->pdo->prepare('SELECT 1 FROM alumnos WHERE id = :id AND activo = 1');
-            $chkAlumno->execute([':id' => $alumnoId]);
-            if (!$chkAlumno->fetchColumn()) { $skipped++; $processed++; continue; }
-
-            // Validar grupo existente y pertenencia del profesor (si aplica)
-            $chkGrupo = $this->pdo->prepare('SELECT profesor_id FROM grupos WHERE id = :id');
-            $chkGrupo->execute([':id' => $grupoId]);
-            $grupoRow = $chkGrupo->fetch(PDO::FETCH_ASSOC);
-            if (!$grupoRow) { $skipped++; $processed++; continue; }
-            if ($role === 'profesor' && (int)$grupoRow['profesor_id'] !== $profId) { $skipped++; $processed++; continue; }
-
             $prom = ($fin !== null) ? (float)$fin : (($p1 !== null && $p2 !== null) ? round(($p1 + $p2) / 2, 2) : null);
-            $stmt->execute([
-                ':alumno' => $alumnoId,
-                ':grupo' => $grupoId,
-                ':p1' => $p1,
-                ':p2' => $p2,
-                ':fin' => $fin,
-                ':prom' => $prom,
-            ]);
-            $count += $stmt->rowCount();
+            $result = $this->gradesRepository->updateBulkRow($alumnoId, $grupoId, $p1, $p2, $fin, $prom, $role, $profId);
+            if ($result === 'updated') {
+                $count++;
+            } else {
+                $skipped++;
+            }
             $processed++;
         }
         fclose($fp);
@@ -194,10 +132,7 @@ class GradesController
             return '';
         }
 
-        // Validar alumno activo
-        $chkAlumno = $this->pdo->prepare('SELECT 1 FROM alumnos WHERE id = :id AND activo = 1');
-        $chkAlumno->execute([':id' => $alumnoId]);
-        if (!$chkAlumno->fetchColumn()) {
+        if (!$this->gradesRepository->isActiveStudent($alumnoId)) {
             http_response_code(400);
             $_SESSION['flash'] = 'Alumno no existe o está inactivo';
             $_SESSION['flash_type'] = 'danger';
@@ -205,10 +140,7 @@ class GradesController
             return '';
         }
 
-        // Validar grupo existente y pertenencia del profesor si aplica
-        $grpStmt = $this->pdo->prepare('SELECT profesor_id FROM grupos WHERE id = :id');
-        $grpStmt->execute([':id' => $grupoId]);
-        $grpRow = $grpStmt->fetch(\PDO::FETCH_ASSOC);
+        $grpRow = $this->gradesRepository->getGroupById($grupoId);
         if (!$grpRow) {
             http_response_code(400);
             $_SESSION['flash'] = 'Grupo inválido';
@@ -227,28 +159,21 @@ class GradesController
             }
         }
 
-        // Upsert con control de permisos: profesor solo actualiza existentes; admin puede insertar
-        try { $this->pdo->exec("ALTER TABLE calificaciones ADD COLUMN promedio DECIMAL(5,2) NULL AFTER final"); } catch (\Throwable $e) {}
-        $stmt = $this->pdo->prepare('SELECT id FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g');
-        $stmt->execute([':a' => $alumnoId, ':g' => $grupoId]);
-        $existingId = $stmt->fetchColumn();
+        $this->gradesRepository->ensurePromedioColumn();
+        $existing = $this->gradesRepository->getGradeByAlumnoGrupo($alumnoId, $grupoId);
 
         $prom = ($fin !== null) ? (float)$fin : (($p1 !== null && $p2 !== null) ? round(($p1 + $p2) / 2, 2) : null);
         $message = 'Calificación registrada correctamente';
-        if ($existingId) {
-            $prevStmt = $this->pdo->prepare('SELECT parcial1, parcial2, final, promedio FROM calificaciones WHERE id = :id');
-            $prevStmt->execute([':id' => (int)$existingId]);
-            $prev = $prevStmt->fetch(PDO::FETCH_ASSOC);
-            $prevP1 = ($prev['parcial1'] !== null ? (int)$prev['parcial1'] : null);
-            $prevP2 = ($prev['parcial2'] !== null ? (int)$prev['parcial2'] : null);
-            $prevFin = ($prev['final'] !== null ? (int)$prev['final'] : null);
-            $prevProm = ($prev['promedio'] !== null ? (float)$prev['promedio'] : null);
+        if ($existing) {
+            $prevP1 = ($existing['parcial1'] !== null ? (int)$existing['parcial1'] : null);
+            $prevP2 = ($existing['parcial2'] !== null ? (int)$existing['parcial2'] : null);
+            $prevFin = ($existing['final'] !== null ? (int)$existing['final'] : null);
+            $prevProm = ($existing['promedio'] !== null ? (float)$existing['promedio'] : null);
             $noChange = ($prevP1 === $p1) && ($prevP2 === $p2) && ($prevFin === $fin) && ($prevProm === $prom);
             if ($noChange) {
                 $message = 'Sin cambios';
             } else {
-                $upd = $this->pdo->prepare('UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin, promedio = :prom WHERE id = :id');
-                $upd->execute([':p1' => $p1, ':p2' => $p2, ':fin' => $fin, ':prom' => $prom, ':id' => (int)$existingId]);
+                $this->gradesRepository->updateGradeById((int)$existing['id'], $p1, $p2, $fin, $prom);
             }
         } else {
             if ($role !== 'admin') {
@@ -258,8 +183,7 @@ class GradesController
                 header('Location: /grades');
                 return '';
             }
-            $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final, promedio) VALUES (:a, :g, :p1, :p2, :fin, :prom)');
-            $ins->execute([':a' => $alumnoId, ':g' => $grupoId, ':p1' => $p1, ':p2' => $p2, ':fin' => $fin, ':prom' => $prom]);
+            $this->gradesRepository->insertGrade($alumnoId, $grupoId, $p1, $p2, $fin, $prom);
         }
 
         \App\Utils\Logger::info('grade_upsert', ['alumno_id' => $alumnoId, 'grupo_id' => $grupoId]);
@@ -291,9 +215,7 @@ class GradesController
         if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
         $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
-        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
-        $stmt->execute([':id' => $grupoId]);
-        $grp = $stmt->fetch(PDO::FETCH_ASSOC);
+        $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
         if ($role === 'profesor') {
             $pid = (int)($_SESSION['user_id'] ?? 0);
@@ -320,9 +242,7 @@ class GradesController
         $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
         $estado = strtolower(trim((string)($_GET['estado'] ?? '')));
-        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
-        $stmt->execute([':id' => $grupoId]);
-        $grp = $stmt->fetch(PDO::FETCH_ASSOC);
+        $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
         if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
         $rows = (new \App\Services\GroupsService($this->pdo))->studentsInGroup($grupoId);
@@ -354,14 +274,10 @@ class GradesController
         if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
         $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
-        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
-        $stmt->execute([':id' => $grupoId]);
-        $grp = $stmt->fetch(PDO::FETCH_ASSOC);
+        $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
         if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
-        $q = $this->pdo->prepare('SELECT a.matricula, a.nombre, a.apellido FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id WHERE c.grupo_id = :gid AND c.final IS NULL ORDER BY a.apellido, a.nombre');
-        $q->execute([':gid' => $grupoId]);
-        $rows = $q->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $this->gradesRepository->getPendingCsvRows($grupoId);
         header('Content-Type: text/csv; charset=UTF-8');
         $fname = 'grupo_' . (int)$grupoId . '_pendientes.csv';
         header('Content-Disposition: attachment; filename="' . $fname . '"');
@@ -384,9 +300,7 @@ class GradesController
         $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
         $estado = strtolower(trim((string)($_GET['estado'] ?? '')));
-        $stmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
-        $stmt->execute([':id' => $grupoId]);
-        $grp = $stmt->fetch(PDO::FETCH_ASSOC);
+        $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
         if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
         $rowsDb = (new \App\Services\GroupsService($this->pdo))->studentsInGroup($grupoId);
@@ -442,9 +356,7 @@ class GradesController
             http_response_code(400);
             return json_encode(['ok' => false, 'message' => 'Parámetros inválidos']);
         }
-        $stmt = $this->pdo->prepare('SELECT profesor_id FROM grupos WHERE id = :id');
-        $stmt->execute([':id' => $grupoId]);
-        $grp = $stmt->fetch(PDO::FETCH_ASSOC);
+        $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) {
             header('Content-Type: application/json');
             http_response_code(404);
@@ -458,9 +370,7 @@ class GradesController
                 return json_encode(['ok' => false, 'message' => 'No autorizado para este grupo']);
             }
         }
-        $q = $this->pdo->prepare('SELECT parcial1, parcial2, final, promedio FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g');
-        $q->execute([':a' => $alumnoId, ':g' => $grupoId]);
-        $row = $q->fetch(PDO::FETCH_ASSOC);
+        $row = $this->gradesRepository->getGradeRow($alumnoId, $grupoId);
         header('Content-Type: application/json');
         if (!$row) { return json_encode(['ok' => true, 'data' => null]); }
         return json_encode(['ok' => true, 'data' => [

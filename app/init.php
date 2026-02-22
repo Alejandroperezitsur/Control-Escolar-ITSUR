@@ -28,10 +28,24 @@ if (session_status() === PHP_SESSION_NONE) {
 
     session_start();
 
-    // Control de expiración de sesión por inactividad
     try {
         $config = @include __DIR__ . '/../config/config.php';
-        $timeout = 3600; // 1 hora por defecto
+        $debug = false;
+        $env = 'local';
+        if (is_array($config) && isset($config['app'])) {
+            $debug = (bool)($config['app']['debug'] ?? false);
+            $env = (string)($config['app']['env'] ?? 'local');
+        }
+        if ($env === 'production' || !$debug) {
+            ini_set('display_errors', '0');
+            ini_set('display_startup_errors', '0');
+            error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT);
+        } else {
+            ini_set('display_errors', '1');
+            ini_set('display_startup_errors', '1');
+            error_reporting(E_ALL);
+        }
+        $timeout = 3600;
         if (is_array($config) && isset($config['security']['session_timeout'])) {
             $timeout = (int)$config['security']['session_timeout'] ?: $timeout;
         }

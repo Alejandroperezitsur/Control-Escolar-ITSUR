@@ -2,73 +2,33 @@
 namespace App\Controllers;
 
 use PDO;
+use App\Repositories\StudentsRepository;
 
 class StudentsController
 {
     private PDO $pdo;
+    private StudentsRepository $studentsRepository;
+
     public function __construct(PDO $pdo)
     {
         $this->pdo = $pdo;
+        $this->studentsRepository = new StudentsRepository($pdo);
     }
 
     public function index(): void
     {
         $page = (int)($_GET['page'] ?? 1);
         $limit = 20;
-        $offset = max(0, ($page - 1) * $limit);
         $search = $_GET['q'] ?? '';
         $status = $_GET['status'] ?? '';
-        
-        $where = '';
-        $params = [];
-        $conditions = [];
-        if ($search) {
-            $conditions[] = "(matricula LIKE :s1 OR nombre LIKE :s2 OR apellido LIKE :s3 OR email LIKE :s4)";
-            $params[':s1'] = "%$search%";
-            $params[':s2'] = "%$search%";
-            $params[':s3'] = "%$search%";
-            $params[':s4'] = "%$search%";
-        }
-        if ($status === 'active') {
-            $conditions[] = "activo = 1";
-        } elseif ($status === 'inactive') {
-            $conditions[] = "activo = 0";
-        }
-        if ($conditions) {
-            $where = 'WHERE ' . implode(' AND ', $conditions);
-        }
-        
-        // Count total for pagination
-        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM alumnos $where");
-        if (!empty($params)) {
-            $countStmt->execute($params);
-        } else {
-            $countStmt->execute();
-        }
-        $total = $countStmt->fetchColumn();
-        $totalPages = ceil($total / $limit);
-
-        // Fetch students
-        // Sorting
         $sort = $_GET['sort'] ?? 'apellido';
         $order = strtoupper($_GET['order'] ?? 'ASC');
-        $allowedSorts = ['matricula', 'nombre', 'apellido', 'email', 'activo'];
-        if (!in_array($sort, $allowedSorts)) { $sort = 'apellido'; }
-        if (!in_array($order, ['ASC', 'DESC'])) { $order = 'ASC'; }
-        
-        // Secondary sort for name consistency
-        $orderBy = "$sort $order";
-        if ($sort === 'apellido') { $orderBy .= ", nombre ASC"; }
-        
-        // Fetch students
-        $sql = "SELECT id, matricula, nombre, apellido, email, activo FROM alumnos $where ORDER BY $orderBy LIMIT :limit OFFSET :offset";
-        $stmt = $this->pdo->prepare($sql);
-        foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
-        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-        $stmt->execute();
-        $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
+
+        $result = $this->studentsRepository->paginate($search, $status, $sort, $order, $page, $limit);
+        $students = $result['students'];
+        $total = $result['total'];
+        $totalPages = $result['total_pages'];
+
         include __DIR__ . '/../Views/students/index.php';
     }
 
@@ -79,10 +39,8 @@ class StudentsController
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
         if ($id <= 0) { http_response_code(400); return 'ID inválido'; }
 
-        $stmt = $this->pdo->prepare('SELECT id, matricula, nombre, apellido, email, activo, fecha_nac, foto FROM alumnos WHERE id = :id');
-        $stmt->execute([':id' => $id]);
-        $alumno = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$alumno) { http_response_code(404); return 'Alumno no encontrado'; }
+        $alumno = $this->studentsRepository->findById($id);
+        if ($alumno === null) { http_response_code(404); return 'Alumno no encontrado'; }
 
         $svc = new \App\Services\StudentsService($this->pdo);
         $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
@@ -151,41 +109,19 @@ class StudentsController
         $this->checkAdmin();
         $this->assertCsrfPost();
         $data = $_POST;
-        
-        // Validation
+
         if (empty($data['matricula']) || empty($data['nombre']) || empty($data['apellido'])) {
             $this->jsonResponse(['error' => 'Campos obligatorios faltantes'], 400);
             return;
         }
 
-        // Check duplicate matricula
-        $stmt = $this->pdo->prepare('SELECT id FROM alumnos WHERE matricula = :m');
-        $stmt->execute([':m' => $data['matricula']]);
-        if ($stmt->fetch()) {
-            $this->jsonResponse(['error' => 'La matrícula ya existe'], 400);
+        $result = $this->studentsRepository->create($data);
+        if (!$result['ok']) {
+            $this->jsonResponse(['error' => $result['error'] ?? 'Error al crear alumno'], 400);
             return;
         }
 
-        $password = !empty($data['password']) ? password_hash($data['password'], PASSWORD_DEFAULT) : null;
-        
-        $sql = "INSERT INTO alumnos (matricula, nombre, apellido, email, password, activo) 
-                VALUES (:matricula, :nombre, :apellido, :email, :password, :activo)";
-        
-        $stmt = $this->pdo->prepare($sql);
-        $res = $stmt->execute([
-            ':matricula' => $data['matricula'],
-            ':nombre' => $data['nombre'],
-            ':apellido' => $data['apellido'],
-            ':email' => $data['email'] ?? null,
-            ':password' => $password,
-            ':activo' => isset($data['activo']) ? 1 : 0
-        ]);
-
-        if ($res) {
-            $this->jsonResponse(['success' => true, 'message' => 'Alumno creado correctamente']);
-        } else {
-            $this->jsonResponse(['error' => 'Error al crear alumno'], 500);
-        }
+        $this->jsonResponse(['success' => true, 'message' => 'Alumno creado correctamente']);
     }
 
     public function update(): void
@@ -199,40 +135,14 @@ class StudentsController
         }
 
         $data = $_POST;
-        
-        // Check duplicate matricula (excluding current user)
-        $stmt = $this->pdo->prepare('SELECT id FROM alumnos WHERE matricula = :m AND id != :id');
-        $stmt->execute([':m' => $data['matricula'], ':id' => $id]);
-        if ($stmt->fetch()) {
-            $this->jsonResponse(['error' => 'La matrícula ya existe'], 400);
+
+        $result = $this->studentsRepository->update($id, $data);
+        if (!$result['ok']) {
+            $this->jsonResponse(['error' => $result['error'] ?? 'Error al actualizar alumno'], 400);
             return;
         }
 
-        $fields = "matricula = :matricula, nombre = :nombre, apellido = :apellido, email = :email, activo = :activo";
-        $params = [
-            ':matricula' => $data['matricula'],
-            ':nombre' => $data['nombre'],
-            ':apellido' => $data['apellido'],
-            ':email' => $data['email'] ?? null,
-            ':activo' => isset($data['activo']) ? 1 : 0,
-            ':id' => $id
-        ];
-
-
-
-        if (!empty($data['password'])) {
-            $fields .= ", password = :password";
-            $params[':password'] = password_hash($data['password'], PASSWORD_DEFAULT);
-        }
-
-        $sql = "UPDATE alumnos SET $fields WHERE id = :id";
-        $stmt = $this->pdo->prepare($sql);
-        
-        if ($stmt->execute($params)) {
-            $this->jsonResponse(['success' => true, 'message' => 'Alumno actualizado correctamente']);
-        } else {
-            $this->jsonResponse(['error' => 'Error al actualizar alumno'], 500);
-        }
+        $this->jsonResponse(['success' => true, 'message' => 'Alumno actualizado correctamente']);
     }
 
     public function delete(): void
@@ -244,13 +154,12 @@ class StudentsController
             $this->jsonResponse(['error' => 'ID inválido'], 400);
             return;
         }
-
-        $stmt = $this->pdo->prepare("DELETE FROM alumnos WHERE id = :id");
-        if ($stmt->execute([':id' => $id])) {
+        $deleted = $this->studentsRepository->delete($id);
+        if ($deleted) {
             $this->jsonResponse(['success' => true, 'message' => 'Alumno eliminado correctamente']);
-        } else {
-            $this->jsonResponse(['error' => 'Error al eliminar alumno'], 500);
+            return;
         }
+        $this->jsonResponse(['error' => 'Error al eliminar alumno'], 500);
     }
 
     public function get(): void
@@ -261,16 +170,12 @@ class StudentsController
             $this->jsonResponse(['error' => 'ID inválido'], 400);
             return;
         }
-
-        $stmt = $this->pdo->prepare("SELECT id, matricula, nombre, apellido, email, activo FROM alumnos WHERE id = :id");
-        $stmt->execute([':id' => $id]);
-        $student = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($student) {
-            $this->jsonResponse($student);
-        } else {
+        $student = $this->studentsRepository->getSimpleById($id);
+        if ($student === null) {
             $this->jsonResponse(['error' => 'Alumno no encontrado'], 404);
+            return;
         }
+        $this->jsonResponse($student);
     }
 
     private function checkAdmin(): void

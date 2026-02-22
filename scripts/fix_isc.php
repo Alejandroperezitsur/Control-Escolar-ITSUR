@@ -1,14 +1,22 @@
 <?php
-// Fix for ISC Curriculum
-// Access this file via browser: http://localhost/PWBII/Control-Escolar-ITSUR/public/fix_isc.php
 
+if (php_sapi_name() !== 'cli') {
+    exit("CLI only\n");
+}
+
+require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/db.php';
+
+$config = require __DIR__ . '/../config/config.php';
+$env = (string)($config['app']['env'] ?? getenv('APP_ENV') ?: 'local');
+if ($env === 'production') {
+    fwrite(STDERR, "Fix ISC deshabilitado en producción\n");
+    exit(1);
+}
+
 $pdo = Database::getInstance()->getConnection();
 
-echo "<pre>";
-echo "=== DIAGNÓSTICO Y REPARACIÓN DE ISC (WEB MODE) ===\n\n";
-
-// 1. Verificar Carrera ISC
+echo "=== DIAGNÓSTICO Y REPARACIÓN DE ISC (CLI MODE) ===\n\n";
 echo "1. Buscando carrera ISC...\n";
 $stmt = $pdo->prepare("SELECT * FROM carreras WHERE clave = ?");
 $stmt->execute(['ISC']);
@@ -25,7 +33,6 @@ if (!$isc) {
     echo "Carrera encontrada: ID $iscId, Nombre: {$isc['nombre']}\n";
 }
 
-// 2. Verificar Materias (Muestra)
 echo "\n2. Verificando materias clave...\n";
 $materiasClave = ['ISC-1001', 'MAT-1001', 'ING-1001'];
 foreach ($materiasClave as $clave) {
@@ -41,14 +48,14 @@ foreach ($materiasClave as $clave) {
     }
 }
 
-// 3. Limpiar y Reparar
 echo "\n3. EJECUTANDO REPARACIÓN FORZADA...\n";
 echo "  -> Limpiando registros actuales de ISC...\n";
 $pdo->prepare("DELETE FROM materias_carrera WHERE carrera_id = ?")->execute([$iscId]);
 
 $sqlFile = __DIR__ . '/../migrations/force_full_isc_curriculum.sql';
 if (!file_exists($sqlFile)) {
-    die("ERROR CRÍTICO: No se encuentra el archivo SQL en $sqlFile\n");
+    fwrite(STDERR, "ERROR CRÍTICO: No se encuentra el archivo SQL en $sqlFile\n");
+    exit(1);
 }
 
 $sql = file_get_contents($sqlFile);
@@ -61,9 +68,12 @@ $success = 0;
 
 foreach ($statements as $query) {
     $query = trim($query);
-    if (empty($query)) continue;
-    if (strpos($query, 'USE control_escolar') !== false) continue;
-
+    if (empty($query)) {
+        continue;
+    }
+    if (strpos($query, 'USE control_escolar') !== false) {
+        continue;
+    }
     try {
         $pdo->exec($query);
         $success++;
@@ -83,9 +93,8 @@ $finalCount = $stmt->fetchColumn();
 echo "Total materias asignadas a ISC ahora: $finalCount\n";
 
 if ($finalCount > 0) {
-    echo "<h1>¡ÉXITO! La retícula ha sido reparada.</h1>";
-    echo "<p>Por favor regrese al Dashboard y verifique.</p>";
+    echo "ÉXITO: La retícula ha sido reparada.\n";
 } else {
-    echo "<h1>FALLO</h1>";
+    echo "FALLO: No se asignaron materias a ISC.\n";
 }
-echo "</pre>";
+

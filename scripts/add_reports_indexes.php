@@ -3,8 +3,17 @@
 // Este script crea índices útiles para acelerar reportes y agregaciones.
 // Comprueba si el índice existe antes de crearlo.
 
+if (php_sapi_name() !== 'cli') {
+    exit("CLI only\n");
+}
+
 require_once __DIR__ . '/../config/db.php';
 $config = include __DIR__ . '/../config/config.php';
+$env = (string)($config['app']['env'] ?? getenv('APP_ENV') ?: 'local');
+if ($env === 'production') {
+    fwrite(STDERR, "Creación de índices deshabilitada en producción\n");
+    exit(1);
+}
 $dbName = $config['db']['name'] ?? 'control_escolar';
 
 try {

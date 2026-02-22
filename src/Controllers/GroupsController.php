@@ -163,6 +163,8 @@ class GroupsController
     public function addSchedule(): void
     {
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
+        $this->assertCsrf();
         $gid = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
         $dia = trim((string)($_POST['dia'] ?? ''));
         $hi = trim((string)($_POST['hora_inicio'] ?? ''));
@@ -181,6 +183,8 @@ class GroupsController
     public function deleteSchedule(): void
     {
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
+        $this->assertCsrf();
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
         if (!$id) { http_response_code(400); echo 'ID inválido'; return; }
         $stmt = $this->pdo->prepare('DELETE FROM horarios_grupo WHERE id = :id');
