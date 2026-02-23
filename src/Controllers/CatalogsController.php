@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use PDO;
+use App\Http\Request;
 
 class CatalogsController
 {
@@ -342,7 +343,7 @@ class CatalogsController
         header('Content-Type: application/json');
         $this->ensureCompleteData();
         if ($grupoId <= 0) { echo json_encode([]); return; }
-        $pending = isset($_GET['pending']) ? (int)$_GET['pending'] : 0;
+        $pending = Request::getInt('pending', 0) ?? 0;
         $sql = 'SELECT a.id, a.matricula, a.nombre, a.apellido FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id WHERE c.grupo_id = :g' . ($pending === 1 ? ' AND c.final IS NULL' : '') . ' ORDER BY a.apellido, a.nombre';
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute([':g' => $grupoId]);

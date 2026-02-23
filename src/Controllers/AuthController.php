@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use App\Services\UserService;
 use App\Utils\Logger;
+use App\Http\Request;
 
 class AuthController
 {
@@ -31,18 +32,20 @@ class AuthController
 
     public function login(): string
     {
-        $token = $_POST['csrf_token'] ?? '';
-        if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
+        $token = Request::postString('csrf_token', '');
+        if ($token === null || $token === '' || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
             http_response_code(403);
             return 'CSRF inválido';
         }
-        $identity = trim((string)($_POST['identity'] ?? ''));
-        $password = (string)($_POST['password'] ?? '');
+        $identityRaw = Request::postString('identity', '');
+        $identity = trim((string)$identityRaw);
+        $password = (string)(Request::postString('password', '') ?? '');
         // Rate limiting básico por sesión
         $_SESSION['login_attempts'] = $_SESSION['login_attempts'] ?? 0;
         $requireCaptcha = ($_SESSION['login_attempts'] ?? 0) >= 3;
         if ($requireCaptcha) {
-            $input = trim((string)($_POST['captcha'] ?? ''));
+            $captchaRaw = Request::postString('captcha', '');
+            $input = trim((string)$captchaRaw);
             $answer = (string)($_SESSION['captcha_answer'] ?? '');
             if ($input === '' || $answer === '' || $input !== $answer) {
                 $_SESSION['flash'] = 'Captcha inválido. Intenta de nuevo.';

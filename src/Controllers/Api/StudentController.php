@@ -3,6 +3,7 @@ namespace App\Controllers\Api;
 
 use PDO;
 use App\Services\StudentsService;
+use App\Http\Request;
 
 class StudentController
 {
@@ -29,7 +30,8 @@ class StudentController
     public function carga(): string
     {
         $alumnoId = (int)($_SESSION['user_id'] ?? 0);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
+        $cicloRaw = Request::getString('ciclo');
+        $ciclo = $cicloRaw !== null ? trim((string)$cicloRaw) : null;
         if ($ciclo !== null && $ciclo !== '' && !preg_match('/^\d{4}-(1|2)$/', $ciclo)) {
             return $this->json(['success' => false, 'error' => 'Ciclo inválido'], 400);
         }
@@ -47,7 +49,8 @@ class StudentController
     public function estadisticas(): string
     {
         $alumnoId = (int)($_SESSION['user_id'] ?? 0);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
+        $cicloRaw = Request::getString('ciclo');
+        $ciclo = $cicloRaw !== null ? trim((string)$cicloRaw) : null;
         if ($ciclo !== null && $ciclo !== '' && !preg_match('/^\d{4}-(1|2)$/', $ciclo)) {
             return $this->json(['success' => false, 'error' => 'Ciclo inválido'], 400);
         }

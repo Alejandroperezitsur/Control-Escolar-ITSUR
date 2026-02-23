@@ -240,17 +240,8 @@ class SubjectsRepository
         return array_map(fn($x) => (string)$x['ciclo'], $cyclesStmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
-    public function ensureMateriasCarreraTable(): void
-    {
-        try {
-            $this->pdo->exec("CREATE TABLE IF NOT EXISTS materias_carrera (id INT AUTO_INCREMENT PRIMARY KEY, materia_id INT NOT NULL, carrera_id INT NOT NULL, semestre TINYINT NOT NULL, tipo ENUM('basica','especialidad','residencia') DEFAULT 'basica', creditos INT DEFAULT 5, UNIQUE KEY uk_materia_carrera_semestre (materia_id, carrera_id, semestre)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        } catch (\Throwable $e) {
-        }
-    }
-
     public function getCareerAssociations(int $materiaId): array
     {
-        $this->ensureMateriasCarreraTable();
         try {
             $stAss = $this->pdo->prepare('SELECT mc.id, mc.carrera_id, c.clave, c.nombre AS carrera_nombre, mc.semestre, mc.creditos, mc.tipo FROM materias_carrera mc JOIN carreras c ON c.id = mc.carrera_id WHERE mc.materia_id = :mid ORDER BY mc.semestre');
             $stAss->execute([':mid' => $materiaId]);
@@ -262,7 +253,6 @@ class SubjectsRepository
 
     public function addToCareer(int $materiaId, int $carreraId, int $semestre, int $creditos, string $tipo): bool
     {
-        $this->ensureMateriasCarreraTable();
         $ins = $this->pdo->prepare('INSERT INTO materias_carrera (materia_id, carrera_id, semestre, creditos, tipo) VALUES (:mid,:cid,:sem,:cred,:tipo) ON DUPLICATE KEY UPDATE creditos = VALUES(creditos), tipo = VALUES(tipo)');
         return $ins->execute([':mid' => $materiaId, ':cid' => $carreraId, ':sem' => $semestre, ':cred' => ($creditos ?: 5), ':tipo' => $tipo]);
     }

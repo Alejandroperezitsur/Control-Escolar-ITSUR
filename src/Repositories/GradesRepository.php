@@ -96,14 +96,6 @@ class GradesRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
-    public function ensurePromedioColumn(): void
-    {
-        try {
-            $this->pdo->exec("ALTER TABLE calificaciones ADD COLUMN promedio DECIMAL(5,2) NULL AFTER final");
-        } catch (\Throwable $e) {
-        }
-    }
-
     public function isActiveStudent(int $alumnoId): bool
     {
         $chkAlumno = $this->pdo->prepare('SELECT 1 FROM alumnos WHERE id = :id AND activo = 1');
@@ -113,7 +105,7 @@ class GradesRepository
 
     public function getGroupById(int $grupoId): ?array
     {
-        $grpStmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
+        $grpStmt = $this->pdo->prepare('SELECT g.id, g.nombre, g.ciclo, g.ciclo_id, m.nombre AS materia, u.nombre AS profesor, g.profesor_id FROM grupos g JOIN materias m ON m.id = g.materia_id JOIN usuarios u ON u.id = g.profesor_id WHERE g.id = :id');
         $grpStmt->execute([':id' => $grupoId]);
         $row = $grpStmt->fetch(PDO::FETCH_ASSOC);
         return $row !== false ? $row : null;
@@ -170,10 +162,15 @@ class GradesRepository
         }
         $grupoRow = $this->getGroupById($grupoId);
         if (!$grupoRow) {
-            return 'skipped';
+            return 'critical';
         }
         if ($role === 'profesor' && (int)$grupoRow['profesor_id'] !== $profId) {
-            return 'skipped';
+            return 'critical';
+        }
+        try {
+            (new \App\Services\AcademicService($this->pdo))->assertActiveCycleForGroup($grupoId);
+        } catch (\Throwable $e) {
+            return 'critical';
         }
         $stmt = $this->pdo->prepare("UPDATE calificaciones SET parcial1 = :p1, parcial2 = :p2, final = :fin, promedio = :prom WHERE alumno_id = :alumno AND grupo_id = :grupo");
         $stmt->execute([
@@ -205,4 +202,3 @@ class GradesRepository
         return $row !== false ? $row : null;
     }
 }
-

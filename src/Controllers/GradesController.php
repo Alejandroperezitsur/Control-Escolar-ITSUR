@@ -1,7 +1,9 @@
 <?php
 namespace App\Controllers;
 
+use App\Http\Request;
 use App\Repositories\GradesRepository;
+use App\Services\AcademicService;
 use PDO;
 
 class GradesController
@@ -28,7 +30,7 @@ class GradesController
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin') { http_response_code(403); return 'No autorizado'; }
         $cycles = $this->gradesRepository->getCycles();
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
+        $ciclo = Request::getString('ciclo');
         $rows = $this->gradesRepository->getPendingForAdmin($ciclo);
 
         ob_start();
@@ -39,7 +41,7 @@ class GradesController
     public function pendingForProfessor(): string
     {
         $pid = (int)($_SESSION['user_id'] ?? 0);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
+        $ciclo = Request::getString('ciclo');
         $rows = $this->gradesRepository->getPendingForProfessor($pid, $ciclo);
         ob_start();
         include __DIR__ . '/../Views/professor/pending.php';
@@ -55,7 +57,7 @@ class GradesController
 
     public function processBulkUpload(): string
     {
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
             http_response_code(403);
             return 'CSRF inválido';
@@ -66,34 +68,65 @@ class GradesController
             http_response_code(400);
             return 'Archivo CSV inválido';
         }
-        $this->gradesRepository->ensurePromedioColumn();
         $fp = fopen($_FILES['csv']['tmp_name'], 'r');
         $headers = fgetcsv($fp);
         $count = 0;
         $skipped = 0;
         $processed = 0;
-        while (($row = fgetcsv($fp)) !== false) {
-            // Espera columnas: alumno_id, grupo_id, parcial1, parcial2, final
-            [$alumnoId, $grupoId, $p1, $p2, $fin] = $row;
+        $criticalError = false;
+        try {
+            $this->pdo->beginTransaction();
+            while (($row = fgetcsv($fp)) !== false) {
+                [$alumnoId, $grupoId, $p1, $p2, $fin] = $row;
 
-            $alumnoId = filter_var($alumnoId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-            $grupoId = filter_var($grupoId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-            $p1 = ($p1 !== '' ? filter_var($p1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null);
-            $p2 = ($p2 !== '' ? filter_var($p2, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null);
-            $fin = ($fin !== '' ? filter_var($fin, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null);
+                $alumnoId = filter_var($alumnoId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                $grupoId = filter_var($grupoId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+                $p1Val = ($p1 !== '' ? filter_var($p1, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null);
+                $p2Val = ($p2 !== '' ? filter_var($p2, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null);
+                $finVal = ($fin !== '' ? filter_var($fin, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null);
 
-            if (!$alumnoId || !$grupoId) { $skipped++; $processed++; continue; }
+                if (!$alumnoId || !$grupoId) { $skipped++; $processed++; continue; }
+                if (($p1 !== '' && $p1Val === false) || ($p2 !== '' && $p2Val === false) || ($fin !== '' && $finVal === false)) { $skipped++; $processed++; continue; }
 
-            $prom = ($fin !== null) ? (float)$fin : (($p1 !== null && $p2 !== null) ? round(($p1 + $p2) / 2, 2) : null);
-            $result = $this->gradesRepository->updateBulkRow($alumnoId, $grupoId, $p1, $p2, $fin, $prom, $role, $profId);
-            if ($result === 'updated') {
-                $count++;
-            } else {
-                $skipped++;
+                try {
+                    (new AcademicService($this->pdo))->assertActiveCycleForGroup($grupoId);
+                } catch (\Throwable $e) {
+                    $criticalError = true;
+                    break;
+                }
+
+                $prom = ($finVal !== null) ? (float)$finVal : (($p1Val !== null && $p2Val !== null) ? round(($p1Val + $p2Val) / 2, 2) : null);
+                $result = $this->gradesRepository->updateBulkRow($alumnoId, $grupoId, $p1Val, $p2Val, $finVal, $prom, $role, $profId);
+                if ($result === 'updated') {
+                    $count++;
+                } elseif ($result === 'critical') {
+                    $criticalError = true;
+                    break;
+                } else {
+                    $skipped++;
+                }
+                $processed++;
             }
-            $processed++;
+            fclose($fp);
+            if ($criticalError) {
+                $this->pdo->rollBack();
+                http_response_code(409);
+                return 'Error crítico en carga masiva (grupo o profesor inválido/ciclo no activo), no se aplicaron cambios';
+            }
+            $invalidRatio = $processed > 0 ? ($skipped / $processed) : 0;
+            if ($invalidRatio > 0.2) {
+                $this->pdo->rollBack();
+                http_response_code(400);
+                return 'Más del 20% de filas inválidas, se deshicieron todos los cambios';
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            fclose($fp);
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
         }
-        fclose($fp);
         \App\Utils\Logger::info('grades_bulk_update', ['updated' => $count, 'skipped' => $skipped, 'processed' => $processed]);
         $_SESSION['bulk_last_summary'] = ['updated' => $count, 'skipped' => $skipped, 'processed' => $processed, 'ts' => time()];
         $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
@@ -106,7 +139,7 @@ class GradesController
 
     public function create(): string
     {
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
             http_response_code(403);
             return 'CSRF inválido';
@@ -120,9 +153,19 @@ class GradesController
 
         $alumnoId = filter_input(INPUT_POST, 'alumno_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $grupoId = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $p1 = ($_POST['parcial1'] ?? '') !== '' ? filter_var($_POST['parcial1'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
-        $p2 = ($_POST['parcial2'] ?? '') !== '' ? filter_var($_POST['parcial2'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
-        $fin = ($_POST['final'] ?? '') !== '' ? filter_var($_POST['final'], FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+        $p1Raw = Request::postString('parcial1', '') ?? '';
+        $p2Raw = Request::postString('parcial2', '') ?? '';
+        $finRaw = Request::postString('final', '') ?? '';
+        $p1 = $p1Raw !== '' ? filter_var($p1Raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+        $p2 = $p2Raw !== '' ? filter_var($p2Raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+        $fin = $finRaw !== '' ? filter_var($finRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+        if (($p1Raw !== '' && $p1 === false) || ($p2Raw !== '' && $p2 === false) || ($finRaw !== '' && $fin === false)) {
+            http_response_code(400);
+            $_SESSION['flash'] = 'Las calificaciones deben estar entre 0 y 100';
+            $_SESSION['flash_type'] = 'danger';
+            header('Location: /grades');
+            return '';
+        }
 
         if (!$alumnoId || !$grupoId) {
             http_response_code(400);
@@ -148,6 +191,15 @@ class GradesController
             header('Location: /grades');
             return '';
         }
+        try {
+            (new AcademicService($this->pdo))->assertActiveCycleForGroup($grupoId);
+        } catch (\Throwable $e) {
+            http_response_code(409);
+            $_SESSION['flash'] = 'No se pueden capturar calificaciones porque el ciclo no está activo para este grupo';
+            $_SESSION['flash_type'] = 'danger';
+            header('Location: /grades');
+            return '';
+        }
         if ($role === 'profesor') {
             $pid = (int)($_SESSION['user_id'] ?? 0);
             if ((int)$grpRow['profesor_id'] !== $pid) {
@@ -159,7 +211,6 @@ class GradesController
             }
         }
 
-        $this->gradesRepository->ensurePromedioColumn();
         $existing = $this->gradesRepository->getGradeByAlumnoGrupo($alumnoId, $grupoId);
 
         $prom = ($fin !== null) ? (float)$fin : (($p1 !== null && $p2 !== null) ? round(($p1 + $p2) / 2, 2) : null);
@@ -187,7 +238,7 @@ class GradesController
         }
 
         \App\Utils\Logger::info('grade_upsert', ['alumno_id' => $alumnoId, 'grupo_id' => $grupoId]);
-        $redirect = $_POST['redirect_to'] ?? '/grades';
+        $redirect = Request::postString('redirect_to', '/grades') ?? '/grades';
         $redirect = is_string($redirect) ? $redirect : '/grades';
         if (!preg_match('#^/[a-zA-Z0-9/_?=&%-]+$#', $redirect)) { $redirect = '/grades'; }
         if ($message === 'Calificación registrada correctamente') {
@@ -213,7 +264,7 @@ class GradesController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
-        $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
+        $grupoId = Request::getInt('grupo_id', 0) ?? 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
         $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
@@ -239,9 +290,10 @@ class GradesController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
-        $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
+        $grupoId = Request::getInt('grupo_id', 0) ?? 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
-        $estado = strtolower(trim((string)($_GET['estado'] ?? '')));
+        $estadoRaw = Request::getString('estado', '') ?? '';
+        $estado = strtolower($estadoRaw);
         $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
         if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
@@ -272,7 +324,7 @@ class GradesController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
-        $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
+        $grupoId = Request::getInt('grupo_id', 0) ?? 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
         $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
@@ -297,9 +349,10 @@ class GradesController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin' && $role !== 'profesor') { http_response_code(403); return 'No autorizado'; }
-        $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
+        $grupoId = Request::getInt('grupo_id', 0) ?? 0;
         if ($grupoId <= 0) { http_response_code(400); return 'Grupo inválido'; }
-        $estado = strtolower(trim((string)($_GET['estado'] ?? '')));
+        $estadoRaw = Request::getString('estado', '') ?? '';
+        $estado = strtolower($estadoRaw);
         $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
         if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
@@ -349,8 +402,8 @@ class GradesController
             http_response_code(403);
             return json_encode(['ok' => false, 'message' => 'No autorizado']);
         }
-        $alumnoId = isset($_GET['alumno_id']) ? (int)$_GET['alumno_id'] : 0;
-        $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
+        $alumnoId = Request::getInt('alumno_id', 0) ?? 0;
+        $grupoId = Request::getInt('grupo_id', 0) ?? 0;
         if ($alumnoId <= 0 || $grupoId <= 0) {
             header('Content-Type: application/json');
             http_response_code(400);

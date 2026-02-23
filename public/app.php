@@ -39,6 +39,7 @@ use App\Controllers\CatalogsController;
 use App\Controllers\ProfessorsController;
 use App\Controllers\AdminSettingsController;
 use App\Controllers\CareersController;
+use App\Controllers\CiclosController;
 
 Kernel::boot();
 $pdo = \Database::getInstance()->getConnection();
@@ -61,6 +62,7 @@ $catalogs = new CatalogsController($pdo);
 $professorsCtl = new ProfessorsController($pdo);
 $adminSettings = new AdminSettingsController();
 $careers = new CareersController($pdo);
+$ciclos = new CiclosController($pdo);
 
 // Rutas públicas
 $router->get('/login', fn() => $auth->showLogin());
@@ -95,6 +97,13 @@ $router->get('/grades/group/export/xlsx', fn() => $grades->exportGroupXlsx(), [A
 // Admin: Ajustes de siembra
 $router->get('/admin/settings', fn() => $adminSettings->index(), [AuthMiddleware::requireRole('admin')]);
 $router->post('/admin/settings/save', fn() => $adminSettings->save(), [AuthMiddleware::requireRole('admin')]);
+
+// Ciclos escolares
+$router->get('/ciclos', fn() => $ciclos->index(), [AuthMiddleware::requireRole('admin')]);
+$router->get('/ciclos/create', fn() => $ciclos->create(), [AuthMiddleware::requireRole('admin')]);
+$router->post('/ciclos/store', fn() => $ciclos->store(), [AuthMiddleware::requireRole('admin')]);
+$router->post('/ciclos/activar', fn() => $ciclos->activar(), [AuthMiddleware::requireRole('admin')]);
+$router->post('/ciclos/cerrar', fn() => $ciclos->cerrar(), [AuthMiddleware::requireRole('admin')]);
 
 // Gestión de profesores (migración de profesores.php)
 $router->get('/professors', fn() => $professorsCtl->index(), [AuthMiddleware::requireRole('admin')]);

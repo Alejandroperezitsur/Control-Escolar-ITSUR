@@ -2,7 +2,9 @@
 namespace App\Controllers;
 
 use PDO;
+use App\Http\Request;
 use App\Repositories\StudentsRepository;
+use App\Services\AcademicService;
 
 class StudentsController
 {
@@ -17,12 +19,12 @@ class StudentsController
 
     public function index(): void
     {
-        $page = (int)($_GET['page'] ?? 1);
+        $page = Request::getInt('page', 1);
         $limit = 20;
-        $search = $_GET['q'] ?? '';
-        $status = $_GET['status'] ?? '';
-        $sort = $_GET['sort'] ?? 'apellido';
-        $order = strtoupper($_GET['order'] ?? 'ASC');
+        $search = Request::getString('q', '') ?? '';
+        $status = Request::getString('status', '') ?? '';
+        $sort = Request::getString('sort', 'apellido') ?? 'apellido';
+        $order = strtoupper(Request::getString('order', 'ASC') ?? 'ASC');
 
         $result = $this->studentsRepository->paginate($search, $status, $sort, $order, $page, $limit);
         $students = $result['students'];
@@ -36,14 +38,14 @@ class StudentsController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin') { http_response_code(403); return 'No autorizado'; }
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        $id = Request::getInt('id', 0) ?? 0;
         if ($id <= 0) { http_response_code(400); return 'ID inválido'; }
 
         $alumno = $this->studentsRepository->findById($id);
         if ($alumno === null) { http_response_code(404); return 'Alumno no encontrado'; }
 
         $svc = new \App\Services\StudentsService($this->pdo);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
+        $ciclo = Request::getString('ciclo', '') ?? '';
         $carga = $svc->getAcademicLoad($id, $ciclo !== '' ? $ciclo : null);
 
         $sql = "SELECT m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.parcial1, c.parcial2, c.final,
@@ -105,9 +107,9 @@ class StudentsController
     public function store(): void
     {
         $this->checkAdmin();
-        $data = $_POST;
+        $data = Request::postAll();
 
-        if (empty($data['matricula']) || empty($data['nombre']) || empty($data['apellido'])) {
+        if (empty($data['matricula'] ?? null) || empty($data['nombre'] ?? null) || empty($data['apellido'] ?? null)) {
             $this->jsonResponse(['error' => 'Campos obligatorios faltantes'], 400);
             return;
         }
@@ -130,7 +132,7 @@ class StudentsController
             return;
         }
 
-        $data = $_POST;
+        $data = Request::postAll();
 
         $result = $this->studentsRepository->update($id, $data);
         if (!$result['ok']) {
@@ -192,8 +194,8 @@ class StudentsController
     public function byProfessor(): string
     {
         $pid = (int)($_SESSION['user_id'] ?? 0);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
-        $grupoId = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
+        $ciclo = Request::getString('ciclo', '') ?? '';
+        $grupoId = Request::getInt('grupo_id', 0) ?? 0;
 
         $params = [':p' => $pid];
         $where = 'WHERE g.profesor_id = :p';
@@ -231,8 +233,8 @@ class StudentsController
     public function myGrades(): string
     {
         $aid = (int)($_SESSION['user_id'] ?? 0);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
-        $materia = isset($_GET['materia']) ? trim((string)$_GET['materia']) : '';
+        $ciclo = Request::getString('ciclo', '') ?? '';
+        $materia = Request::getString('materia', '') ?? '';
         $params = [':a' => $aid];
         $where = 'WHERE c.alumno_id = :a';
         if ($ciclo !== '') { $where .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
@@ -312,8 +314,9 @@ class StudentsController
     {
         $aid = (int)($_SESSION['user_id'] ?? 0);
         $svc = new \App\Services\StudentsService($this->pdo);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
-        $career = isset($_GET['career']) ? strtoupper(trim((string)$_GET['career'])) : '';
+        $ciclo = Request::getString('ciclo', '') ?? '';
+        $careerRaw = Request::getString('career', '') ?? '';
+        $career = strtoupper($careerRaw);
         $load = $svc->getAcademicLoad($aid, $ciclo !== '' ? $ciclo : null);
 
         $params = [];
@@ -369,48 +372,102 @@ class StudentsController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'alumno') { http_response_code(403); return json_encode(['error' => 'No autorizado']); }
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); return json_encode(['error' => 'CSRF inválido']); }
         $aid = (int)($_SESSION['user_id'] ?? 0);
         $gid = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
         if (!$aid || !$gid) { http_response_code(400); return json_encode(['error' => 'Parámetros inválidos']); }
-        $stG = $this->pdo->prepare('SELECT g.id, g.materia_id, g.ciclo, COALESCE(g.cupo,30) AS cupo FROM grupos g WHERE g.id = :id');
-        $stG->execute([':id' => $gid]);
-        $g = $stG->fetch(PDO::FETCH_ASSOC);
-        if (!$g) { http_response_code(404); return json_encode(['error' => 'Grupo no existe']); }
-        $stCnt = $this->pdo->prepare('SELECT COUNT(*) FROM calificaciones WHERE grupo_id = :g');
-        $stCnt->execute([':g' => $gid]);
-        $ocup = (int)$stCnt->fetchColumn();
-        if ($ocup >= (int)($g['cupo'] ?? 30)) { http_response_code(409); return json_encode(['error' => 'Cupo lleno']); }
-        $stDup = $this->pdo->prepare('SELECT 1 FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g LIMIT 1');
-        $stDup->execute([':a' => $aid, ':g' => $gid]);
-        if ($stDup->fetchColumn()) { http_response_code(409); return json_encode(['error' => 'Ya inscrito en el grupo']); }
-        $stApr = $this->pdo->prepare('SELECT 1 FROM calificaciones c JOIN grupos gx ON gx.id = c.grupo_id WHERE c.alumno_id = :a AND gx.materia_id = :m AND c.final IS NOT NULL AND c.final >= 70 LIMIT 1');
-        $stApr->execute([':a' => $aid, ':m' => (int)($g['materia_id'] ?? 0)]);
-        if ($stApr->fetchColumn()) { http_response_code(409); return json_encode(['error' => 'Materia ya aprobada']); }
-        // Bloqueo: ya tiene pendiente en misma materia y ciclo
-        $stPendSame = $this->pdo->prepare('SELECT 1 FROM calificaciones c JOIN grupos gx ON gx.id = c.grupo_id WHERE c.alumno_id = :a AND c.final IS NULL AND gx.materia_id = :m AND gx.ciclo = :c AND gx.id <> :g LIMIT 1');
-        $stPendSame->execute([':a' => $aid, ':m' => (int)($g['materia_id'] ?? 0), ':c' => (string)($g['ciclo'] ?? ''), ':g' => (int)($g['id'] ?? 0)]);
-        if ($stPendSame->fetchColumn()) { http_response_code(409); return json_encode(['error' => 'Ya tienes una inscripción pendiente en la misma materia y ciclo']); }
-        // Límite de grupos por ciclo (pendientes)
-        $cfg = @include __DIR__ . '/../../config/config.php';
-        $maxPerCycle = 7;
-        if (is_array($cfg) && isset($cfg['academic']['max_grupos_por_ciclo'])) { $maxPerCycle = (int)$cfg['academic']['max_grupos_por_ciclo'] ?: $maxPerCycle; }
-        $stCountCycle = $this->pdo->prepare('SELECT COUNT(*) FROM calificaciones c JOIN grupos gx ON gx.id = c.grupo_id WHERE c.alumno_id = :a AND gx.ciclo = :c AND c.final IS NULL');
-        $stCountCycle->execute([':a' => $aid, ':c' => (string)($g['ciclo'] ?? '')]);
-        $pendingInCycle = (int)$stCountCycle->fetchColumn();
-        if ($pendingInCycle >= $maxPerCycle) { http_response_code(409); return json_encode(['error' => 'Has alcanzado el límite de grupos pendientes por ciclo']); }
-        $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final) VALUES (:a,:g,NULL,NULL,NULL)');
-        $ok = $ins->execute([':a' => $aid, ':g' => $gid]);
-        if ($ok) { header('Content-Type: application/json'); return json_encode(['success' => true]); }
-        http_response_code(500); return json_encode(['error' => 'Error al inscribir']);
+        try {
+            $this->pdo->beginTransaction();
+            $stG = $this->pdo->prepare('SELECT g.id, g.materia_id, g.ciclo, g.ciclo_id, COALESCE(g.cupo,30) AS cupo FROM grupos g WHERE g.id = :id');
+            $stG->execute([':id' => $gid]);
+            $g = $stG->fetch(PDO::FETCH_ASSOC);
+            if (!$g) {
+                $this->pdo->rollBack();
+                http_response_code(404);
+                return json_encode(['error' => 'Grupo no existe']);
+            }
+            (new AcademicService($this->pdo))->assertActiveCycleForGroup($gid);
+            $stCnt = $this->pdo->prepare('SELECT COUNT(*) FROM calificaciones WHERE grupo_id = :g FOR UPDATE');
+            $stCnt->execute([':g' => $gid]);
+            $ocup = (int)$stCnt->fetchColumn();
+            if ($ocup >= (int)($g['cupo'] ?? 30)) {
+                $this->pdo->rollBack();
+                http_response_code(409);
+                return json_encode(['error' => 'Cupo lleno']);
+            }
+            $stDup = $this->pdo->prepare('SELECT 1 FROM calificaciones WHERE alumno_id = :a AND grupo_id = :g LIMIT 1');
+            $stDup->execute([':a' => $aid, ':g' => $gid]);
+            if ($stDup->fetchColumn()) {
+                $this->pdo->rollBack();
+                http_response_code(409);
+                return json_encode(['error' => 'Ya inscrito en el grupo']);
+            }
+            $stApr = $this->pdo->prepare('SELECT 1 FROM calificaciones c JOIN grupos gx ON gx.id = c.grupo_id WHERE c.alumno_id = :a AND gx.materia_id = :m AND c.final IS NOT NULL AND c.final >= 70 LIMIT 1');
+            $stApr->execute([':a' => $aid, ':m' => (int)($g['materia_id'] ?? 0)]);
+            if ($stApr->fetchColumn()) {
+                $this->pdo->rollBack();
+                http_response_code(409);
+                return json_encode(['error' => 'Materia ya aprobada']);
+            }
+            $stPendSame = $this->pdo->prepare('SELECT 1 FROM calificaciones c JOIN grupos gx ON gx.id = c.grupo_id WHERE c.alumno_id = :a AND c.final IS NULL AND gx.materia_id = :m AND gx.ciclo = :c AND gx.id <> :g LIMIT 1');
+            $stPendSame->execute([':a' => $aid, ':m' => (int)($g['materia_id'] ?? 0), ':c' => (string)($g['ciclo'] ?? ''), ':g' => (int)($g['id'] ?? 0)]);
+            if ($stPendSame->fetchColumn()) {
+                $this->pdo->rollBack();
+                http_response_code(409);
+                return json_encode(['error' => 'Ya tienes una inscripción pendiente en la misma materia y ciclo']);
+            }
+            $stPre = $this->pdo->prepare('SELECT materia_requisito_id FROM materias_prerrequisitos WHERE materia_id = :mid');
+            $stPre->execute([':mid' => (int)($g['materia_id'] ?? 0)]);
+            $reqIds = $stPre->fetchAll(PDO::FETCH_COLUMN);
+            if ($reqIds) {
+                $reqIds = array_map('intval', $reqIds);
+                $placeholders = implode(',', array_fill(0, count($reqIds), '?'));
+                $sqlReq = 'SELECT COUNT(DISTINCT gx.materia_id) FROM calificaciones c2 JOIN grupos gx ON gx.id = c2.grupo_id WHERE c2.alumno_id = ? AND c2.final IS NOT NULL AND c2.final >= 70 AND gx.materia_id IN ('.$placeholders.')';
+                $params = array_merge([$aid], $reqIds);
+                $stReq = $this->pdo->prepare($sqlReq);
+                $stReq->execute($params);
+                $aprobadasReq = (int)$stReq->fetchColumn();
+                if ($aprobadasReq < count($reqIds)) {
+                    $this->pdo->rollBack();
+                    http_response_code(409);
+                    return json_encode(['error' => 'No has aprobado las materias prerrequisito para este grupo']);
+                }
+            }
+            $cfg = @include __DIR__ . '/../../config/config.php';
+            $maxPerCycle = 7;
+            if (is_array($cfg) && isset($cfg['academic']['max_grupos_por_ciclo'])) { $maxPerCycle = (int)$cfg['academic']['max_grupos_por_ciclo'] ?: $maxPerCycle; }
+            $stCountCycle = $this->pdo->prepare('SELECT COUNT(*) FROM calificaciones c JOIN grupos gx ON gx.id = c.grupo_id WHERE c.alumno_id = :a AND gx.ciclo = :c AND c.final IS NULL');
+            $stCountCycle->execute([':a' => $aid, ':c' => (string)($g['ciclo'] ?? '')]);
+            $pendingInCycle = (int)$stCountCycle->fetchColumn();
+            if ($pendingInCycle >= $maxPerCycle) {
+                $this->pdo->rollBack();
+                http_response_code(409);
+                return json_encode(['error' => 'Has alcanzado el límite de grupos pendientes por ciclo']);
+            }
+            $ins = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final) VALUES (:a,:g,NULL,NULL,NULL)');
+            $ok = $ins->execute([':a' => $aid, ':g' => $gid]);
+            if (!$ok) {
+                $this->pdo->rollBack();
+                http_response_code(500);
+                return json_encode(['error' => 'Error al inscribir']);
+            }
+            $this->pdo->commit();
+            header('Content-Type: application/json');
+            return json_encode(['success' => true]);
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     public function selfUnenroll(): string
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'alumno') { http_response_code(403); return json_encode(['error' => 'No autorizado']); }
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); return json_encode(['error' => 'CSRF inválido']); }
         $aid = (int)($_SESSION['user_id'] ?? 0);
         $gid = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
@@ -428,7 +485,7 @@ class StudentsController
     public function mySubjects(): string
     {
         $aid = (int)($_SESSION['user_id'] ?? 0);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
+        $ciclo = Request::getString('ciclo', '') ?? '';
         $params = [':a' => $aid];
         $where = '';
         if ($ciclo !== '') { $where = ' AND g.ciclo = :c'; $params[':c'] = $ciclo; }
@@ -461,8 +518,8 @@ class StudentsController
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'alumno') { http_response_code(403); return ''; }
         $aid = (int)($_SESSION['user_id'] ?? 0);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
-        $materia = isset($_GET['materia']) ? trim((string)$_GET['materia']) : '';
+        $ciclo = Request::getString('ciclo', '') ?? '';
+        $materia = Request::getString('materia', '') ?? '';
         $params = [':a' => $aid];
         $where = 'WHERE c.alumno_id = :a';
         if ($ciclo !== '') { $where .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }
@@ -501,8 +558,8 @@ class StudentsController
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'alumno') { http_response_code(403); return ''; }
         $aid = (int)($_SESSION['user_id'] ?? 0);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
-        $materia = isset($_GET['materia']) ? trim((string)$_GET['materia']) : '';
+        $ciclo = Request::getString('ciclo', '') ?? '';
+        $materia = Request::getString('materia', '') ?? '';
         $params = [':a' => $aid];
         $where = 'WHERE c.alumno_id = :a';
         if ($ciclo !== '') { $where .= ' AND g.ciclo = :ciclo'; $params[':ciclo'] = $ciclo; }

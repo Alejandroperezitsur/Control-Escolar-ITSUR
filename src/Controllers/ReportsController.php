@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use PDO;
 use App\Utils\Logger;
+use App\Http\Request;
 
 class ReportsController
 {
@@ -130,21 +131,30 @@ class ReportsController
             return '';
         }
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
-        if ($token && !$this->validateCsrf($token)) {
+        $token = Request::postString('csrf_token') ?? Request::getString('csrf_token') ?? '';
+        if ($token !== '' && !$this->validateCsrf($token)) {
             http_response_code(400);
             echo 'CSRF inválido';
             return '';
         }
 
-        $src = ($method === 'GET') ? $_GET : $_POST;
-        $filters = [
-            'ciclo' => $src['ciclo'] ?? null,
-            'grupo_id' => isset($src['grupo_id']) ? (int)$src['grupo_id'] : null,
-            'profesor_id' => isset($src['profesor_id']) ? (int)$src['profesor_id'] : null,
-            'materia_id' => isset($src['materia_id']) ? (int)$src['materia_id'] : null,
-            'estado' => $src['estado'] ?? null,
-        ];
+        if ($method === 'GET') {
+            $filters = [
+                'ciclo' => Request::getString('ciclo'),
+                'grupo_id' => Request::getInt('grupo_id'),
+                'profesor_id' => Request::getInt('profesor_id'),
+                'materia_id' => Request::getInt('materia_id'),
+                'estado' => Request::getString('estado'),
+            ];
+        } else {
+            $filters = [
+                'ciclo' => Request::postString('ciclo'),
+                'grupo_id' => Request::postInt('grupo_id'),
+                'profesor_id' => Request::postInt('profesor_id'),
+                'materia_id' => Request::postInt('materia_id'),
+                'estado' => Request::postString('estado'),
+            ];
+        }
         [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
 
         Logger::info('report_export_csv', ['filters' => $filters]);
@@ -205,20 +215,29 @@ class ReportsController
             exit('No autorizado');
         }
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
-        if ($token && !$this->validateCsrf($token)) {
+        $token = Request::postString('csrf_token') ?? Request::getString('csrf_token') ?? '';
+        if ($token !== '' && !$this->validateCsrf($token)) {
             http_response_code(400);
             exit('CSRF inválido');
         }
 
-        $src = ($method === 'GET') ? $_GET : $_POST;
-        $filters = [
-            'ciclo' => $src['ciclo'] ?? null,
-            'grupo_id' => isset($src['grupo_id']) ? (int)$src['grupo_id'] : null,
-            'profesor_id' => isset($src['profesor_id']) ? (int)$src['profesor_id'] : null,
-            'materia_id' => isset($src['materia_id']) ? (int)$src['materia_id'] : null,
-            'estado' => $src['estado'] ?? null,
-        ];
+        if ($method === 'GET') {
+            $filters = [
+                'ciclo' => Request::getString('ciclo'),
+                'grupo_id' => Request::getInt('grupo_id'),
+                'profesor_id' => Request::getInt('profesor_id'),
+                'materia_id' => Request::getInt('materia_id'),
+                'estado' => Request::getString('estado'),
+            ];
+        } else {
+            $filters = [
+                'ciclo' => Request::postString('ciclo'),
+                'grupo_id' => Request::postInt('grupo_id'),
+                'profesor_id' => Request::postInt('profesor_id'),
+                'materia_id' => Request::postInt('materia_id'),
+                'estado' => Request::postString('estado'),
+            ];
+        }
         [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
 
         Logger::info('report_export_pdf', ['filters' => $filters]);
@@ -300,7 +319,10 @@ class ReportsController
                     GROUP BY a.id, a.matricula, a.nombre, a.apellido
                     ORDER BY promedio DESC LIMIT 5";
         $stA = $this->pdo->prepare($qTopAl); $stA->execute($pTop); $rowsA = $stA->fetchAll(PDO::FETCH_ASSOC);
-        $riskVal = isset($src['riesgo_umbral']) ? (int)$src['riesgo_umbral'] : 60;
+        $riskInput = $method === 'GET'
+            ? Request::getInt('riesgo_umbral', 60)
+            : Request::postInt('riesgo_umbral', 60);
+        $riskVal = (int)($riskInput ?? 60);
         if ($riskVal < 10) { $riskVal = 10; } elseif ($riskVal > 100) { $riskVal = 100; }
         $qRisk = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final
                   FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
@@ -357,8 +379,8 @@ class ReportsController
             return '';
         }
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
-        if ($token && !$this->validateCsrf($token)) {
+        $token = Request::postString('csrf_token') ?? Request::getString('csrf_token') ?? '';
+        if ($token !== '' && !$this->validateCsrf($token)) {
             http_response_code(400);
             echo 'CSRF inválido';
             return '';
@@ -370,14 +392,23 @@ class ReportsController
             return '';
         }
 
-        $src = ($method === 'GET') ? $_GET : $_POST;
-        $filters = [
-            'ciclo' => $src['ciclo'] ?? null,
-            'grupo_id' => isset($src['grupo_id']) ? (int)$src['grupo_id'] : null,
-            'profesor_id' => isset($src['profesor_id']) ? (int)$src['profesor_id'] : null,
-            'materia_id' => isset($src['materia_id']) ? (int)$src['materia_id'] : null,
-            'estado' => $src['estado'] ?? null,
-        ];
+        if ($method === 'GET') {
+            $filters = [
+                'ciclo' => Request::getString('ciclo'),
+                'grupo_id' => Request::getInt('grupo_id'),
+                'profesor_id' => Request::getInt('profesor_id'),
+                'materia_id' => Request::getInt('materia_id'),
+                'estado' => Request::getString('estado'),
+            ];
+        } else {
+            $filters = [
+                'ciclo' => Request::postString('ciclo'),
+                'grupo_id' => Request::postInt('grupo_id'),
+                'profesor_id' => Request::postInt('profesor_id'),
+                'materia_id' => Request::postInt('materia_id'),
+                'estado' => Request::postString('estado'),
+            ];
+        }
         [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
 
         $makeCsv = function(array $header, callable $rowBuilder): string {
@@ -461,7 +492,10 @@ class ReportsController
             return $out;
         });
 
-        $riskValZip = isset($src['riesgo_umbral']) ? (int)$src['riesgo_umbral'] : 60;
+        $riskInputZip = $method === 'GET'
+            ? Request::getInt('riesgo_umbral', 60)
+            : Request::postInt('riesgo_umbral', 60);
+        $riskValZip = (int)($riskInputZip ?? 60);
         if ($riskValZip < 10) { $riskValZip = 10; } elseif ($riskValZip > 100) { $riskValZip = 100; }
         $sqlRisk = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final
                     FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
@@ -515,7 +549,7 @@ class ReportsController
         }
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
         if ($method !== 'GET') {
-            $token = $_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? '');
+            $token = Request::postString('csrf_token') ?? Request::getString('csrf_token') ?? '';
             if (!$this->validateCsrf($token)) {
                 http_response_code(400);
                 echo 'CSRF inválido';
@@ -529,12 +563,25 @@ class ReportsController
             return '';
         }
 
-        $src = ($method === 'GET') ? $_GET : $_POST;
-        $filters = [
-            'ciclo' => $src['ciclo'] ?? null,
-            'grupo_id' => isset($src['grupo_id']) ? (int)$src['grupo_id'] : null,
-            'profesor_id' => isset($src['profesor_id']) ? (int)$src['profesor_id'] : null,
-        ];
+        if ($method === 'GET') {
+            $filters = [
+                'ciclo' => Request::getString('ciclo'),
+                'grupo_id' => Request::getInt('grupo_id'),
+                'profesor_id' => Request::getInt('profesor_id'),
+            ];
+            $materiaIdRaw = Request::getInt('materia_id', 0);
+            $estadoRaw = Request::getString('estado', '');
+            $riesgoRaw = Request::getInt('riesgo_umbral', 60);
+        } else {
+            $filters = [
+                'ciclo' => Request::postString('ciclo'),
+                'grupo_id' => Request::postInt('grupo_id'),
+                'profesor_id' => Request::postInt('profesor_id'),
+            ];
+            $materiaIdRaw = Request::postInt('materia_id', 0);
+            $estadoRaw = Request::postString('estado', '');
+            $riesgoRaw = Request::postInt('riesgo_umbral', 60);
+        }
         [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
 
         $qMain = "SELECT COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, g.nombre AS grupo, m.nombre AS materia, g.ciclo, c.parcial1, c.parcial2, c.final, c.promedio
@@ -551,9 +598,9 @@ class ReportsController
         $profName = '';
         if ($profId > 0) { $ps = $this->pdo->prepare("SELECT nombre FROM usuarios WHERE id = :id AND rol = 'profesor' LIMIT 1"); $ps->execute([':id'=>$profId]); $profName = (string)($ps->fetchColumn() ?: ''); }
         $materiaName = '';
-        $midVal = (int)($src['materia_id'] ?? 0);
+        $midVal = (int)($materiaIdRaw ?? 0);
         if ($midVal > 0) { $pm = $this->pdo->prepare("SELECT nombre FROM materias WHERE id = :id LIMIT 1"); $pm->execute([':id'=>$midVal]); $materiaName = (string)($pm->fetchColumn() ?: ''); }
-        $estado = strtolower(trim((string)($src['estado'] ?? '')));
+        $estado = strtolower(trim((string)($estadoRaw ?? '')));
 
         $qAvg = "SELECT g.nombre AS grupo, m.nombre AS materia, g.ciclo, ROUND(AVG(c.final),2) AS promedio
                  FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
@@ -586,7 +633,8 @@ class ReportsController
                   ORDER BY promedio DESC LIMIT 5";
         $stAlum = $this->pdo->prepare($qAlum); $stAlum->execute($params); $rowsAlum = $stAlum->fetchAll(PDO::FETCH_ASSOC);
 
-        $riskVal = isset($src['riesgo_umbral']) ? (int)$src['riesgo_umbral'] : 60;
+        $riskValInput = (int)($riesgoRaw ?? 60);
+        $riskVal = $riskValInput;
         if ($riskVal < 10) { $riskVal = 10; } elseif ($riskVal > 100) { $riskVal = 100; }
         $qRisk = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final
                   FROM calificaciones c JOIN alumnos a ON a.id = c.alumno_id JOIN grupos g ON g.id = c.grupo_id JOIN materias m ON m.id = g.materia_id
@@ -782,11 +830,11 @@ class ReportsController
         }
 
         $filters = [
-            'ciclo' => $_GET['ciclo'] ?? null,
-            'grupo_id' => isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : null,
-            'profesor_id' => isset($_GET['profesor_id']) ? (int)$_GET['profesor_id'] : null,
-            'materia_id' => isset($_GET['materia_id']) ? (int)$_GET['materia_id'] : null,
-            'estado' => $_GET['estado'] ?? null,
+            'ciclo' => Request::getString('ciclo'),
+            'grupo_id' => Request::getInt('grupo_id'),
+            'profesor_id' => Request::getInt('profesor_id'),
+            'materia_id' => Request::getInt('materia_id'),
+            'estado' => Request::getString('estado'),
         ];
         $estado = strtolower(trim((string)$filters['estado'] ?? ''));
         $filtersNoEstado = $filters; $filtersNoEstado['estado'] = null;
@@ -842,11 +890,11 @@ class ReportsController
             return json_encode(['ok' => false, 'message' => 'No autorizado']);
         }
         $filters = [
-            'ciclo' => $_GET['ciclo'] ?? null,
-            'grupo_id' => isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : null,
-            'profesor_id' => isset($_GET['profesor_id']) ? (int)$_GET['profesor_id'] : null,
-            'materia_id' => isset($_GET['materia_id']) ? (int)$_GET['materia_id'] : null,
-            'estado' => $_GET['estado'] ?? null,
+            'ciclo' => Request::getString('ciclo'),
+            'grupo_id' => Request::getInt('grupo_id'),
+            'profesor_id' => Request::getInt('profesor_id'),
+            'materia_id' => Request::getInt('materia_id'),
+            'estado' => Request::getString('estado'),
         ];
         $estado = strtolower(trim((string)$filters['estado'] ?? ''));
         $filtersNoEstado = $filters; $filtersNoEstado['estado'] = null;
@@ -885,7 +933,8 @@ class ReportsController
         $stmt->execute($params);
         $topAlumnos = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $riskVal = isset($_GET['riesgo_umbral']) ? (int)$_GET['riesgo_umbral'] : 60;
+        $riskInput = Request::getInt('riesgo_umbral', 60);
+        $riskVal = (int)($riskInput ?? 60);
         if ($riskVal < 10) { $riskVal = 10; } elseif ($riskVal > 100) { $riskVal = 100; }
         $sqlRiesgo = "SELECT a.matricula, COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno,
                              m.nombre AS materia, g.nombre AS grupo, g.ciclo, c.final

@@ -1,6 +1,8 @@
 <?php
 namespace App\Controllers;
 
+use App\Http\Request;
+
 class CareersController
 {
     private \PDO $pdo;
@@ -29,8 +31,8 @@ class CareersController
 
     public function getCurriculum(): string
     {
-        // Endpoint para obtener el curriculum de una carrera específica desde BD
-        $careerClave = strtoupper($_GET['career'] ?? 'ISC');
+        $careerRaw = Request::getString('career', 'ISC');
+        $careerClave = strtoupper((string)$careerRaw);
         
         header('Content-Type: application/json');
         

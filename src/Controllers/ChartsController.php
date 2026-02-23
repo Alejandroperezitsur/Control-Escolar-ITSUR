@@ -3,6 +3,7 @@ namespace App\Controllers;
 
 use PDO;
 use App\Utils\Logger;
+use App\Http\Request;
 
 class ChartsController
 {
@@ -50,10 +51,11 @@ class ChartsController
     // /api/charts/promedios-ciclo
     public function averagesByCycle(): string
     {
-        $gid = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : null;
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
-        $mid = isset($_GET['materia_id']) ? (int)$_GET['materia_id'] : null;
-        $estado = isset($_GET['estado']) ? strtolower(trim((string)$_GET['estado'])) : '';
+        $gid = Request::getInt('grupo_id');
+        $ciclo = Request::getString('ciclo');
+        $mid = Request::getInt('materia_id');
+        $estadoRaw = Request::getString('estado', '');
+        $estado = strtolower(trim((string)$estadoRaw));
         $role = $_SESSION['role'] ?? '';
         $pid = (int)($_SESSION['user_id'] ?? 0);
         $filters = ['gid' => $gid, 'ciclo' => $ciclo, 'mid' => $mid, 'estado' => $estado, 'pid' => ($role==='profesor'?$pid:null)];
@@ -99,10 +101,11 @@ class ChartsController
             http_response_code(403);
             return json_encode(['ok' => false, 'message' => 'No autorizado']);
         }
-        $gid = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : null;
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
-        $mid = isset($_GET['materia_id']) ? (int)$_GET['materia_id'] : null;
-        $estado = isset($_GET['estado']) ? strtolower(trim((string)$_GET['estado'])) : '';
+        $gid = Request::getInt('grupo_id');
+        $ciclo = Request::getString('ciclo');
+        $mid = Request::getInt('materia_id');
+        $estadoRaw = Request::getString('estado', '');
+        $estado = strtolower(trim((string)$estadoRaw));
         $key = $this->cacheKey('desempeno_grupo', ['pid' => $pid, 'gid' => $gid, 'ciclo' => $ciclo, 'mid' => $mid, 'estado' => $estado]);
         $cached = $this->getCache($key);
         if ($cached) {
@@ -139,10 +142,11 @@ class ChartsController
     {
         $role = $_SESSION['role'] ?? '';
         $pid = (int)($_SESSION['user_id'] ?? 0);
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : null;
-        $gid = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : null;
-        $mid = isset($_GET['materia_id']) ? (int)$_GET['materia_id'] : null;
-        $estado = isset($_GET['estado']) ? strtolower(trim((string)$_GET['estado'])) : '';
+        $ciclo = Request::getString('ciclo');
+        $gid = Request::getInt('grupo_id');
+        $mid = Request::getInt('materia_id');
+        $estadoRaw = Request::getString('estado', '');
+        $estado = strtolower(trim((string)$estadoRaw));
         $filters = ['ciclo' => $ciclo, 'gid' => $gid, 'mid' => $mid, 'estado' => $estado, 'pid' => ($role==='profesor'?$pid:null)];
         $key = $this->cacheKey('reprobados_materia', $filters);
         $cached = $this->getCache($key);

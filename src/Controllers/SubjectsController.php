@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use PDO;
+use App\Http\Request;
 use App\Repositories\SubjectsRepository;
 
 class SubjectsController
@@ -19,14 +20,19 @@ class SubjectsController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin') { http_response_code(403); return 'No autorizado'; }
-        $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-        $per = isset($_GET['per_page']) ? (int)$_GET['per_page'] : 10;
-        $sort = isset($_GET['sort']) ? strtolower(trim((string)$_GET['sort'])) : 'nombre';
-        $order = isset($_GET['order']) ? strtoupper(trim((string)$_GET['order'])) : 'ASC';
-        $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
-        $car = isset($_GET['carrera']) ? strtoupper(trim((string)$_GET['carrera'])) : '';
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
-        $estado = isset($_GET['estado']) ? strtolower(trim((string)$_GET['estado'])) : '';
+        $page = Request::getInt('page', 1) ?? 1;
+        if ($page < 1) { $page = 1; }
+        $per = Request::getInt('per_page', 10) ?? 10;
+        $sortRaw = Request::getString('sort', 'nombre') ?? 'nombre';
+        $orderRaw = Request::getString('order', 'ASC') ?? 'ASC';
+        $sort = strtolower($sortRaw);
+        $order = strtoupper($orderRaw);
+        $q = Request::getString('q', '') ?? '';
+        $carRaw = Request::getString('carrera', '') ?? '';
+        $car = strtoupper($carRaw);
+        $ciclo = Request::getString('ciclo', '') ?? '';
+        $estadoRaw = Request::getString('estado', '') ?? '';
+        $estado = strtolower($estadoRaw);
         $result = $this->subjectsRepository->paginate($q, $car, $ciclo, $estado, $sort, $order, $page, $per);
         $subjects = $result['subjects'];
         $pagination = $result['pagination'];
@@ -41,10 +47,12 @@ class SubjectsController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin') { http_response_code(403); return 'No autorizado'; }
-        $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
-        $car = isset($_GET['carrera']) ? strtoupper(trim((string)$_GET['carrera'])) : '';
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
-        $estado = isset($_GET['estado']) ? strtolower(trim((string)$_GET['estado'])) : '';
+        $q = Request::getString('q', '') ?? '';
+        $carRaw = Request::getString('carrera', '') ?? '';
+        $car = strtoupper($carRaw);
+        $ciclo = Request::getString('ciclo', '') ?? '';
+        $estadoRaw = Request::getString('estado', '') ?? '';
+        $estado = strtolower($estadoRaw);
         $rows = $this->subjectsRepository->exportSubjects($q, $car, $ciclo, $estado);
         header('Content-Type: text/csv; charset=UTF-8');
         header('Content-Disposition: attachment; filename="materias.csv"');
@@ -66,10 +74,12 @@ class SubjectsController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
-        $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
-        $car = isset($_GET['carrera']) ? strtoupper(trim((string)$_GET['carrera'])) : '';
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
-        $estado = isset($_GET['estado']) ? strtolower(trim((string)$_GET['estado'])) : '';
+        $q = Request::getString('q', '') ?? '';
+        $carRaw = Request::getString('carrera', '') ?? '';
+        $car = strtoupper($carRaw);
+        $ciclo = Request::getString('ciclo', '') ?? '';
+        $estadoRaw = Request::getString('estado', '') ?? '';
+        $estado = strtolower($estadoRaw);
         $rows = $this->subjectsRepository->exportSubjects($q, $car, $ciclo, $estado);
 
         $html = '<h2>Materias</h2>';
@@ -109,10 +119,12 @@ class SubjectsController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin') { http_response_code(403); return 'No autorizado'; }
-        $q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
-        $car = isset($_GET['carrera']) ? strtoupper(trim((string)$_GET['carrera'])) : '';
-        $ciclo = isset($_GET['ciclo']) ? trim((string)$_GET['ciclo']) : '';
-        $estado = isset($_GET['estado']) ? strtolower(trim((string)$_GET['estado'])) : '';
+        $q = Request::getString('q', '') ?? '';
+        $carRaw = Request::getString('carrera', '') ?? '';
+        $car = strtoupper($carRaw);
+        $ciclo = Request::getString('ciclo', '') ?? '';
+        $estadoRaw = Request::getString('estado', '') ?? '';
+        $estado = strtolower($estadoRaw);
         $rowsDb = $this->subjectsRepository->exportSubjects($q, $car, $ciclo, $estado);
         $headers = ['ID','Nombre','Clave','Carreras','Grupos','Promedio'];
         $rows = array_map(function($r){ return [
@@ -250,12 +262,12 @@ class SubjectsController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin') { http_response_code(403); return 'No autorizado'; }
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        $id = Request::getInt('id', 0) ?? 0;
         if ($id <= 0) { http_response_code(400); return 'ID inválido'; }
         $materia = $this->subjectsRepository->findById($id);
         if ($materia === null) { http_response_code(404); return 'Materia no encontrada'; }
 
-        $carKey = isset($_GET['carrera']) ? trim((string)$_GET['carrera']) : '';
+        $carKey = Request::getString('carrera', '') ?? '';
         $creditos = null;
         $carreras = $this->subjectsRepository->getCareers();
         if ($carKey !== '') {
@@ -276,14 +288,15 @@ class SubjectsController
     public function addToCareer(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         $materia_id = filter_input(INPUT_POST, 'materia_id', FILTER_VALIDATE_INT);
         $carrera_id = filter_input(INPUT_POST, 'carrera_id', FILTER_VALIDATE_INT);
         $semestre = filter_input(INPUT_POST, 'semestre', FILTER_VALIDATE_INT);
         $creditos = filter_input(INPUT_POST, 'creditos', FILTER_VALIDATE_INT);
-        $tipo = in_array($_POST['tipo'] ?? 'basica', ['basica','especialidad','residencia'], true) ? $_POST['tipo'] : 'basica';
+        $tipoRaw = Request::postString('tipo', 'basica') ?? 'basica';
+        $tipo = in_array($tipoRaw, ['basica','especialidad','residencia'], true) ? $tipoRaw : 'basica';
         if (!$materia_id || !$carrera_id || !$semestre) { $_SESSION['flash'] = 'Datos inválidos'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; }
         $ok = $this->subjectsRepository->addToCareer($materia_id, $carrera_id, $semestre, (int)($creditos ?: 5), $tipo);
         $_SESSION['flash'] = $ok ? 'Asignación guardada' : 'Error al guardar asignación';
@@ -294,7 +307,7 @@ class SubjectsController
     public function removeFromCareer(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
@@ -316,10 +329,11 @@ class SubjectsController
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
-        $nombre = trim((string)($_POST['nombre'] ?? ''));
-        $clave = strtoupper(trim((string)($_POST['clave'] ?? '')));
+        $nombre = Request::postString('nombre', '') ?? '';
+        $claveRaw = Request::postString('clave', '') ?? '';
+        $clave = strtoupper($claveRaw);
         if ($nombre === '' || $clave === '') { $_SESSION['flash'] = 'Datos inválidos'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; }
         $result = $this->subjectsRepository->createSubject($nombre, $clave);
         if (!$result['ok']) {
@@ -335,7 +349,7 @@ class SubjectsController
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if (!$id) { $_SESSION['flash'] = 'ID inválido'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; }
@@ -353,12 +367,13 @@ class SubjectsController
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if (!$id) { $_SESSION['flash'] = 'ID inválido'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; }
-        $nombre = trim((string)($_POST['nombre'] ?? ''));
-        $clave = strtoupper(trim((string)($_POST['clave'] ?? '')));
+        $nombre = Request::postString('nombre', '') ?? '';
+        $claveRaw = Request::postString('clave', '') ?? '';
+        $clave = strtoupper($claveRaw);
         if ($nombre === '' || $clave === '') { $_SESSION['flash'] = 'Datos inválidos'; $_SESSION['flash_type'] = 'danger'; header('Location: /subjects'); return; }
         $result = $this->subjectsRepository->updateSubject($id, $nombre, $clave);
         if (!$result['ok']) {

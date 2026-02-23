@@ -2,6 +2,7 @@
 namespace App\Controllers;
 
 use PDO;
+use App\Http\Request;
 
 class ProfessorsController
 {
@@ -15,10 +16,10 @@ class ProfessorsController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
-        $page = (int)($_GET['page'] ?? 1);
+        $page = Request::getInt('page', 1) ?? 1;
         $limit = 20;
-        $q = trim((string)($_GET['q'] ?? ''));
-        $status = trim((string)($_GET['status'] ?? ''));
+        $q = Request::getString('q', '') ?? '';
+        $status = Request::getString('status', '') ?? '';
         $conds = ["rol = 'profesor'"]; $params = [];
         if ($q !== '') { $conds[] = '(nombre LIKE :q1 OR email LIKE :q2)'; $params[':q1'] = '%' . $q . '%'; $params[':q2'] = '%' . $q . '%'; }
         if ($status === 'active') { $conds[] = 'activo = 1'; }
@@ -32,8 +33,10 @@ class ProfessorsController
         $page = min(max(1, $page), $totalPages);
         $offset = max(0, ($page - 1) * $limit);
         $allowedSorts = ['id','nombre','email','activo'];
-        $sort = strtolower(trim((string)($_GET['sort'] ?? 'nombre')));
-        $order = strtoupper(trim((string)($_GET['order'] ?? 'ASC')));
+        $sortRaw = Request::getString('sort', 'nombre') ?? 'nombre';
+        $orderRaw = Request::getString('order', 'ASC') ?? 'ASC';
+        $sort = strtolower($sortRaw);
+        $order = strtoupper($orderRaw);
         if (!in_array($sort, $allowedSorts, true)) { $sort = 'nombre'; }
         if (!in_array($order, ['ASC','DESC'], true)) { $order = 'ASC'; }
         $sql = "SELECT id, nombre, email, activo FROM usuarios $where ORDER BY $sort $order LIMIT :limit OFFSET :offset";
@@ -51,7 +54,7 @@ class ProfessorsController
     {
         $role = $_SESSION['role'] ?? '';
         if ($role !== 'admin') { http_response_code(403); return 'No autorizado'; }
-        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        $id = Request::getInt('id', 0) ?? 0;
         if ($id <= 0) { http_response_code(400); return 'ID inválido'; }
         $stmt = $this->pdo->prepare('SELECT id, nombre, email, matricula, activo FROM usuarios WHERE id = :id AND rol = "profesor"');
         $stmt->execute([':id' => $id]);
@@ -69,12 +72,13 @@ class ProfessorsController
     public function create(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
 
-        $nombre = trim((string)($_POST['nombre'] ?? ''));
-        $email = filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL);
+        $nombre = Request::postString('nombre', '') ?? '';
+        $emailRaw = Request::postString('email', '') ?? '';
+        $email = $emailRaw !== '' ? filter_var($emailRaw, FILTER_VALIDATE_EMAIL) : false;
         if ($nombre === '' || !$email) { $_SESSION['flash'] = 'Datos inválidos'; $_SESSION['flash_type'] = 'danger'; header('Location: /professors'); return; }
 
         // Validación de unicidad de email
@@ -102,7 +106,7 @@ class ProfessorsController
     public function delete(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
@@ -118,14 +122,15 @@ class ProfessorsController
     public function update(): void
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
-        $token = $_POST['csrf_token'] ?? '';
+        $token = Request::postString('csrf_token', '') ?? '';
         if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); echo 'CSRF inválido'; return; }
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if (!$id) { $_SESSION['flash'] = 'ID inválido'; $_SESSION['flash_type'] = 'danger'; header('Location: /professors'); return; }
-        $nombre = trim((string)($_POST['nombre'] ?? ''));
-        $email = filter_var($_POST['email'] ?? '', FILTER_VALIDATE_EMAIL);
-        $activo = isset($_POST['activo']) ? 1 : 0;
+        $nombre = Request::postString('nombre', '') ?? '';
+        $emailRaw = Request::postString('email', '') ?? '';
+        $email = $emailRaw !== '' ? filter_var($emailRaw, FILTER_VALIDATE_EMAIL) : false;
+        $activo = Request::hasPost('activo') ? 1 : 0;
         if ($nombre === '' || !$email) { $_SESSION['flash'] = 'Datos inválidos'; $_SESSION['flash_type'] = 'danger'; header('Location: /professors'); return; }
         $sel = $this->pdo->prepare("SELECT 1 FROM usuarios WHERE rol = 'profesor' AND email = :e AND id <> :id LIMIT 1");
         $sel->execute([':e' => $email, ':id' => $id]);
