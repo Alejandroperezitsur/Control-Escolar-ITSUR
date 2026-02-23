@@ -353,27 +353,19 @@ class GradesController
         $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
         if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
-        $rows = (new \App\Services\GroupsService($this->pdo))->studentsInGroup($grupoId);
-        if ($estado === 'pendiente') {
-            $rows = array_values(array_filter($rows, fn($r) => ($r['final'] ?? null) === null));
-        } elseif ($estado === 'aprobado') {
-            $rows = array_values(array_filter($rows, fn($r) => ($r['final'] ?? null) !== null && (float)$r['final'] >= 70));
-        } elseif ($estado === 'reprobado') {
-            $rows = array_values(array_filter($rows, fn($r) => ($r['final'] ?? null) !== null && (float)$r['final'] < 70));
-        }
+        $svc = new \App\Services\GroupsService($this->pdo);
+        $stmt = $svc->studentsInGroupCursor($grupoId, $estado);
         header('Content-Type: text/csv; charset=UTF-8');
         $fname = 'grupo_' . (int)$grupoId . '_calificaciones.csv';
         header('Content-Disposition: attachment; filename="' . $fname . '"');
-        $fp = fopen('php://temp', 'w+');
+        $fp = fopen('php://output', 'w');
         fputcsv($fp, ['Matrícula','Alumno','Parcial 1','Parcial 2','Final','Promedio']);
-        foreach ($rows as $r) {
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $al = trim((string)($r['nombre'] ?? '')); $ap = trim((string)($r['apellido'] ?? ''));
             fputcsv($fp, [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap), (string)($r['parcial1'] ?? ''), (string)($r['parcial2'] ?? ''), (string)($r['final'] ?? ''), (string)($r['promedio'] ?? '') ]);
         }
-        rewind($fp);
-        $csv = stream_get_contents($fp);
         fclose($fp);
-        return (string)$csv;
+        return '';
     }
 
     public function exportGroupPendingCsv(): string
@@ -385,20 +377,19 @@ class GradesController
         $grp = $this->gradesRepository->getGroupById($grupoId);
         if (!$grp) { http_response_code(404); return 'Grupo no encontrado'; }
         if ($role === 'profesor') { $pid = (int)($_SESSION['user_id'] ?? 0); if ((int)$grp['profesor_id'] !== $pid) { http_response_code(403); return 'No autorizado para este grupo'; } }
-        $rows = $this->gradesRepository->getPendingCsvRows($grupoId);
+        $svc = new \App\Services\GroupsService($this->pdo);
+        $stmt = $svc->studentsInGroupCursor($grupoId, 'pendiente');
         header('Content-Type: text/csv; charset=UTF-8');
         $fname = 'grupo_' . (int)$grupoId . '_pendientes.csv';
         header('Content-Disposition: attachment; filename="' . $fname . '"');
-        $fp = fopen('php://temp', 'w+');
+        $fp = fopen('php://output', 'w');
         fputcsv($fp, ['Matrícula','Alumno']);
-        foreach ($rows as $r) {
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
             $al = trim((string)($r['nombre'] ?? '')); $ap = trim((string)($r['apellido'] ?? ''));
             fputcsv($fp, [ (string)($r['matricula'] ?? ''), trim($al . ' ' . $ap) ]);
         }
-        rewind($fp);
-        $csv = stream_get_contents($fp);
         fclose($fp);
-        return (string)$csv;
+        return '';
     }
 
     public function exportGroupXlsx(): string

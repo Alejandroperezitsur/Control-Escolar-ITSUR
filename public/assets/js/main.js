@@ -1,6 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
 
-  // Marcar activo en el sidebar según la URL
   const links = document.querySelectorAll('.app-sidebar .menu-section a');
   const path = location.pathname.replace(/\\/g, '/');
   links.forEach(a => {
@@ -17,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Exportación CSV/PDF
   document.querySelectorAll('[data-export="csv"]').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.getAttribute('data-target');
@@ -35,17 +33,13 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', () => {
       const target = btn.getAttribute('data-target');
       if (target) {
-        // Impresión específica de tabla
         printTable(target);
       } else {
-        // Impresión general de la página
         window.print();
       }
     });
   });
 
-
-  // --- TEMA: toggle global y robusto ---
   const THEME_KEY = 'sicenet-theme';
   const getSystemPref = () => {
     try { return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; } catch { return 'dark'; }
@@ -70,10 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
     updateThemeToggles(t);
     document.dispatchEvent(new CustomEvent('theme-changed', { detail: { theme: t } }));
   }
-  // Inicializar tema según preferencia guardada o sistema
   const initialTheme = getStoredTheme() || getSystemPref() || 'dark';
   applyTheme(initialTheme);
-  // Eliminar listeners previos para evitar duplicados
   document.querySelectorAll('#theme-toggle, #themeToggle').forEach(btn => {
     btn.removeEventListener('click', btn._themeHandler || (()=>{}));
     btn._themeHandler = function() {
@@ -85,10 +77,8 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', btn._themeHandler, { passive: true });
   });
 
-  // Autoactivar ordenamiento en tablas con clase .table-sort
   document.querySelectorAll('table.table-sort').forEach(tbl => enableTableSort(tbl));
 
-  // Filtro rápido: inputs con data-quick-filter-for="#selector"
   document.querySelectorAll('[data-quick-filter-for]').forEach(input => {
     const sel = input.getAttribute('data-quick-filter-for');
     const table = document.querySelector(sel);
@@ -110,7 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Evitar doble envío: deshabilita botón submit y muestra spinner ligero
   document.querySelectorAll('form').forEach(form => {
     form.addEventListener('submit', (e) => {
       const btn = form.querySelector('button[type="submit"]');
@@ -247,7 +236,6 @@ function printTable(tableSelector) {
     return;
   }
   
-  // Crear ventana de impresión con solo la tabla
   const printWindow = window.open('', '_blank');
   const title = document.title || 'Exportación PDF';
   
@@ -286,18 +274,15 @@ function printTable(tableSelector) {
   printWindow.document.close();
   printWindow.focus();
   
-  // Esperar a que cargue y luego imprimir
   setTimeout(() => {
     printWindow.print();
     printWindow.close();
   }, 250);
 }
 
-// -------- CSRF helpers: lectura y uso automático --------
 (function setupCSRF() {
   const meta = document.querySelector('meta[name="csrf-token"]');
   const token = meta?.content || '';
-  // Helper: añade csrf_token a FormData o URLSearchParams
   function appendCSRF(body) {
     try {
       if (!token) return body;
@@ -309,7 +294,6 @@ function printTable(tableSelector) {
         if (!body.has('csrf_token')) body.set('csrf_token', token);
         return body;
       }
-      // Si es JSON, transformar a URLSearchParams para compatibilidad con PHP $_POST
       if (typeof body === 'string') {
         // No tocar
         return body;
@@ -323,7 +307,6 @@ function printTable(tableSelector) {
       return body;
     } catch { return body; }
   }
-  // Wrapper fetch: si método es POST/PUT/DELETE, asegurar csrf_token en cuerpo
   const _fetch = window.fetch.bind(window);
   window.csrfFetch = async function(url, options = {}) {
     const opts = { ...options };
@@ -333,7 +316,6 @@ function printTable(tableSelector) {
     }
     return _fetch(url, opts);
   };
-  // XMLHttpRequest: interceptar send para añadir en FormData/URLSearchParams
   const _send = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.send = function(body) {
     const method = (this._method || 'GET');
@@ -348,7 +330,6 @@ function printTable(tableSelector) {
   };
 })();
 
-// -------- Helpers para gestión de Alumnos (compartidos) --------
 window.BASE_URL = window.BASE_URL || (document.querySelector('base')?.getAttribute('href') || '');
 const PUBLIC_BASE = (function(){
   try {
@@ -368,7 +349,12 @@ function openCreateModal(){
     const act = document.getElementById('activo'); if(act) act.checked = true;
     const m = (typeof bootstrap !== 'undefined' && document.getElementById('studentModal')) ? new bootstrap.Modal(document.getElementById('studentModal')) : null;
     if(m) m.show();
-  }catch(e){ console.error(e); alert('Error al abrir el formulario'); }
+  }catch(e){
+    console.error(e);
+    if (typeof window.showToast === 'function') {
+      window.showToast('error', 'Error al abrir el formulario');
+    }
+  }
 }
 
 async function openEditModal(id){
@@ -380,7 +366,12 @@ async function openEditModal(id){
     const btn = document.getElementById('saveBtn'); if(btn){ btn.disabled = true; btn.textContent = 'Cargando...'; }
     const res = await fetch(`${ROUTER}/alumnos/get&id=${id}`, { credentials: 'same-origin' });
     const data = await res.json();
-    if(data.error){ alert(data.error); return; }
+    if(data.error){
+      if (typeof window.showToast === 'function') {
+        window.showToast('error', data.error);
+      }
+      return;
+    }
     document.getElementById('studentId').value = data.id;
     document.getElementById('matricula').value = data.matricula || '';
     document.getElementById('nombre').value = data.nombre || '';
@@ -391,7 +382,12 @@ async function openEditModal(id){
     const pwd = document.getElementById('password'); if(pwd){ pwd.placeholder='Dejar en blanco para mantener actual'; pwd.required = false; }
     if(title) title.textContent = 'Editar Alumno';
     if(btn){ btn.disabled = false; btn.textContent = 'Guardar'; }
-  }catch(e){ console.error(e); alert('Error de conexión al obtener datos'); }
+  }catch(e){
+    console.error(e);
+    if (typeof window.showToast === 'function') {
+      window.showToast('error', 'Error de conexión al obtener datos');
+    }
+  }
 }
 
 function saveStudent(e){
@@ -402,16 +398,150 @@ function saveStudent(e){
   const url = id ? `${ROUTER}/alumnos/update` : `${ROUTER}/alumnos/store`;
   const btn = document.getElementById('saveBtn'); const orig = btn ? btn.textContent : '';
   if(btn){ btn.disabled = true; btn.textContent = 'Guardando...'; }
-  csrfFetch(url, { method: 'POST', body: fd, credentials: 'same-origin' }).then(r=>r.json()).then(data=>{ if(data.success){ location.reload(); } else { alert(data.error || 'Error desconocido'); } }).catch(()=> alert('Error de red')).finally(()=>{ if(btn){ btn.disabled=false; btn.textContent=orig; } });
+  csrfFetch(url, { method: 'POST', body: fd, credentials: 'same-origin' })
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.success){
+        location.reload();
+      } else {
+        if (typeof window.showToast === 'function') {
+          window.showToast('error', data.error || 'Error desconocido');
+        }
+      }
+    })
+    .catch(()=>{
+      if (typeof window.showToast === 'function') {
+        window.showToast('error', 'Error de red');
+      }
+    })
+    .finally(()=>{
+      if(btn){ btn.disabled=false; btn.textContent=orig; }
+    });
 }
 
 function deleteStudent(id){
-  if(!confirm('¿Estás seguro de eliminar este alumno? Esta acción no se puede deshacer.')) return;
-  const fd = new FormData(); fd.append('id', id); fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
-  csrfFetch(`${ROUTER}/alumnos/delete`, { method: 'POST', body: fd, credentials: 'same-origin' }).then(r=>r.json()).then(data=>{ if(data.success){ location.reload(); } else { alert(data.error || 'Error al eliminar'); } });
+  if (typeof window.showConfirm === 'function') {
+    window.showConfirm('¿Estás seguro de eliminar este alumno? Esta acción no se puede deshacer.').then(function(confirmed){
+      if (!confirmed) return;
+      const fd = new FormData();
+      fd.append('id', id);
+      fd.append('csrf_token', document.querySelector('meta[name="csrf-token"]')?.content || '');
+      csrfFetch(`${ROUTER}/alumnos/delete`, { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(r=>r.json())
+        .then(data=>{
+          if(data.success){
+            if (typeof window.showToast === 'function') {
+              window.showToast('success', 'Alumno eliminado');
+            }
+            location.reload();
+          } else {
+            if (typeof window.showToast === 'function') {
+              window.showToast('error', data.error || 'Error al eliminar');
+            }
+          }
+        })
+        .catch(()=>{
+          if (typeof window.showToast === 'function') {
+            window.showToast('error', 'Error al eliminar');
+          }
+        });
+    });
+  }
 }
 
 window.openCreateModal = openCreateModal;
 window.openEditModal = openEditModal;
 window.saveStudent = saveStudent;
 window.deleteStudent = deleteStudent;
+
+(function(){
+  function resolveToastType(type){
+    const t = String(type || '').toLowerCase();
+    if (t === 'success' || t === 'ok') return 'success';
+    if (t === 'error' || t === 'danger' || t === 'fail') return 'danger';
+    if (t === 'warning' || t === 'warn') return 'warning';
+    if (t === 'info') return 'info';
+    return 'primary';
+  }
+  function getToastContainer(){
+    let cont = document.getElementById('toast-root');
+    if (!cont) {
+      cont = document.createElement('div');
+      cont.id = 'toast-root';
+      cont.className = 'position-fixed bottom-0 end-0 p-3';
+      cont.style.zIndex = '1080';
+      document.body.appendChild(cont);
+    }
+    return cont;
+  }
+  window.showToast = function(type, message){
+    try{
+      const cont = getToastContainer();
+      const variant = resolveToastType(type);
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = '<div class="toast align-items-center text-bg-' + variant + ' border-0" role="alert" aria-live="assertive" aria-atomic="true"><div class="d-flex"><div class="toast-body"></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Cerrar"></button></div></div>';
+      const toastEl = wrapper.firstElementChild;
+      const bodyEl = toastEl.querySelector('.toast-body');
+      if (bodyEl) bodyEl.textContent = message || '';
+      cont.appendChild(toastEl);
+      const delay = 5000;
+      if (window.bootstrap && window.bootstrap.Toast) {
+        const inst = new window.bootstrap.Toast(toastEl, { delay });
+        inst.show();
+      } else {
+        toastEl.classList.add('show');
+        setTimeout(function(){
+          if (toastEl.parentNode) toastEl.parentNode.removeChild(toastEl);
+        }, delay);
+      }
+    } catch(e){
+      console.error(e);
+    }
+  };
+})();
+
+(function(){
+  window.showConfirm = function(message){
+    try{
+      const modalEl = document.getElementById('confirmModal');
+      const msgEl = document.getElementById('confirmModalMessage');
+      const okBtn = document.getElementById('confirmModalOk');
+      const cancelBtn = document.getElementById('confirmModalCancel');
+      if (!modalEl || !okBtn || !msgEl || !(window.bootstrap && window.bootstrap.Modal)) {
+        const result = window.confirm(message);
+        return Promise.resolve(result);
+      }
+      msgEl.textContent = message || '';
+      const modal = window.bootstrap.Modal.getInstance(modalEl) || new window.bootstrap.Modal(modalEl);
+      return new Promise(function(resolve){
+        function cleanup(){
+          okBtn.removeEventListener('click', onOk);
+          if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
+          modalEl.removeEventListener('hidden.bs.modal', onHidden);
+        }
+        function onOk(){
+          cleanup();
+          resolve(true);
+          modal.hide();
+        }
+        function onCancel(){
+          cleanup();
+          resolve(false);
+          modal.hide();
+        }
+        function onHidden(){
+          cleanup();
+          resolve(false);
+        }
+        okBtn.addEventListener('click', onOk);
+        if (cancelBtn) cancelBtn.addEventListener('click', onCancel);
+        modalEl.addEventListener('hidden.bs.modal', onHidden);
+        modal.show();
+      });
+    } catch(e){
+      console.error(e);
+      const result = window.confirm(message);
+      return Promise.resolve(result);
+    }
+  };
+})();

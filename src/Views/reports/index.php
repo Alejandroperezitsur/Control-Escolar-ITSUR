@@ -14,59 +14,67 @@ ob_start();
     <a href="<?php echo $goDashboard; ?>" class="btn btn-outline-secondary">Volver</a>
   </div>
 
-  <div class="card mb-4">
-  <div class="card-body">
-    <form method="get" action="<?php echo $base; ?>/reports" class="row g-2" id="filtersForm">
-      <div class="col-md-3">
-        <label class="form-label">Ciclo</label>
-        <small class="text-muted d-block">Formato típico: 2024A, 2024B</small>
-        <select class="form-select" name="ciclo" id="sel-ciclo" aria-label="Seleccionar ciclo" title="Selecciona el ciclo académico">
-          <option value="">Todos</option>
-          <?php if (!empty($cyclesList)) { foreach ($cyclesList as $c) { echo '<option value="'.htmlspecialchars($c).'">'.htmlspecialchars($c).'</option>'; } } ?>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Grupo</label>
-        <small class="text-muted d-block">Depende del ciclo y profesor</small>
-        <select class="form-select" name="grupo_id" id="sel-grupo" aria-label="Seleccionar grupo" title="Lista filtrada por ciclo y profesor">
-          <option value="">Todos</option>
-          <?php if (!empty($groupsList)) { foreach ($groupsList as $g) { echo '<option value="'.(int)$g['id'].'">'.htmlspecialchars($g['ciclo']).' — '.htmlspecialchars($g['materia']).' / '.htmlspecialchars($g['nombre']).'</option>'; } } ?>
-        </select>
-      </div>
-      <?php if ($role === 'admin'): ?>
-      <div class="col-md-3">
-        <label class="form-label">Profesor</label>
-        <small class="text-muted d-block">Solo para administrador</small>
-        <select class="form-select" name="profesor_id" id="sel-prof" aria-label="Seleccionar profesor" title="Filtrar por profesor">
-          <option value="">Todos</option>
-          <?php if (!empty($profsList)) { foreach ($profsList as $p) { $label = ($p['email'] ?? '') ? ($p['nombre'].' ('.$p['email'].')') : $p['nombre']; echo '<option value="'.(int)$p['id'].'">'.htmlspecialchars($label).'</option>'; } } ?>
-        </select>
-      </div>
-      <?php endif; ?>
-      <div class="col-md-3">
-        <label class="form-label">Materia</label>
-        <small class="text-muted d-block">Materia asociada al grupo</small>
-        <select class="form-select" name="materia_id" id="sel-materia" aria-label="Seleccionar materia" title="Filtrar por materia">
-          <option value="">Todas</option>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Estado</label>
-        <small class="text-muted d-block">Con final o pendientes de final</small>
-        <select class="form-select" name="estado" id="sel-estado" aria-label="Seleccionar estado" title="Con final: usa calificación final; Pendientes: usa promedio de parciales">
-          <option value="">Todos</option>
-          <option value="con_final">Con final</option>
-          <option value="pendientes">Pendientes</option>
-        </select>
-      </div>
-      <div class="col-md-3 align-self-end d-grid gap-2">
-        <button class="btn btn-primary" type="submit" aria-label="Aplicar filtros"><i class="fa-solid fa-filter me-1"></i> Aplicar filtros</button>
-        <button class="btn btn-outline-secondary" type="button" id="btn-reset" aria-label="Limpiar filtros"><i class="fa-solid fa-rotate-left me-1"></i> Limpiar filtros</button>
-        <button class="btn btn-outline-info" type="button" id="btn-copy-link" aria-label="Copiar enlace con filtros"><i class="fa-solid fa-link me-1"></i> Copiar enlace</button>
-      </div>
-    </form>
+  <div class="d-sm-none mb-3">
+    <button class="btn btn-outline-primary w-100" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse" aria-expanded="true" aria-controls="filtersCollapse">
+      <i class="fa-solid fa-filter me-1" aria-hidden="true"></i> Filtros
+    </button>
   </div>
-</div>
+
+  <div id="filtersCollapse" class="collapse show">
+    <div class="card mb-4">
+      <div class="card-body">
+        <form method="get" action="<?php echo $base; ?>/reports" class="row g-2" id="filtersForm">
+          <div class="col-md-3">
+            <label class="form-label">Ciclo</label>
+            <small class="text-muted d-block">Formato típico: 2024A, 2024B</small>
+            <select class="form-select" name="ciclo" id="sel-ciclo" aria-label="Seleccionar ciclo" title="Selecciona el ciclo académico">
+              <option value="">Todos</option>
+              <?php if (!empty($cyclesList)) { foreach ($cyclesList as $c) { echo '<option value="'.htmlspecialchars($c).'">'.htmlspecialchars($c).'</option>'; } } ?>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Grupo</label>
+            <small class="text-muted d-block">Depende del ciclo y profesor</small>
+            <select class="form-select" name="grupo_id" id="sel-grupo" aria-label="Seleccionar grupo" title="Lista filtrada por ciclo y profesor">
+              <option value="">Todos</option>
+              <?php if (!empty($groupsList)) { foreach ($groupsList as $g) { echo '<option value="'.(int)$g['id'].'">'.htmlspecialchars($g['ciclo']).' — '.htmlspecialchars($g['materia']).' / '.htmlspecialchars($g['nombre']).'</option>'; } } ?>
+            </select>
+          </div>
+          <?php if ($role === 'admin'): ?>
+          <div class="col-md-3">
+            <label class="form-label">Profesor</label>
+            <small class="text-muted d-block">Solo para administrador</small>
+            <select class="form-select" name="profesor_id" id="sel-prof" aria-label="Seleccionar profesor" title="Filtrar por profesor">
+              <option value="">Todos</option>
+              <?php if (!empty($profsList)) { foreach ($profsList as $p) { $label = ($p['email'] ?? '') ? ($p['nombre'].' ('.$p['email'].')') : $p['nombre']; echo '<option value="'.(int)$p['id'].'">'.htmlspecialchars($label).'</option>'; } } ?>
+            </select>
+          </div>
+          <?php endif; ?>
+          <div class="col-md-3">
+            <label class="form-label">Materia</label>
+            <small class="text-muted d-block">Materia asociada al grupo</small>
+            <select class="form-select" name="materia_id" id="sel-materia" aria-label="Seleccionar materia" title="Filtrar por materia">
+              <option value="">Todas</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Estado</label>
+            <small class="text-muted d-block">Con final o pendientes de final</small>
+            <select class="form-select" name="estado" id="sel-estado" aria-label="Seleccionar estado" title="Con final: usa calificación final; Pendientes: usa promedio de parciales">
+              <option value="">Todos</option>
+              <option value="con_final">Con final</option>
+              <option value="pendientes">Pendientes</option>
+            </select>
+          </div>
+          <div class="col-md-3 align-self-end d-grid gap-2">
+            <button class="btn btn-primary" type="submit" aria-label="Aplicar filtros"><i class="fa-solid fa-filter me-1"></i> Aplicar filtros</button>
+            <button class="btn btn-outline-secondary" type="button" id="btn-reset" aria-label="Limpiar filtros"><i class="fa-solid fa-rotate-left me-1"></i> Limpiar filtros</button>
+            <button class="btn btn-outline-info" type="button" id="btn-copy-link" aria-label="Copiar enlace con filtros"><i class="fa-solid fa-link me-1"></i> Copiar enlace</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 
   <div id="activeFiltersLine" class="mb-2 text-muted"></div>
 
@@ -76,7 +84,7 @@ ob_start();
     $actZip = $base . ($isPublic ? '/app.php?r=/reports/export/zip' : '/reports/export/zip');
     $actXls = $base . ($isPublic ? '/app.php?r=/reports/export/xlsx' : '/reports/export/xlsx');
   ?>
-  <div class="d-flex justify-content-end mb-3 gap-2">
+  <div class="d-flex justify-content-end mb-3 gap-2 flex-wrap">
     <form method="post" action="<?php echo $actCsv; ?>">
       <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
       <input type="hidden" name="ciclo" value="<?= htmlspecialchars($_GET['ciclo'] ?? '') ?>">
@@ -409,8 +417,7 @@ function updateChart() {
   const qs = new URLSearchParams();
   const c = document.getElementById('sel-ciclo')?.value || '';
   const g = document.getElementById('sel-grupo')?.value || '';
-  const m = qs.get('materia_id') || '';
-
+  const m = document.getElementById('sel-materia')?.value || '';
   const e = document.getElementById('sel-estado')?.value || '';
   if (c) qs.set('ciclo', c);
   if (g) qs.set('grupo_id', g);
@@ -421,7 +428,14 @@ function updateChart() {
     const ctx = document.getElementById('chartStats');
     const emptyEl = document.getElementById('chartStatsEmpty');
     const loadEl = document.getElementById('chartStatsLoading');
-    if (!j.ok) { if (emptyEl) emptyEl.style.display = ''; if (loadEl) loadEl.style.display = 'none'; return; }
+    if (!j.ok) {
+      if (emptyEl) emptyEl.style.display = '';
+      if (loadEl) loadEl.style.display = 'none';
+      if (typeof window.showToast === 'function') {
+        window.showToast('error', j.message || 'No se pudieron cargar las estadísticas.');
+      }
+      return;
+    }
     const isLine = (chartUrl.includes('promedios-ciclo'));
     const vals = (j.data.data || []).map(Number);
     const bgColors = vals.map(v => (isNaN(v) ? 'rgba(108,117,125,0.3)' : (v >= 70 ? 'rgba(25,135,84,0.4)' : 'rgba(220,53,69,0.4)')));
@@ -462,6 +476,9 @@ function updateChart() {
     const emptyEl = document.getElementById('chartStatsEmpty');
     if (loadEl) loadEl.style.display = 'none';
     if (emptyEl) emptyEl.style.display = '';
+    if (typeof window.showToast === 'function') {
+      window.showToast('error', 'Error de comunicación al cargar las estadísticas.');
+    }
   });
 
   // Fail chart
@@ -473,7 +490,14 @@ function updateChart() {
     const ctxF = document.getElementById('chartFail');
     const emptyElF = document.getElementById('chartFailEmpty');
     const loadElF = document.getElementById('chartFailLoading');
-    if (!j.ok) { if (emptyElF) emptyElF.style.display = ''; if (loadElF) loadElF.style.display = 'none'; return; }
+    if (!j.ok) {
+      if (emptyElF) emptyElF.style.display = '';
+      if (loadElF) loadElF.style.display = 'none';
+      if (typeof window.showToast === 'function') {
+        window.showToast('error', j.message || 'No se pudo cargar la gráfica de reprobados.');
+      }
+      return;
+    }
     const vals = (j.data.data || []).map(Number);
     const bg = vals.map(v => (isNaN(v) ? 'rgba(108,117,125,0.3)' : (v >= 30 ? 'rgba(220,53,69,0.4)' : 'rgba(25,135,84,0.4)')));
     const border = vals.map(v => (isNaN(v) ? '#6c757d' : (v >= 30 ? '#dc3545' : '#198754')));
@@ -509,6 +533,9 @@ function updateChart() {
     const loadElF = document.getElementById('chartFailLoading');
     if (loadElF) loadElF.style.display = 'none';
     if (emptyElF) emptyElF.style.display = '';
+    if (typeof window.showToast === 'function') {
+      window.showToast('error', 'Error de comunicación al cargar la gráfica de reprobados.');
+    }
   });
 
   // Tops

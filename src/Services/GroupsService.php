@@ -52,6 +52,26 @@ class GroupsService
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function studentsInGroupCursor(int $grupoId, ?string $estado = null): \PDOStatement
+    {
+        $sql = "SELECT a.matricula, a.nombre, a.apellido,
+                       c.parcial1, c.parcial2, c.final, c.promedio
+                FROM calificaciones c
+                JOIN alumnos a ON a.id = c.alumno_id
+                WHERE c.grupo_id = :grupoId";
+        if ($estado === 'pendiente') {
+            $sql .= " AND c.final IS NULL";
+        } elseif ($estado === 'aprobado') {
+            $sql .= " AND c.final IS NOT NULL AND c.final >= 70";
+        } elseif ($estado === 'reprobado') {
+            $sql .= " AND c.final IS NOT NULL AND c.final < 70";
+        }
+        $sql .= " ORDER BY a.apellido, a.nombre";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':grupoId' => $grupoId]);
+        return $stmt;
+    }
+
     public function getLastError(): ?string
     {
         return $this->lastError;

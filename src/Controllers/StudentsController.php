@@ -438,7 +438,11 @@ class StudentsController
         if ($t !== false) { $s = $t ?: $s; }
         $s = str_replace(["'", "`"], '', (string)$s);
         $s = preg_replace('/[^\x20-\x7E]/', '', (string)$s);
-        return (string)$s;
+        $s = (string)$s;
+        if ($s !== '' && strpbrk($s[0], '+=-@') !== false) {
+            $s = "'" . $s;
+        }
+        return $s;
     }
 
     public function exportMyGradesCsv(): string
