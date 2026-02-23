@@ -122,6 +122,31 @@ class ReportsController
         return [$sqlWhere, $params];
     }
 
+    private function guardExportLimits(array $filters, ?int $profesorIdFromSession, string $context): void
+    {
+        $ciclo = trim((string)($filters['ciclo'] ?? ''));
+        $gid = (int)($filters['grupo_id'] ?? 0);
+        $pid = (int)($filters['profesor_id'] ?? 0);
+        $mid = (int)($filters['materia_id'] ?? 0);
+        if ($ciclo === '' && $gid === 0 && $pid === 0 && $mid === 0) {
+            http_response_code(400);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'Filtros obligatorios faltantes para ' . $context . '. Especifica al menos ciclo, grupo, profesor o materia.';
+            exit;
+        }
+        [$sqlWhere, $params] = $this->buildWhere($filters, $profesorIdFromSession);
+        $sql = "SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id $sqlWhere";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $total = (int)$stmt->fetchColumn();
+        if ($total > 50000) {
+            http_response_code(413);
+            header('Content-Type: text/plain; charset=UTF-8');
+            echo 'Exportación demasiado grande (' . $total . ' filas). Ajusta los filtros para un rango menor a 50,000 registros.';
+            exit;
+        }
+    }
+
     public function exportCsv(): string
     {
         $role = $_SESSION['role'] ?? '';
@@ -155,7 +180,9 @@ class ReportsController
                 'estado' => Request::postString('estado'),
             ];
         }
-        [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
+        $profesorId = $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null;
+        $this->guardExportLimits($filters, $profesorId, 'exportar CSV de calificaciones');
+        [$sqlWhere, $params] = $this->buildWhere($filters, $profesorId);
 
         Logger::info('report_export_csv', ['filters' => $filters]);
 
@@ -238,7 +265,9 @@ class ReportsController
                 'estado' => Request::postString('estado'),
             ];
         }
-        [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
+        $profesorId = $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null;
+        $this->guardExportLimits($filters, $profesorId, 'exportar PDF de calificaciones');
+        [$sqlWhere, $params] = $this->buildWhere($filters, $profesorId);
 
         Logger::info('report_export_pdf', ['filters' => $filters]);
 
@@ -409,7 +438,9 @@ class ReportsController
                 'estado' => Request::postString('estado'),
             ];
         }
-        [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
+        $profesorId = $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null;
+        $this->guardExportLimits($filters, $profesorId, 'exportar ZIP de reportes');
+        [$sqlWhere, $params] = $this->buildWhere($filters, $profesorId);
 
         $makeCsv = function(array $header, callable $rowBuilder): string {
             $fp = fopen('php://temp', 'r+');
@@ -582,7 +613,9 @@ class ReportsController
             $estadoRaw = Request::postString('estado', '');
             $riesgoRaw = Request::postInt('riesgo_umbral', 60);
         }
-        [$sqlWhere, $params] = $this->buildWhere($filters, $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null);
+        $profesorId = $role === 'profesor' ? (int)($_SESSION['user_id'] ?? 0) : null;
+        $this->guardExportLimits($filters, $profesorId, 'exportar XLSX de reportes');
+        [$sqlWhere, $params] = $this->buildWhere($filters, $profesorId);
 
         $qMain = "SELECT COALESCE(NULLIF(CONCAT_WS(' ', a.nombre, a.apellido), ''), a.email, a.matricula) AS alumno, g.nombre AS grupo, m.nombre AS materia, g.ciclo, c.parcial1, c.parcial2, c.final, c.promedio
                   FROM calificaciones c

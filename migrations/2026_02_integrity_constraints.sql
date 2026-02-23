@@ -38,7 +38,6 @@ CREATE UNIQUE INDEX uniq_single_active_cycle
 
 -- Trigger para garantizar que al activar un ciclo se desactiven los demás
 DROP TRIGGER IF EXISTS trg_ciclos_single_active_before_insert;
-DELIMITER $$
 CREATE TRIGGER trg_ciclos_single_active_before_insert
 BEFORE INSERT ON ciclos_escolares
 FOR EACH ROW
@@ -46,11 +45,9 @@ BEGIN
   IF NEW.activo = 1 THEN
     UPDATE ciclos_escolares SET activo = 0 WHERE activo = 1;
   END IF;
-END$$
-DELIMITER ;
+END;
 
 DROP TRIGGER IF EXISTS trg_ciclos_single_active_before_update;
-DELIMITER $$
 CREATE TRIGGER trg_ciclos_single_active_before_update
 BEFORE UPDATE ON ciclos_escolares
 FOR EACH ROW
@@ -58,21 +55,10 @@ BEGIN
   IF NEW.activo = 1 AND (OLD.activo IS NULL OR OLD.activo = 0) THEN
     UPDATE ciclos_escolares SET activo = 0 WHERE activo = 1 AND id <> NEW.id;
   END IF;
-END$$
-DELIMITER ;
+END;
 
 -- Índices para concurrencia en consultas críticas
 CREATE INDEX idx_calif_grupo ON calificaciones(grupo_id);
 CREATE INDEX idx_calif_alumno ON calificaciones(alumno_id);
 CREATE INDEX idx_grupo_ciclo ON grupos(ciclo_id);
 CREATE INDEX idx_materia_carrera ON materias_carrera(carrera_id, semestre);
-
--- EXPLAIN antes/después para consultas críticas
-EXPLAIN SELECT COUNT(*) FROM calificaciones WHERE grupo_id = 123;
-EXPLAIN SELECT COUNT(*) FROM calificaciones c
-  JOIN grupos gx ON gx.id = c.grupo_id
-  WHERE c.alumno_id = 1
-    AND c.final IS NOT NULL
-    AND c.final >= 70
-    AND gx.materia_id IN (1,2,3);
-

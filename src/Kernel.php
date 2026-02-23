@@ -2,6 +2,7 @@
 namespace App;
 
 use App\Http\SecurityHeaders;
+use App\Utils\Logger;
 
 class Kernel
 {
@@ -47,6 +48,31 @@ class Kernel
                 ini_set('display_startup_errors', '1');
                 error_reporting(E_ALL);
             }
+
+            set_exception_handler(function (\Throwable $e) use ($env) {
+                $payload = [
+                    'timestamp' => date('c'),
+                    'level' => 'error',
+                    'message' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'user_id' => $_SESSION['user_id'] ?? null,
+                    'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+                ];
+                $dir = __DIR__ . '/../storage/logs';
+                if (!is_dir($dir)) {
+                    @mkdir($dir, 0775, true);
+                }
+                $logFile = $dir . '/system.log';
+                @file_put_contents($logFile, json_encode($payload) . PHP_EOL, FILE_APPEND | LOCK_EX);
+                if ($env !== 'production') {
+                    http_response_code(500);
+                    echo 'Error: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');
+                } else {
+                    http_response_code(500);
+                    echo 'Ha ocurrido un error interno.';
+                }
+            });
 
             $timeout = 3600;
             if (is_array($config) && isset($config['security']['session_timeout'])) {

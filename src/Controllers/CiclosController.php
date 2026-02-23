@@ -135,16 +135,19 @@ class CiclosController
             http_response_code(400);
             return 'Ciclo inválido';
         }
-        $this->pdo->beginTransaction();
         try {
-            $check = $this->pdo->prepare('SELECT id FROM ciclos_escolares WHERE id = :id');
+            $this->pdo->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+            $this->pdo->beginTransaction();
+            $check = $this->pdo->prepare('SELECT id FROM ciclos_escolares WHERE id = :id FOR UPDATE');
             $check->execute([':id' => $id]);
             if (!$check->fetchColumn()) {
                 $this->pdo->rollBack();
                 http_response_code(404);
                 return 'Ciclo no encontrado';
             }
-            $this->pdo->exec('UPDATE ciclos_escolares SET activo = 0');
+            $lock = $this->pdo->query('SELECT id FROM ciclos_escolares WHERE activo = 1 FOR UPDATE');
+            $lock->fetchAll(\PDO::FETCH_ASSOC);
+            $this->pdo->exec('UPDATE ciclos_escolares SET activo = 0 WHERE activo = 1');
             $upd = $this->pdo->prepare('UPDATE ciclos_escolares SET activo = 1 WHERE id = :id');
             $upd->execute([':id' => $id]);
             $this->pdo->commit();
@@ -181,4 +184,3 @@ class CiclosController
         return '';
     }
 }
-

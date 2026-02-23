@@ -73,7 +73,7 @@ class Database {
                 }
             } catch (Throwable $e) {}
         } catch(PDOException $e) {
-            die("Error de conexión: " . $e->getMessage());
+            throw $e;
         }
     }
 

@@ -68,6 +68,11 @@ class GradesController
             http_response_code(400);
             return 'Archivo CSV inválido';
         }
+        if (!isset($_FILES['csv']['size']) || (int)$_FILES['csv']['size'] > (5 * 1024 * 1024)) {
+            http_response_code(400);
+            return 'CSV demasiado grande (límite 5MB)';
+        }
+        set_time_limit(120);
         $fp = fopen($_FILES['csv']['tmp_name'], 'r');
         $headers = fgetcsv($fp);
         $count = 0;
@@ -75,8 +80,13 @@ class GradesController
         $processed = 0;
         $criticalError = false;
         try {
+            $this->pdo->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
             $this->pdo->beginTransaction();
             while (($row = fgetcsv($fp)) !== false) {
+                if ($processed >= 5000) {
+                    $criticalError = true;
+                    break;
+                }
                 [$alumnoId, $grupoId, $p1, $p2, $fin] = $row;
 
                 $alumnoId = filter_var($alumnoId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
@@ -212,29 +222,75 @@ class GradesController
         }
 
         $existing = $this->gradesRepository->getGradeByAlumnoGrupo($alumnoId, $grupoId);
-
         $prom = ($fin !== null) ? (float)$fin : (($p1 !== null && $p2 !== null) ? round(($p1 + $p2) / 2, 2) : null);
         $message = 'Calificación registrada correctamente';
+        $oldData = null;
+        $existingId = null;
         if ($existing) {
-            $prevP1 = ($existing['parcial1'] !== null ? (int)$existing['parcial1'] : null);
-            $prevP2 = ($existing['parcial2'] !== null ? (int)$existing['parcial2'] : null);
-            $prevFin = ($existing['final'] !== null ? (int)$existing['final'] : null);
-            $prevProm = ($existing['promedio'] !== null ? (float)$existing['promedio'] : null);
-            $noChange = ($prevP1 === $p1) && ($prevP2 === $p2) && ($prevFin === $fin) && ($prevProm === $prom);
-            if ($noChange) {
-                $message = 'Sin cambios';
+            $existingId = (int)$existing['id'];
+            $oldData = [
+                'parcial1' => $existing['parcial1'],
+                'parcial2' => $existing['parcial2'],
+                'final' => $existing['final'],
+                'promedio' => $existing['promedio'],
+            ];
+        }
+        try {
+            $this->pdo->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+            $this->pdo->beginTransaction();
+            if ($existing && $existingId !== null) {
+                $prevP1 = ($existing['parcial1'] !== null ? (int)$existing['parcial1'] : null);
+                $prevP2 = ($existing['parcial2'] !== null ? (int)$existing['parcial2'] : null);
+                $prevFin = ($existing['final'] !== null ? (int)$existing['final'] : null);
+                $prevProm = ($existing['promedio'] !== null ? (float)$existing['promedio'] : null);
+                $noChange = ($prevP1 === $p1) && ($prevP2 === $p2) && ($prevFin === $fin) && ($prevProm === $prom);
+                if ($noChange) {
+                    $message = 'Sin cambios';
+                } else {
+                    $this->gradesRepository->updateGradeById($existingId, $p1, $p2, $fin, $prom);
+                    $newData = [
+                        'parcial1' => $p1,
+                        'parcial2' => $p2,
+                        'final' => $fin,
+                        'promedio' => $prom,
+                    ];
+                    $aud = $this->pdo->prepare('INSERT INTO auditoria_academica (usuario_id, accion, entidad, entidad_id, datos_anteriores, datos_nuevos, ip) VALUES (:uid,:acc,:ent,:eid,:old,:new,:ip)');
+                    $audOk = $aud->execute([
+                        ':uid' => (int)($_SESSION['user_id'] ?? 0) ?: null,
+                        ':acc' => 'update_grade',
+                        ':ent' => 'calificacion',
+                        ':eid' => $existingId,
+                        ':old' => $oldData !== null ? json_encode($oldData) : null,
+                        ':new' => json_encode($newData),
+                        ':ip' => (string)($_SERVER['REMOTE_ADDR'] ?? ''),
+                    ]);
+                    if (!$audOk) {
+                        $this->pdo->rollBack();
+                        http_response_code(500);
+                        $_SESSION['flash'] = 'Error de auditoría, no se guardó la calificación';
+                        $_SESSION['flash_type'] = 'danger';
+                        header('Location: /grades');
+                        return '';
+                    }
+                    $message = 'Calificación actualizada correctamente';
+                }
             } else {
-                $this->gradesRepository->updateGradeById((int)$existing['id'], $p1, $p2, $fin, $prom);
+                if ($role !== 'admin') {
+                    $this->pdo->rollBack();
+                    http_response_code(403);
+                    $_SESSION['flash'] = 'Solo un administrador puede inscribir alumnos al grupo';
+                    $_SESSION['flash_type'] = 'danger';
+                    header('Location: /grades');
+                    return '';
+                }
+                $this->gradesRepository->insertGrade($alumnoId, $grupoId, $p1, $p2, $fin, $prom);
             }
-        } else {
-            if ($role !== 'admin') {
-                http_response_code(403);
-                $_SESSION['flash'] = 'Solo un administrador puede inscribir alumnos al grupo';
-                $_SESSION['flash_type'] = 'danger';
-                header('Location: /grades');
-                return '';
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
             }
-            $this->gradesRepository->insertGrade($alumnoId, $grupoId, $p1, $p2, $fin, $prom);
+            throw $e;
         }
 
         \App\Utils\Logger::info('grade_upsert', ['alumno_id' => $alumnoId, 'grupo_id' => $grupoId]);
