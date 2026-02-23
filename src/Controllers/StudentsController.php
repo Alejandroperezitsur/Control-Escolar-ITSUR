@@ -74,7 +74,6 @@ class StudentsController
     public function enroll(): void
     {
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
-        $this->assertCsrfPost();
         $alumnoId = filter_input(INPUT_POST, 'alumno_id', FILTER_VALIDATE_INT);
         $grupoId = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
         if (!$alumnoId || !$grupoId) { http_response_code(400); echo 'Parámetros inválidos'; return; }
@@ -95,7 +94,6 @@ class StudentsController
     public function unenroll(): void
     {
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
-        $this->assertCsrfPost();
         $alumnoId = filter_input(INPUT_POST, 'alumno_id', FILTER_VALIDATE_INT);
         $grupoId = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
         if (!$alumnoId || !$grupoId) { http_response_code(400); echo 'Parámetros inválidos'; return; }
@@ -107,7 +105,6 @@ class StudentsController
     public function store(): void
     {
         $this->checkAdmin();
-        $this->assertCsrfPost();
         $data = $_POST;
 
         if (empty($data['matricula']) || empty($data['nombre']) || empty($data['apellido'])) {
@@ -127,7 +124,6 @@ class StudentsController
     public function update(): void
     {
         $this->checkAdmin();
-        $this->assertCsrfPost();
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
         if (!$id) {
             $this->jsonResponse(['error' => 'ID inválido'], 400);
@@ -148,7 +144,6 @@ class StudentsController
     public function delete(): void
     {
         $this->checkAdmin();
-        $this->assertCsrfPost();
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
         if (!$id) {
             $this->jsonResponse(['error' => 'ID inválido'], 400);
@@ -183,13 +178,6 @@ class StudentsController
         if (($_SESSION['role'] ?? '') !== 'admin') {
             $this->jsonResponse(['error' => 'No autorizado'], 403);
             exit;
-        }
-    }
-    private function assertCsrfPost(): void
-    {
-        $token = $_POST['csrf_token'] ?? '';
-        if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
-            $this->jsonResponse(['error' => 'CSRF inválido'], 403);
         }
     }
 

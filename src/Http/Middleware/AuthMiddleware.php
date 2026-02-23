@@ -12,6 +12,11 @@ class AuthMiddleware
                 header('Location: ' . $base . '/app.php?r=/login');
                 return false;
             }
+            if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+                if (!CsrfMiddleware::checkAuthenticatedPost()) {
+                    return false;
+                }
+            }
             return true;
         };
     }
@@ -29,6 +34,11 @@ class AuthMiddleware
                 http_response_code(403);
                 echo 'Acceso denegado: rol requerido ' . htmlspecialchars($role);
                 return false;
+            }
+            if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+                if (!CsrfMiddleware::checkAuthenticatedPost()) {
+                    return false;
+                }
             }
             return true;
         };
@@ -51,6 +61,11 @@ class AuthMiddleware
                 http_response_code(403);
                 echo 'Acceso denegado: roles permitidos ' . htmlspecialchars(implode(',', $roles));
                 return false;
+            }
+            if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+                if (!CsrfMiddleware::checkAuthenticatedPost()) {
+                    return false;
+                }
             }
             return true;
         };

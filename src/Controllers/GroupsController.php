@@ -28,7 +28,6 @@ class GroupsController
     {
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
-        $this->assertCsrf();
         $grupo_id = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
         $profesor_id = filter_input(INPUT_POST, 'profesor_id', FILTER_VALIDATE_INT);
         if (!$grupo_id) { $_SESSION['flash'] = 'Grupo inválido'; $_SESSION['flash_type'] = 'danger'; header('Location: /groups'); return; }
@@ -96,7 +95,6 @@ class GroupsController
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
-            $this->assertCsrf();
             $ok = $this->service->create($_POST);
             \App\Utils\Logger::info('group_create', [
                 'materia_id' => (int)($_POST['materia_id'] ?? 0),
@@ -116,7 +114,6 @@ class GroupsController
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
-            $this->assertCsrf();
             $id = (int)($_POST['id'] ?? 0);
             $ok = $this->service->update($id, $_POST);
             \App\Utils\Logger::info('group_update', ['id' => $id]);
@@ -132,7 +129,6 @@ class GroupsController
     {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
-            $this->assertCsrf();
             $id = (int)($_POST['id'] ?? 0);
             $ok = $this->service->delete($id);
             \App\Utils\Logger::info('group_delete', ['id' => $id]);
@@ -151,9 +147,6 @@ class GroupsController
         $gid = isset($_GET['grupo_id']) ? (int)$_GET['grupo_id'] : 0;
         header('Content-Type: application/json');
         if ($gid <= 0) { http_response_code(400); return json_encode(['success'=>false,'error'=>'Grupo inválido']); }
-        try {
-            $this->pdo->exec("CREATE TABLE IF NOT EXISTS horarios_grupo (id INT AUTO_INCREMENT PRIMARY KEY, grupo_id INT NOT NULL, dia VARCHAR(10) NOT NULL, hora_inicio TIME NOT NULL, hora_fin TIME NOT NULL, salon VARCHAR(50) DEFAULT NULL, INDEX idx_grupo (grupo_id), FOREIGN KEY (grupo_id) REFERENCES grupos(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        } catch (\Throwable $e) {}
         $stmt = $this->pdo->prepare('SELECT id, dia, hora_inicio, hora_fin, salon FROM horarios_grupo WHERE grupo_id = :g ORDER BY FIELD(dia, "Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"), hora_inicio');
         $stmt->execute([':g'=>$gid]);
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
@@ -164,16 +157,12 @@ class GroupsController
     {
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
-        $this->assertCsrf();
         $gid = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT);
         $dia = trim((string)($_POST['dia'] ?? ''));
         $hi = trim((string)($_POST['hora_inicio'] ?? ''));
         $hf = trim((string)($_POST['hora_fin'] ?? ''));
         $salon = trim((string)($_POST['salon'] ?? ''));
         if (!$gid || $dia === '' || $hi === '' || $hf === '') { http_response_code(400); echo 'Parámetros inválidos'; return; }
-        try {
-            $this->pdo->exec("CREATE TABLE IF NOT EXISTS horarios_grupo (id INT AUTO_INCREMENT PRIMARY KEY, grupo_id INT NOT NULL, dia VARCHAR(10) NOT NULL, hora_inicio TIME NOT NULL, hora_fin TIME NOT NULL, salon VARCHAR(50) DEFAULT NULL, INDEX idx_grupo (grupo_id), FOREIGN KEY (grupo_id) REFERENCES grupos(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        } catch (\Throwable $e) {}
         $stmt = $this->pdo->prepare('INSERT INTO horarios_grupo (grupo_id, dia, hora_inicio, hora_fin, salon) VALUES (:g,:d,:hi,:hf,:s)');
         $ok = $stmt->execute([':g'=>$gid, ':d'=>$dia, ':hi'=>$hi, ':hf'=>$hf, ':s'=>$salon !== '' ? $salon : null]);
         header('Content-Type: application/json');
@@ -184,7 +173,6 @@ class GroupsController
     {
         if (($_SESSION['role'] ?? '') !== 'admin') { http_response_code(403); echo 'No autorizado'; return; }
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo 'Método no permitido'; return; }
-        $this->assertCsrf();
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
         if (!$id) { http_response_code(400); echo 'ID inválido'; return; }
         $stmt = $this->pdo->prepare('DELETE FROM horarios_grupo WHERE id = :id');
@@ -193,12 +181,4 @@ class GroupsController
         echo json_encode(['success'=>$ok]);
     }
 
-    private function assertCsrf(): void
-    {
-        $token = $_POST['csrf_token'] ?? '';
-        if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
-            http_response_code(403);
-            exit('CSRF inválido');
-        }
-    }
 }

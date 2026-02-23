@@ -1,5 +1,8 @@
 RewriteEngine On
 
+RedirectMatch 403 ^/scripts/
+RedirectMatch 403 ^/migrations/
+
 # Si piden la raíz del proyecto, enviar a public/ (preserva querystring)
 RewriteRule ^$ public/ [QSA,L]
 

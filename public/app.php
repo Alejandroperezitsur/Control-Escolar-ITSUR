@@ -17,8 +17,6 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     });
 }
 
-// Inicializa sesión y configuración defensiva
-require_once __DIR__ . '/../app/init.php';
 // Reutiliza la conexión existente
 require_once __DIR__ . '/../config/db.php';
 

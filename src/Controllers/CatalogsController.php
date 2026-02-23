@@ -40,18 +40,8 @@ class CatalogsController
         $changed = false;
 
         try {
-            $chkM = $this->pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'materias' AND COLUMN_NAME = 'carrera_id'");
-            $chkM->execute();
-            if ((int)$chkM->fetchColumn() === 0) { $this->pdo->exec("ALTER TABLE materias ADD COLUMN carrera_id INT NULL"); }
-            $chkG = $this->pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'grupos' AND COLUMN_NAME = 'carrera_id'");
-            $chkG->execute();
-            if ((int)$chkG->fetchColumn() === 0) { $this->pdo->exec("ALTER TABLE grupos ADD COLUMN carrera_id INT NULL"); }
             $this->pdo->exec("UPDATE usuarios SET nombre = SUBSTRING_INDEX(email,'@',1) WHERE (nombre IS NULL OR nombre = '') AND email IS NOT NULL AND email <> ''");
             $this->pdo->exec("UPDATE alumnos SET nombre = SUBSTRING_INDEX(email,'@',1) WHERE (nombre IS NULL OR nombre = '') AND email IS NOT NULL AND email <> ''");
-        } catch (\Throwable $e) {}
-
-        try {
-            $this->pdo->exec("CREATE TABLE IF NOT EXISTS carreras (id INT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(120) NOT NULL, clave VARCHAR(20) NOT NULL UNIQUE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         } catch (\Throwable $e) {}
         $carSel = $this->pdo->prepare("SELECT id, nombre FROM carreras WHERE clave = :c");
         $carIns = $this->pdo->prepare("INSERT INTO carreras (nombre, clave) VALUES (:n,:c)");
@@ -236,13 +226,6 @@ class CatalogsController
                     $countCal->execute([':g'=>$gid]);
                     $existingCount = (int)($countCal->fetchColumn() ?: 0);
                     if ($existingCount < $seedGradesMin) {
-                        try {
-                            $chkCol = $this->pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'calificaciones' AND COLUMN_NAME = 'promedio'");
-                            $chkCol->execute();
-                            if ((int)$chkCol->fetchColumn() === 0) {
-                                $this->pdo->exec("ALTER TABLE calificaciones ADD COLUMN promedio DECIMAL(5,2) NULL AFTER final");
-                            }
-                        } catch (\Throwable $e) {}
                         $insC = $this->pdo->prepare('INSERT INTO calificaciones (alumno_id, grupo_id, parcial1, parcial2, final, promedio) VALUES (:a,:g,:p1,:p2,:f,:pr)');
                         $nToAdd = max($seedGradesMin, 1);
                         $i = 0;
