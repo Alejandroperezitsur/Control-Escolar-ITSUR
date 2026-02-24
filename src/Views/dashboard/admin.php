@@ -4,16 +4,16 @@ $containerFluid = true;
 ob_start();
 ?>
 <div class="container-fluid py-4">
-  <div class="d-flex justify-content-between align-items-center mb-4">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
     <div>
-      <h3 class="mb-1">Panel general</h3>
-      <p class="text-muted mb-0">Resumen ejecutivo del sistema y accesos rápidos</p>
+      <h3 class="mb-1">Resumen institucional</h3>
+      <p class="text-muted mb-0">Visión general de alumnos, profesores, materias y pendientes de evaluación.</p>
     </div>
   </div>
 
   <div class="row g-3 mb-4" id="admin-kpis">
     <div class="col-12 col-sm-6 col-xl-3">
-      <div class="card h-100">
+      <div class="card h-100 position-relative">
         <div class="card-body">
           <div class="d-flex align-items-center mb-2">
             <div class="flex-grow-1">
@@ -111,6 +111,9 @@ ob_start();
           <div class="text-muted small mt-2">
             Calificaciones sin final capturado en el sistema.
           </div>
+          <div class="mt-2">
+            <span id="kpi-alert" class="badge d-none">Riesgo bajo</span>
+          </div>
         </div>
       </div>
     </div>
@@ -174,6 +177,7 @@ ob_start();
     const promedioEl = document.getElementById('kpi-promedio');
     const gruposEl = document.getElementById('kpi-grupos');
     const pendEl = document.getElementById('kpi-pendientes');
+    const alertEl = document.getElementById('kpi-alert');
 
     function formatNumber(n) {
       return (typeof n === 'number' && !isNaN(n)) ? n.toLocaleString('es-MX') : '—';
@@ -193,7 +197,21 @@ ob_start();
         if (carrerasEl) carrerasEl.textContent = formatNumber(data.carreras ?? data.total_carreras);
         if (promedioEl) promedioEl.textContent = formatPromedio(data.promedio ?? data.promedio_general);
         if (gruposEl) gruposEl.textContent = formatNumber(data.grupos ?? data.grupos_activos);
-        if (pendEl) pendEl.textContent = formatNumber(data.pendientes_evaluacion ?? data.pendientes);
+        const pendValue = typeof data.pendientes_evaluacion !== 'undefined' ? data.pendientes_evaluacion : data.pendientes;
+        if (pendEl) pendEl.textContent = formatNumber(pendValue);
+        if (alertEl && typeof pendValue === 'number') {
+          alertEl.classList.remove('d-none','bg-success-subtle','text-success','bg-warning-subtle','text-warning','bg-danger-subtle','text-danger');
+          if (pendValue <= 0) {
+            alertEl.textContent = 'Sin pendientes relevantes';
+            alertEl.classList.add('bg-success-subtle','text-success');
+          } else if (pendValue < 50) {
+            alertEl.textContent = 'Riesgo moderado';
+            alertEl.classList.add('bg-warning-subtle','text-warning');
+          } else {
+            alertEl.textContent = 'Riesgo alto de pendientes';
+            alertEl.classList.add('bg-danger-subtle','text-danger');
+          }
+        }
       })
       .catch(function(){
         if (typeof window.showToast === 'function') {

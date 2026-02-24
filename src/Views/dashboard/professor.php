@@ -2,9 +2,14 @@
 $base = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
 ob_start();
 ?>
-<h2 class="mb-4">Dashboard Profesor</h2>
-<div class="row g-3 mb-3">
-  <div class="col-md-6">
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3">
+  <div>
+    <h2 class="mb-1">Mi actividad como profesor</h2>
+    <p class="text-muted mb-0">Revisa tus grupos, pendientes de evaluación y alumnos a tu cargo.</p>
+  </div>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-lg-4">
     <div class="card">
       <div class="card-body">
         <div class="d-flex align-items-center">
@@ -22,7 +27,7 @@ ob_start();
   <div class="col-md-6"></div>
 </div>
 <div class="row g-3">
-  <div class="col-md-4">
+  <div class="col-md-6 col-lg-4">
     <div class="card position-relative">
       <div class="card-body">
         <div class="d-flex align-items-center">
@@ -36,7 +41,7 @@ ob_start();
       </div>
     </div>
   </div>
-  <div class="col-md-4">
+  <div class="col-md-6 col-lg-4">
     <div class="card position-relative">
       <div class="card-body">
         <div class="d-flex align-items-center">
@@ -56,7 +61,7 @@ ob_start();
         <div class="d-flex align-items-center">
           <i class="fa-solid fa-clipboard-check fa-2x me-3 text-warning"></i>
           <div>
-            <div class="small">Evaluaciones Pendientes</div>
+            <div class="small">Evaluaciones pendientes</div>
             <div class="h5 mb-0" id="kpi-pendientes">—</div>
           </div>
         </div>
@@ -66,8 +71,15 @@ ob_start();
   </div>
 </div>
 
-<div class="mt-4">
-  <a class="btn btn-outline-primary" href="<?php echo $base; ?>/grades/bulk"><i class="fa-solid fa-file-import me-1"></i> Carga masiva de calificaciones (CSV)</a>
+<div class="mt-4 d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
+  <div>
+    <h5 class="mb-1">¿Qué tienes pendiente hoy?</h5>
+    <p class="text-muted small mb-0">Accede rápido a tus grupos y tareas de evaluación.</p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-outline-primary" href="<?php echo $base; ?>/profesor/pendientes"><i class="fa-solid fa-clock me-1"></i> Ver pendientes de evaluación</a>
+    <a class="btn btn-outline-secondary" href="<?php echo $base; ?>/grades/bulk"><i class="fa-solid fa-file-import me-1"></i> Carga masiva de calificaciones</a>
+  </div>
 </div>
 
 <script>
@@ -87,12 +99,18 @@ fetch('<?php echo $base; ?>/api/kpis/profesor').then(r=>r.json()).then(d=>{
 <div class="mt-4">
   <div class="card">
     <div class="card-body">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="card-title mb-0">Mis Grupos</h5>
-        <input type="text" id="grp-filter" class="form-control form-control-sm" style="max-width: 240px" placeholder="Filtrar por materia/grupo">
+      <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-2">
+        <div>
+          <h5 class="card-title mb-0">Mis grupos</h5>
+          <p class="text-muted small mb-0">Selecciona un grupo para capturar o revisar calificaciones.</p>
+        </div>
+        <div class="mt-2 mt-sm-0" style="max-width: 260px;">
+          <input type="text" id="grp-filter" class="form-control form-control-sm" placeholder="Buscar por materia o grupo">
+        </div>
       </div>
-      <div class="table-responsive">
-        <table class="table table-sm">
+      <div id="grp-list" class="d-md-none"></div>
+      <div class="table-responsive d-none d-md-block">
+        <table class="table table-sm align-middle">
           <thead><tr><th>Ciclo</th><th>Materia</th><th>Grupo</th><th class="text-end">Acciones</th></tr></thead>
           <tbody id="grp-tbody"></tbody>
         </table>
@@ -105,12 +123,14 @@ fetch('<?php echo $base; ?>/api/kpis/profesor').then(r=>r.json()).then(d=>{
 fetch('<?php echo $base; ?>/api/kpis/profesor').then(r=>r.json()).then(d=>{
   const rows = (d.grupos || []).filter(x => Number(x.alumnos || 0) > 0);
   const tbody = document.getElementById('grp-tbody');
+  const list = document.getElementById('grp-list');
   const formatAvg = v => (v !== null && v !== undefined && !isNaN(Number(v))) ? Number(v).toFixed(2) : '';
   const render = () => {
     const q = document.getElementById('grp-filter').value.toLowerCase();
     const filtered = rows.filter(x => (x.materia||'').toLowerCase().includes(q) || (x.grupo||'').toLowerCase().includes(q));
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No hay grupos con alumnos</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No hay grupos con alumnos.</td></tr>`;
+      if (list) list.innerHTML = `<div class="text-muted small">No hay grupos con alumnos.</div>`;
       return;
     }
     tbody.innerHTML = filtered
@@ -123,10 +143,34 @@ fetch('<?php echo $base; ?>/api/kpis/profesor').then(r=>r.json()).then(d=>{
           ${x.promedio ? `<span class="badge bg-info ms-1">${formatAvg(x.promedio)}</span>` : ''}
         </td>
         <td class="text-end">
-          <a class="btn btn-outline-success btn-sm" href="<?php echo $base; ?>/grades"><i class="fa-solid fa-pen"></i> Calificar</a>
+          <a class="btn btn-outline-success btn-sm" href="<?php echo $base; ?>/grades?grupo_id=${x.id}"><i class="fa-solid fa-pen"></i> Calificar</a>
           <a class="btn btn-outline-primary btn-sm ms-1" href="<?php echo $base; ?>/grades/group?grupo_id=${x.id}"><i class="fa-solid fa-table"></i> Ver calificaciones</a>
         </td>
       </tr>`).join('');
+    if (list) {
+      list.innerHTML = filtered
+        .map(x => `
+          <div class="card mb-2">
+            <div class="card-body py-2">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <div class="small text-muted">${x.ciclo ?? ''}</div>
+                  <div class="fw-semibold">${x.materia ?? ''}</div>
+                  <div class="text-muted small">${x.grupo ?? ''}</div>
+                </div>
+                <div class="text-end">
+                  <div class="badge bg-secondary mb-1">${Number(x.alumnos||0)} alumnos</div>
+                  ${x.promedio ? `<div class="badge bg-info">Promedio ${formatAvg(x.promedio)}</div>` : ''}
+                </div>
+              </div>
+              <div class="mt-2 d-flex justify-content-end gap-2">
+                <a class="btn btn-sm btn-outline-success" href="<?php echo $base; ?>/grades?grupo_id=${x.id}"><i class="fa-solid fa-pen"></i> Calificar</a>
+                <a class="btn btn-sm btn-outline-primary" href="<?php echo $base; ?>/grades/group?grupo_id=${x.id}"><i class="fa-solid fa-table"></i> Ver</a>
+              </div>
+            </div>
+          </div>
+        `).join('');
+    }
   };
   render();
   document.getElementById('grp-filter').addEventListener('input', render);

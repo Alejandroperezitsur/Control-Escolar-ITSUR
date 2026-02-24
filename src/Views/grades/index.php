@@ -100,9 +100,6 @@ var IS_DIRTY = false;
   const LS_P = 'grades_only_pending';
   const getDraftKey = (gid, aid) => 'grades_draft_' + String(gid||'') + '_' + String(aid||'');
   
-  console.log('Iniciando carga de catálogos...');
-  console.log('Session info - Role:', '<?php echo $_SESSION['role'] ?? 'N/A'; ?>', 'User ID:', '<?php echo $_SESSION['user_id'] ?? 'N/A'; ?>');
-  
   try {
     grupoSel.innerHTML = '<option value="">Cargando grupos...</option>';
     alumnoSel.innerHTML = '<option value="">Selecciona el grupo para ver alumnos...</option>';

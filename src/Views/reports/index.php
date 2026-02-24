@@ -9,9 +9,14 @@ ob_start();
 ?>
 <div class="container py-4">
   <?php $isPublic = (substr($base, -7) === '/public'); $goDashboard = $base . ($isPublic ? '/app.php?r=/dashboard' : '/dashboard'); ?>
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3>Reportes Avanzados</h3>
-    <a href="<?php echo $goDashboard; ?>" class="btn btn-outline-secondary">Volver</a>
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-2">
+    <div>
+      <h3 class="mb-1">Centro de análisis académico</h3>
+      <p class="text-muted mb-0">Explora promedios, reprobación y riesgo académico por ciclo, grupo y materia.</p>
+    </div>
+    <div class="mt-2 mt-md-0">
+      <a href="<?php echo $goDashboard; ?>" class="btn btn-outline-secondary">Volver al panel</a>
+    </div>
   </div>
 
   <div class="d-sm-none mb-3">
@@ -23,10 +28,10 @@ ob_start();
   <div id="filtersCollapse" class="collapse show">
     <div class="card mb-4">
       <div class="card-body">
-        <form method="get" action="<?php echo $base; ?>/reports" class="row g-2" id="filtersForm">
+        <form method="get" action="<?php echo $base; ?>/reports" class="row g-3" id="filtersForm">
           <div class="col-md-3">
             <label class="form-label">Ciclo</label>
-            <small class="text-muted d-block">Formato típico: 2024A, 2024B</small>
+            <small class="text-muted d-block">Selecciona el ciclo que quieres analizar.</small>
             <select class="form-select" name="ciclo" id="sel-ciclo" aria-label="Seleccionar ciclo" title="Selecciona el ciclo académico">
               <option value="">Todos</option>
               <?php if (!empty($cyclesList)) { foreach ($cyclesList as $c) { echo '<option value="'.htmlspecialchars($c).'">'.htmlspecialchars($c).'</option>'; } } ?>
@@ -34,42 +39,54 @@ ob_start();
           </div>
           <div class="col-md-3">
             <label class="form-label">Grupo</label>
-            <small class="text-muted d-block">Depende del ciclo y profesor</small>
+            <small class="text-muted d-block">Filtra por grupo específico (opcional).</small>
             <select class="form-select" name="grupo_id" id="sel-grupo" aria-label="Seleccionar grupo" title="Lista filtrada por ciclo y profesor">
               <option value="">Todos</option>
               <?php if (!empty($groupsList)) { foreach ($groupsList as $g) { echo '<option value="'.(int)$g['id'].'">'.htmlspecialchars($g['ciclo']).' — '.htmlspecialchars($g['materia']).' / '.htmlspecialchars($g['nombre']).'</option>'; } } ?>
             </select>
           </div>
-          <?php if ($role === 'admin'): ?>
           <div class="col-md-3">
-            <label class="form-label">Profesor</label>
-            <small class="text-muted d-block">Solo para administrador</small>
-            <select class="form-select" name="profesor_id" id="sel-prof" aria-label="Seleccionar profesor" title="Filtrar por profesor">
-              <option value="">Todos</option>
-              <?php if (!empty($profsList)) { foreach ($profsList as $p) { $label = ($p['email'] ?? '') ? ($p['nombre'].' ('.$p['email'].')') : $p['nombre']; echo '<option value="'.(int)$p['id'].'">'.htmlspecialchars($label).'</option>'; } } ?>
-            </select>
-          </div>
-          <?php endif; ?>
-          <div class="col-md-3">
-            <label class="form-label">Materia</label>
-            <small class="text-muted d-block">Materia asociada al grupo</small>
-            <select class="form-select" name="materia_id" id="sel-materia" aria-label="Seleccionar materia" title="Filtrar por materia">
-              <option value="">Todas</option>
-            </select>
+            <label class="form-label">Vista rápida</label>
+            <small class="text-muted d-block">Aplicar filtros y refrescar indicadores.</small>
+            <div class="d-grid gap-2">
+              <button class="btn btn-primary" type="submit" aria-label="Aplicar filtros"><i class="fa-solid fa-filter me-1"></i> Aplicar filtros</button>
+              <button class="btn btn-outline-secondary" type="button" id="btn-reset" aria-label="Limpiar filtros"><i class="fa-solid fa-rotate-left me-1"></i> Limpiar filtros</button>
+            </div>
           </div>
           <div class="col-md-3">
-            <label class="form-label">Estado</label>
-            <small class="text-muted d-block">Con final o pendientes de final</small>
-            <select class="form-select" name="estado" id="sel-estado" aria-label="Seleccionar estado" title="Con final: usa calificación final; Pendientes: usa promedio de parciales">
-              <option value="">Todos</option>
-              <option value="con_final">Con final</option>
-              <option value="pendientes">Pendientes</option>
-            </select>
-          </div>
-          <div class="col-md-3 align-self-end d-grid gap-2">
-            <button class="btn btn-primary" type="submit" aria-label="Aplicar filtros"><i class="fa-solid fa-filter me-1"></i> Aplicar filtros</button>
-            <button class="btn btn-outline-secondary" type="button" id="btn-reset" aria-label="Limpiar filtros"><i class="fa-solid fa-rotate-left me-1"></i> Limpiar filtros</button>
-            <button class="btn btn-outline-info" type="button" id="btn-copy-link" aria-label="Copiar enlace con filtros"><i class="fa-solid fa-link me-1"></i> Copiar enlace</button>
+            <label class="form-label d-flex justify-content-between align-items-center">
+              <span>Opciones avanzadas</span>
+              <button class="btn btn-link btn-sm p-0" type="button" data-bs-toggle="collapse" data-bs-target="#advancedFilters" aria-expanded="false" aria-controls="advancedFilters">
+                Ajustar detalle
+              </button>
+            </label>
+            <small class="text-muted d-block mb-2">Refina por materia, profesor, estado y riesgo.</small>
+            <div id="advancedFilters" class="collapse">
+              <div class="mb-2">
+                <label class="form-label small mb-1">Materia</label>
+                <select class="form-select form-select-sm" name="materia_id" id="sel-materia" aria-label="Seleccionar materia" title="Filtrar por materia">
+                  <option value="">Todas</option>
+                </select>
+              </div>
+              <?php if ($role === 'admin'): ?>
+              <div class="mb-2">
+                <label class="form-label small mb-1">Profesor</label>
+                <select class="form-select form-select-sm" name="profesor_id" id="sel-prof" aria-label="Seleccionar profesor" title="Filtrar por profesor">
+                  <option value="">Todos</option>
+                  <?php if (!empty($profsList)) { foreach ($profsList as $p) { $label = ($p['email'] ?? '') ? ($p['nombre'].' ('.$p['email'].')') : $p['nombre']; echo '<option value="'.(int)$p['id'].'">'.htmlspecialchars($label).'</option>'; } } ?>
+                </select>
+              </div>
+              <?php endif; ?>
+              <div class="mb-2">
+                <label class="form-label small mb-1">Estado</label>
+                <select class="form-select form-select-sm" name="estado" id="sel-estado" aria-label="Seleccionar estado" title="Con final: usa calificación final; Pendientes: usa promedio de parciales">
+                  <option value="">Todos</option>
+                  <option value="con_final">Con final</option>
+                  <option value="pendientes">Pendientes</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-outline-info btn-sm mt-2 w-100" type="button" id="btn-copy-link" aria-label="Copiar enlace con filtros"><i class="fa-solid fa-link me-1"></i> Copiar enlace con filtros</button>
           </div>
         </form>
       </div>
@@ -137,12 +154,13 @@ ob_start();
 
   <div class="row g-3">
     <div class="col-md-4">
-      <div class="card h-100">
+          <div class="card h-100">
         <div class="card-body">
           <h5 class="card-title d-flex align-items-center justify-content-between">
             <span id="summaryTitle">Resumen</span>
             <a id="btn-view-group" href="#" class="btn btn-sm btn-outline-primary" style="display:none" aria-label="Ver calificaciones del grupo"><i class="fa-solid fa-table me-1"></i> Ver grupo</a>
           </h5>
+          <p class="text-muted small mb-2">Este resumen muestra el desempeño general según los filtros seleccionados.</p>
           <div id="summaryBox" class="text-muted">Cargando…</div>
         </div>
       </div>
@@ -150,15 +168,17 @@ ob_start();
     <div class="col-md-8">
       <div class="card h-100">
         <div class="card-body">
-          <h5 class="card-title"><span id="chartStatsTitle">Estadísticas</span></h5>
+          <h5 class="card-title mb-1"><span id="chartStatsTitle">Estadísticas</span></h5>
+          <p class="text-muted small mb-2" id="chartStatsDescription">Cada barra representa el promedio del grupo o ciclo según los filtros actuales.</p>
           <canvas id="chartStats" height="160" aria-label="Gráfica de estadísticas"></canvas>
           <div id="chartStatsLoading" class="text-muted small mt-2" style="display:none">Cargando...</div>
-          <div id="chartStatsEmpty" class="text-muted small mt-2" style="display:none">Sin datos</div>
+          <div id="chartStatsEmpty" class="text-muted small mt-2" style="display:none">No hay datos para los filtros actuales. Prueba ajustar ciclo o grupo.</div>
           <hr>
-          <h6 class="mt-3" id="chartFailTitle">Reprobados por Materia (%)</h6>
+          <h6 class="mt-3 mb-1" id="chartFailTitle">Reprobados por Materia (%)</h6>
+          <p class="text-muted small mb-2" id="chartFailDescription">Cada barra muestra el porcentaje de alumnos reprobados o pendientes por materia.</p>
           <canvas id="chartFail" height="140" aria-label="Gráfica de reprobados o pendientes"></canvas>
           <div id="chartFailLoading" class="text-muted small mt-2" style="display:none">Cargando...</div>
-          <div id="chartFailEmpty" class="text-muted small mt-2" style="display:none">Sin datos</div>
+          <div id="chartFailEmpty" class="text-muted small mt-2" style="display:none">No hay datos para los filtros actuales. Prueba ajustar ciclo o grupo.</div>
           <hr>
           <div class="d-flex justify-content-end mb-2">
             <button class="btn btn-sm btn-outline-primary" type="button" id="btn-export-tops" aria-label="Exportar Tops a CSV"><i class="fa-solid fa-file-csv me-1"></i> Exportar Tops (CSV)</button>
@@ -388,7 +408,7 @@ function updateSummary() {
   fetch(resumenUrl).then(safeJson).then(j => {
     const box = document.getElementById('summaryBox');
     if (!box) return;
-    if (!j.ok) { box.textContent = j.message || 'Sin datos'; return; }
+    if (!j.ok) { box.textContent = j.message || 'No hay datos para los filtros actuales. Prueba cambiar el ciclo o grupo.'; return; }
     const prom = Number(j.data.promedio ?? 0);
     const promCls = isNaN(prom) ? 'text-muted' : (prom >= 70 ? 'text-success' : 'text-danger');
     box.innerHTML = `
@@ -405,7 +425,7 @@ function updateSummary() {
     </div>`;
   }).catch(() => {
     const box = document.getElementById('summaryBox');
-    if (box) box.textContent = 'Sin datos';
+    if (box) box.textContent = 'No hay datos para los filtros actuales. Prueba cambiar el ciclo o grupo.';
   });
 }
 
