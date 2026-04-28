@@ -1,45 +1,54 @@
 ```
+# Directories
+Control-Escolar-ITSUR/
+
 # Dependencies
-vendor/
-
-# Logs
-*.log
-
-# Environment
+node_modules/
+__pycache__/
+*.egg-info/
+.venv/
+venv/
 .env
 .env.local
 .env.*
 
-# Backup and temporary files
-*.bak
+# Build artifacts
+dist/
+build/
+target/
+*.pyc
+*.class
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
+
+# Logs and temporary files
+*.log
 *.tmp
-*~
+*.swp
+*.swo
 
 # OS generated files
 .DS_Store
 Thumbs.db
 
-# PHP specific
-*.php~
-.php_cs.cache
-
-# Test and coverage
-.coverage
+# Coverage reports
 coverage/
 htmlcov/
+.coverage
 
-# Build and distribution
-dist/
-build/
-*.phar
-
-# Editor/IDE
+# IDE specific
 .vscode/
 .idea/
-*.swp
-*.swo
+.mypy_cache/
+.pytest_cache/
+.gradle/
 
-# Compression archives
+# Compressed files
 *.zip
 *.gz
 *.tar
@@ -58,8 +67,4 @@ build/
 *.Z
 *.lz
 *.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
 ```
