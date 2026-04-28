@@ -1,45 +1,49 @@
-```
 # Dependencies
-vendor/
-
-# Logs
-*.log
-
-# Environment
-.env
-.env.local
-.env.*
-
-# Backup and temporary files
-*.bak
-*.tmp
-*~
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# PHP specific
-*.php~
-.php_cs.cache
-
-# Test and coverage
-.coverage
-coverage/
-htmlcov/
-
-# Build and distribution
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
 dist/
 build/
-*.phar
+target/
+.gradle/
 
-# Editor/IDE
+# Compiled files
+*.pyc
+*.class
+*.o
+*.exe
+*.dll
+*.so
+*.a
+*.obj
+*.out
+
+# Editors/IDEs
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Compression archives
+# System files
+.DS_Store
+Thumbs.db
+.env
+.env.local
+*.env.*
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Compressed files
 *.zip
 *.gz
 *.tar
@@ -62,4 +66,3 @@ build/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```
