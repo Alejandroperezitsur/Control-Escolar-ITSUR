@@ -1,52 +1,47 @@
-```
-# Directories
-Control-Escolar-ITSUR/
-
 # Dependencies
 node_modules/
-__pycache__/
-*.egg-info/
-.venv/
 venv/
-.env
-.env.local
-.env.*
-
-# Build artifacts
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
 dist/
 build/
 target/
+.gradle/
+
+# Compiled files
 *.pyc
 *.class
 *.o
-*.obj
 *.exe
 *.dll
 *.so
 *.a
+*.obj
 *.out
 
-# Logs and temporary files
-*.log
-*.tmp
+# Editors/IDEs
+.vscode/
+.idea/
 *.swp
 *.swo
 
-# OS generated files
+# System files
 .DS_Store
 Thumbs.db
+.env
+.env.local
+*.env.*
 
-# Coverage reports
+# Logs and temp files
+*.log
+*.tmp
+
+# Coverage
 coverage/
 htmlcov/
 .coverage
-
-# IDE specific
-.vscode/
-.idea/
-.mypy_cache/
-.pytest_cache/
-.gradle/
 
 # Compressed files
 *.zip
@@ -67,4 +62,7 @@ htmlcov/
 *.Z
 *.lz
 *.lzo
-```
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
