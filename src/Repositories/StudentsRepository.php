@@ -132,13 +132,35 @@ class StudentsRepository
 
     public function delete(int $id): bool
     {
-        $stmt = $this->pdo->prepare("DELETE FROM alumnos WHERE id = :id");
+        // DEPRECATED: Usar softDelete en su lugar
+        error_log("WARNING: StudentsRepository::delete() llamado para ID $id. Usar softDelete().");
+        return $this->softDelete($id);
+    }
+
+    public function softDelete(int $id): bool
+    {
+        $stmt = $this->pdo->prepare("UPDATE alumnos SET activo = 0, deleted_at = NOW() WHERE id = :id");
         return $stmt->execute([':id' => $id]);
+    }
+
+    public function hasAcademicRecord(int $id): bool
+    {
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM calificaciones c JOIN grupos g ON g.id = c.grupo_id WHERE c.alumno_id = :aid AND g.deleted_at IS NULL");
+        $stmt->execute([':aid' => $id]);
+        return (int)$stmt->fetchColumn() > 0;
+    }
+
+    public function findByMatricula(string $matricula): ?array
+    {
+        $stmt = $this->pdo->prepare("SELECT id, matricula, nombre, apellido, email, activo, deleted_at FROM alumnos WHERE matricula = :mat LIMIT 1");
+        $stmt->execute([':mat' => $matricula]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
     }
 
     public function getSimpleById(int $id): ?array
     {
-        $stmt = $this->pdo->prepare("SELECT id, matricula, nombre, apellido, email, activo FROM alumnos WHERE id = :id");
+        $stmt = $this->pdo->prepare("SELECT id, matricula, nombre, apellido, email, activo, deleted_at FROM alumnos WHERE id = :id AND deleted_at IS NULL");
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row !== false ? $row : null;

@@ -163,12 +163,17 @@ class GradesController
 
         $alumnoId = filter_input(INPUT_POST, 'alumno_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $grupoId = filter_input(INPUT_POST, 'grupo_id', FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        
+        // MASS ASSIGNMENT PROTECTION: Solo aceptar campos específicos
         $p1Raw = Request::postString('parcial1', '') ?? '';
         $p2Raw = Request::postString('parcial2', '') ?? '';
         $finRaw = Request::postString('final', '') ?? '';
+        
+        // Validación estricta de rangos
         $p1 = $p1Raw !== '' ? filter_var($p1Raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
         $p2 = $p2Raw !== '' ? filter_var($p2Raw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
         $fin = $finRaw !== '' ? filter_var($finRaw, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0, 'max_range' => 100]]) : null;
+        
         if (($p1Raw !== '' && $p1 === false) || ($p2Raw !== '' && $p2 === false) || ($finRaw !== '' && $fin === false)) {
             http_response_code(400);
             $_SESSION['flash'] = 'Las calificaciones deben estar entre 0 y 100';
@@ -183,6 +188,19 @@ class GradesController
             $_SESSION['flash_type'] = 'danger';
             header('Location: /grades');
             return '';
+        }
+
+        // IDOR PROTECTION: Verificar propiedad del recurso
+        if ($role === 'profesor') {
+            $currentUserId = (int)($_SESSION['user_id'] ?? 0);
+            $grpRow = $this->gradesRepository->getGroupById($grupoId);
+            if (!$grpRow || (int)$grpRow['profesor_id'] !== $currentUserId) {
+                http_response_code(403);
+                $_SESSION['flash'] = 'No autorizado para modificar calificaciones de este grupo';
+                $_SESSION['flash_type'] = 'danger';
+                header('Location: /grades');
+                return '';
+            }
         }
 
         if (!$this->gradesRepository->isActiveStudent($alumnoId)) {
@@ -201,8 +219,21 @@ class GradesController
             header('Location: /grades');
             return '';
         }
+        
+        // PERIOD BLOCKING: Verificar si el periodo está cerrado para calificaciones
         try {
-            (new AcademicService($this->pdo))->assertActiveCycleForGroup($grupoId);
+            $academicSvc = new AcademicService($this->pdo);
+            $academicSvc->assertActiveCycleForGroup($grupoId);
+            
+            // Verificación adicional de bloqueo
+            $cycleBlocked = $this->gradesRepository->isCycleBlockedForGrades($grupoId);
+            if ($cycleBlocked && $role !== 'admin') {
+                http_response_code(403);
+                $_SESSION['flash'] = 'El periodo está cerrado. No se pueden modificar calificaciones.';
+                $_SESSION['flash_type'] = 'danger';
+                header('Location: /grades');
+                return '';
+            }
         } catch (\Throwable $e) {
             http_response_code(409);
             $_SESSION['flash'] = 'No se pueden capturar calificaciones porque el ciclo no está activo para este grupo';
@@ -210,6 +241,8 @@ class GradesController
             header('Location: /grades');
             return '';
         }
+        
+        // Si es profesor, verificar que es SU grupo (doble verificación)
         if ($role === 'profesor') {
             $pid = (int)($_SESSION['user_id'] ?? 0);
             if ((int)$grpRow['profesor_id'] !== $pid) {
@@ -222,10 +255,23 @@ class GradesController
         }
 
         $existing = $this->gradesRepository->getGradeByAlumnoGrupo($alumnoId, $grupoId);
-        $prom = ($fin !== null) ? (float)$fin : (($p1 !== null && $p2 !== null) ? round(($p1 + $p2) / 2, 2) : null);
+        
+        // CÁLCULO CORRECTO DE PROMEDIO: Final tiene prioridad, si no, promedio de parciales existentes
+        $prom = null;
+        if ($fin !== null) {
+            $prom = (float)$fin;
+        } elseif ($p1 !== null || $p2 !== null) {
+            $parcialesValidos = array_filter([$p1, $p2], fn($v) => $v !== null);
+            if (!empty($parcialesValidos)) {
+                $prom = round(array_sum($parcialesValidos) / count($parcialesValidos), 2);
+            }
+        }
+        
         $message = 'Calificación registrada correctamente';
         $oldData = null;
         $existingId = null;
+        $motivo = Request::postString('motivo_cambio', '') ?? '';
+        
         if ($existing) {
             $existingId = (int)$existing['id'];
             $oldData = [
@@ -235,35 +281,43 @@ class GradesController
                 'promedio' => $existing['promedio'],
             ];
         }
+        
         try {
             $this->pdo->exec('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
             $this->pdo->beginTransaction();
+            
             if ($existing && $existingId !== null) {
                 $prevP1 = ($existing['parcial1'] !== null ? (int)$existing['parcial1'] : null);
                 $prevP2 = ($existing['parcial2'] !== null ? (int)$existing['parcial2'] : null);
                 $prevFin = ($existing['final'] !== null ? (int)$existing['final'] : null);
                 $prevProm = ($existing['promedio'] !== null ? (float)$existing['promedio'] : null);
                 $noChange = ($prevP1 === $p1) && ($prevP2 === $p2) && ($prevFin === $fin) && ($prevProm === $prom);
+                
                 if ($noChange) {
                     $message = 'Sin cambios';
                 } else {
+                    // AUDITORÍA OBLIGATORIA para cambios
                     $this->gradesRepository->updateGradeById($existingId, $p1, $p2, $fin, $prom);
+                    
                     $newData = [
                         'parcial1' => $p1,
                         'parcial2' => $p2,
                         'final' => $fin,
                         'promedio' => $prom,
                     ];
-                    $aud = $this->pdo->prepare('INSERT INTO auditoria_academica (usuario_id, accion, entidad, entidad_id, datos_anteriores, datos_nuevos, ip) VALUES (:uid,:acc,:ent,:eid,:old,:new,:ip)');
+                    
+                    $aud = $this->pdo->prepare('INSERT INTO auditoria_academica (usuario_id, accion, tabla_afectada, registro_id, valores_anteriores, valores_nuevos, motivo, ip_address) VALUES (:uid,:acc,:tab,:rid,:old,:new,:mot,:ip)');
                     $audOk = $aud->execute([
                         ':uid' => (int)($_SESSION['user_id'] ?? 0) ?: null,
-                        ':acc' => 'update_grade',
-                        ':ent' => 'calificacion',
-                        ':eid' => $existingId,
-                        ':old' => $oldData !== null ? json_encode($oldData) : null,
+                        ':acc' => 'UPDATE_CALIFICACION',
+                        ':tab' => 'calificaciones',
+                        ':rid' => $existingId,
+                        ':old' => $oldData !== null ? json_encode($oldData) : 'null',
                         ':new' => json_encode($newData),
+                        ':mot' => $motivo ?: ($role === 'admin' ? 'Corrección administrativa' : 'Captura docente'),
                         ':ip' => (string)($_SERVER['REMOTE_ADDR'] ?? ''),
                     ]);
+                    
                     if (!$audOk) {
                         $this->pdo->rollBack();
                         http_response_code(500);
@@ -272,6 +326,13 @@ class GradesController
                         header('Location: /grades');
                         return '';
                     }
+                    
+                    \App\Utils\Logger::info('grade_updated_with_audit', [
+                        'calificacion_id' => $existingId,
+                        'usuario_id' => $_SESSION['user_id'] ?? null,
+                        'motivo' => $motivo
+                    ]);
+                    
                     $message = 'Calificación actualizada correctamente';
                 }
             } else {
