@@ -113,10 +113,25 @@ class StudentsController
     public function store(): void
     {
         $this->checkAdmin();
-        $data = Request::postAll();
+        
+        // MASS ASSIGNMENT PROTECTION: Whitelist estricta
+        $allowedFields = ['matricula', 'nombre', 'apellido', 'email', 'telefono', 'fecha_nacimiento', 'direccion', 'curp'];
+        $data = [];
+        foreach ($allowedFields as $field) {
+            if (isset($_POST[$field])) {
+                $data[$field] = is_string($_POST[$field]) ? trim($_POST[$field]) : $_POST[$field];
+            }
+        }
 
-        if (empty($data['matricula'] ?? null) || empty($data['nombre'] ?? null) || empty($data['apellido'] ?? null)) {
+        if (empty($data['matricula']) || empty($data['nombre']) || empty($data['apellido'])) {
             $this->jsonResponse(['error' => 'Campos obligatorios faltantes'], 400);
+            return;
+        }
+
+        // Verificar duplicidad de matrícula
+        $existing = $this->studentsRepository->findByMatricula($data['matricula']);
+        if ($existing) {
+            $this->jsonResponse(['error' => 'La matrícula ya existe'], 409);
             return;
         }
 
@@ -126,7 +141,8 @@ class StudentsController
             return;
         }
 
-        $this->jsonResponse(['success' => true, 'message' => 'Alumno creado correctamente']);
+        Logger::info('student_created', ['student_id' => $result['id'], 'matricula' => $data['matricula']]);
+        $this->jsonResponse(['success' => true, 'message' => 'Alumno creado correctamente', 'id' => $result['id']]);
     }
 
     public function update(): void
@@ -138,7 +154,30 @@ class StudentsController
             return;
         }
 
-        $data = Request::postAll();
+        // MASS ASSIGNMENT PROTECTION: Whitelist estricta
+        $allowedFields = ['matricula', 'nombre', 'apellido', 'email', 'telefono', 'fecha_nacimiento', 'direccion', 'curp', 'activo'];
+        $data = [];
+        foreach ($allowedFields as $field) {
+            if (isset($_POST[$field])) {
+                $data[$field] = is_string($_POST[$field]) ? trim($_POST[$field]) : $_POST[$field];
+            }
+        }
+
+        // Verificar que el alumno existe y no está eliminado
+        $existing = $this->studentsRepository->findById($id);
+        if (!$existing) {
+            $this->jsonResponse(['error' => 'Alumno no encontrado'], 404);
+            return;
+        }
+
+        // Verificar duplicidad de matrícula (solo si cambió)
+        if (isset($data['matricula']) && $data['matricula'] !== $existing['matricula']) {
+            $duplicate = $this->studentsRepository->findByMatricula($data['matricula']);
+            if ($duplicate && $duplicate['id'] !== $id) {
+                $this->jsonResponse(['error' => 'La matrícula ya existe para otro alumno'], 409);
+                return;
+            }
+        }
 
         $result = $this->studentsRepository->update($id, $data);
         if (!$result['ok']) {
@@ -146,6 +185,7 @@ class StudentsController
             return;
         }
 
+        Logger::info('student_updated', ['student_id' => $id, 'changes' => array_keys($data)]);
         $this->jsonResponse(['success' => true, 'message' => 'Alumno actualizado correctamente']);
     }
 
@@ -157,12 +197,35 @@ class StudentsController
             $this->jsonResponse(['error' => 'ID inválido'], 400);
             return;
         }
-        $deleted = $this->studentsRepository->delete($id);
-        if ($deleted) {
-            $this->jsonResponse(['success' => true, 'message' => 'Alumno eliminado correctamente']);
+
+        // SOFT DELETE: Verificar integridad antes de "eliminar"
+        $student = $this->studentsRepository->findById($id);
+        if (!$student) {
+            $this->jsonResponse(['error' => 'Alumno no encontrado'], 404);
             return;
         }
-        $this->jsonResponse(['error' => 'Error al eliminar alumno'], 500);
+
+        // Verificar si tiene calificaciones registradas
+        $hasGrades = $this->studentsRepository->hasAcademicRecord($id);
+        if ($hasGrades) {
+            // NO eliminar físicamente - solo soft delete
+            Logger::warning('student_delete_attempt_with_records', ['student_id' => $id]);
+            $this->jsonResponse([
+                'error' => 'No se puede eliminar un alumno con historial académico. Use soft-delete (desactivar).',
+                'has_academic_record' => true
+            ], 409);
+            return;
+        }
+
+        // Soft delete: marcar como inactivo y establecer deleted_at
+        $deleted = $this->studentsRepository->softDelete($id);
+        if ($deleted) {
+            Logger::info('student_soft_deleted', ['student_id' => $id]);
+            $this->jsonResponse(['success' => true, 'message' => 'Alumno desactivado correctamente (soft-delete)']);
+            return;
+        }
+        
+        $this->jsonResponse(['error' => 'Error al desactivar alumno'], 500);
     }
 
     public function get(): void

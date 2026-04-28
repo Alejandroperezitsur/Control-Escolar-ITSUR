@@ -201,4 +201,19 @@ class GradesRepository
         $row = $q->fetch(PDO::FETCH_ASSOC);
         return $row !== false ? $row : null;
     }
+
+    /**
+     * Verifica si el ciclo del grupo tiene bloqueadas las calificaciones
+     */
+    public function isCycleBlockedForGrades(int $grupoId): bool
+    {
+        $sql = "SELECT ce.calificaciones_bloqueadas 
+                FROM grupos g 
+                JOIN ciclos_escolares ce ON g.ciclo_id = ce.id 
+                WHERE g.id = :gid LIMIT 1";
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute([':gid' => $grupoId]);
+        $result = $stmt->fetchColumn();
+        return (bool)$result;
+    }
 }
